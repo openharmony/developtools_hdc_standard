@@ -1,0 +1,128 @@
+# Copyright (C) 2021 Huawei Device Co., Ltd.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+import("//build/ohos.gni")
+HDC_PATH = "//developtools/hdc_standard"
+
+hdc_common_sources = [
+  "${HDC_PATH}/src/common/async_cmd.cpp",
+  "${HDC_PATH}/src/common/auth.cpp",
+  "${HDC_PATH}/src/common/base.cpp",
+  "${HDC_PATH}/src/common/channel.cpp",
+  "${HDC_PATH}/src/common/debug.cpp",
+  "${HDC_PATH}/src/common/file.cpp",
+  "${HDC_PATH}/src/common/file_descriptor.cpp",
+  "${HDC_PATH}/src/common/forward.cpp",
+  "${HDC_PATH}/src/common/session.cpp",
+  "${HDC_PATH}/src/common/task.cpp",
+  "${HDC_PATH}/src/common/tcp.cpp",
+  "${HDC_PATH}/src/common/transfer.cpp",
+  "${HDC_PATH}/src/common/usb.cpp",
+]
+
+config("hdc_config") {
+  include_dirs = [ "${HDC_PATH}/src/common" ]
+  cflags_cc = [ "-std=c++17" ]
+}
+
+ohos_executable("hdcd") {
+  sources = [
+    "src/daemon/daemon.cpp",
+    "src/daemon/daemon_app.cpp",
+    "src/daemon/daemon_forward.cpp",
+    "src/daemon/daemon_tcp.cpp",
+    "src/daemon/daemon_unity.cpp",
+    "src/daemon/daemon_usb.cpp",
+    "src/daemon/jdwp.cpp",
+    "src/daemon/main.cpp",
+    "src/daemon/shell.cpp",
+  ]
+  sources += hdc_common_sources
+
+  defines = [
+    "HDC_DEBUG",
+    "HARMONY_PROJECT",
+  ]
+
+  configs = [ ":hdc_config" ]
+
+  deps = [
+    "//third_party/libuv:uv_static",
+    "//third_party/lz4:liblz4_static",
+    "//third_party/openssl:crypto_source",
+    "//utils/native/base:utils",
+  ]
+
+  include_dirs = [
+    "${HDC_PATH}/daemon",
+    "//utils/native/base/include",
+    "//third_party/lz4/lib",
+    "//third_party/openssl/include",
+    "//third_party/libuv",
+  ]
+  install_enable = true
+  subsystem_name = "developtools"
+  part_name = "hdc_standard"
+}
+
+ohos_executable("hdc_std") {
+  configs = [ ":hdc_config" ]
+  defines = [
+    "HDC_HOST",
+    "HARMONY_PROJECT",
+  ]
+  cflags_cc = [
+    "-Wno-error",
+    "-Wno-error=unused-variable",
+    "-Wno-unused-variable",
+  ]
+  sources = [
+    "src/host/client.cpp",
+    "src/host/host_app.cpp",
+    "src/host/host_forward.cpp",
+    "src/host/host_tcp.cpp",
+    "src/host/host_unity.cpp",
+    "src/host/host_usb.cpp",
+    "src/host/main.cpp",
+    "src/host/server.cpp",
+    "src/host/server_for_client.cpp",
+    "src/host/translate.cpp",
+  ]
+  sources += hdc_common_sources
+
+  deps = [
+    "//third_party/libuv:uv_static",
+    "//third_party/lz4:liblz4_static",
+  ]
+  deps += [
+    "//third_party/openssl:crypto_source",
+    "//utils/native/base:utilsecurec",
+  ]
+
+  include_dirs = [
+    "${HDC_PATH}/daemon",
+    "//utils/native/base/include",
+    "//third_party/lz4/lib",
+    "//third_party/openssl/include",
+    "//third_party/libuv",
+  ]
+  subsystem_name = "developtools"
+  part_name = "hdc_standard"
+}
+
+group("hdc_target_standard") {
+  deps = [
+    ":hdc_std",
+    ":hdcd",
+  ]
+}

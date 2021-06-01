@@ -1,0 +1,10 @@
+{
+  "subsystem": "developtools",
+  "parts": {
+    "hdc_standard": {
+      "module_list": [
+        "//developtools/hdc_standard:hdcd"
+      ]
+    }
+  }
+}
