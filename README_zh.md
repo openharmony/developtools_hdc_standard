@@ -110,32 +110,22 @@ hdc当前支持如下命令：
 <td class="cellrowborder" valign="top" width="50%" headers="mcps1.2.3.1.2 "><p id="p124267438425"><a name="p124267438425"></a><a name="p124267438425"></a><span>执行后设备端对应daemon进程重启，并优先使用网络方式连接设备，如果连接设备再选择usb连接</span></p>
 </td>
 </tr>
-<tr id="row1322512145211"><td class="cellrowborder" valign="top" width="50%" headers="mcps1.2.3.1.1 "><p id="p4427174394215"><a name="p4427174394215"></a><a name="p4427174394215"></a>fport list</p>
-</td>
-<td class="cellrowborder" valign="top" width="50%" headers="mcps1.2.3.1.2 "><p id="p19427184384213"><a name="p19427184384213"></a><a name="p19427184384213"></a><span>查看所有已建立的映射连接列表，显示的参数包括转发配置字符串，转发类型，转发参数</span></p>
-</td>
-</tr>
-<tr id="row115461418165218"><td class="cellrowborder" valign="top" width="50%" headers="mcps1.2.3.1.1 "><p id="p1842714364210"><a name="p1842714364210"></a><a name="p1842714364210"></a>fport rm <em id="i245711341319"><a name="i245711341319"></a><a name="i245711341319"></a>local</em></p>
-</td>
-<td class="cellrowborder" valign="top" width="50%" headers="mcps1.2.3.1.2 "><p id="p342724319424"><a name="p342724319424"></a><a name="p342724319424"></a><span>删除已映射的给定配置字符串连接(配置字符串值可以通过list获取)，没有指定则删除所有</span></p>
-</td>
-</tr>
 <tr id="row1157737165213"><td class="cellrowborder" valign="top" width="50%" headers="mcps1.2.3.1.1 "><p id="p442704315428"><a name="p442704315428"></a><a name="p442704315428"></a>file send<em id="i34274438428"><a name="i34274438428"></a><a name="i34274438428"></a> </em><em id="i6958481309"><a name="i6958481309"></a><a name="i6958481309"></a>local remote</em></p>
 </td>
 <td class="cellrowborder" valign="top" width="50%" headers="mcps1.2.3.1.2 "><p id="p12427114316425"><a name="p12427114316425"></a><a name="p12427114316425"></a><span>从host端发送文件至设备</span>端</p>
-<p id="p292614408162"><a name="p292614408162"></a><a name="p292614408162"></a>举例： hdc file send  E:\a.txt  /data/local/tmp</p>
+<p id="p292614408162"><a name="p292614408162"></a><a name="p292614408162"></a>举例： hdc file send  E:\a.txt  /data/local/tmp/a.txt</p>
 </td>
 </tr>
 <tr id="row8748171465317"><td class="cellrowborder" valign="top" width="50%" headers="mcps1.2.3.1.1 "><p id="p7427164310425"><a name="p7427164310425"></a><a name="p7427164310425"></a>file recv [-a] <em id="i1880435111020"><a name="i1880435111020"></a><a name="i1880435111020"></a>remote local</em></p>
 </td>
 <td class="cellrowborder" valign="top" width="50%" headers="mcps1.2.3.1.2 "><p id="p19427143174220"><a name="p19427143174220"></a><a name="p19427143174220"></a><span>从设备端拉出文件至本地</span>host端</p>
-<p id="p191761424101713"><a name="p191761424101713"></a><a name="p191761424101713"></a>举例： hdc file recv  /data/local/tmp/a.txt   ./</p>
+<p id="p191761424101713"><a name="p191761424101713"></a><a name="p191761424101713"></a>举例： hdc file recv  /data/local/tmp/a.txt   ./a.txt</p>
 </td>
 </tr>
 <tr id="row887171025420"><td class="cellrowborder" valign="top" width="50%" headers="mcps1.2.3.1.1 "><p id="p204287432425"><a name="p204287432425"></a><a name="p204287432425"></a>install<em id="i242704315422"><a name="i242704315422"></a><a name="i242704315422"></a> </em>[-r/-d/-g]<em id="i642814310424"><a name="i642814310424"></a><a name="i642814310424"></a> </em><em id="i103610557016"><a name="i103610557016"></a><a name="i103610557016"></a>package</em></p>
 </td>
 <td class="cellrowborder" valign="top" width="50%" headers="mcps1.2.3.1.2 "><p id="p12428194312421"><a name="p12428194312421"></a><a name="p12428194312421"></a><span>安装</span><span id="text242884314423"><a name="text242884314423"></a><a name="text242884314423"></a>OpenHarmony</span><span> package</span></p>
-<p id="p1419642611411"><a name="p1419642611411"></a><a name="p1419642611411"></a>举例： hdc install ***.hap</p>
+<p id="p1419642611411"><a name="p1419642611411"></a><a name="p1419642611411"></a>举例： hdc install E:\***.hap</p>
 </td>
 </tr>
 <tr id="row1973583819549"><td class="cellrowborder" valign="top" width="50%" headers="mcps1.2.3.1.1 "><p id="p20428943104214"><a name="p20428943104214"></a><a name="p20428943104214"></a>uninstall [-k] <em id="i84129581508"><a name="i84129581508"></a><a name="i84129581508"></a>package</em></p>
@@ -166,19 +156,23 @@ hdc当前支持如下命令：
     hdc list targets
     ```
 
-
 -   往设备中推送文件
 
     ```
-    hdc file send  E:\a.txt  /data/local/tmp
+    hdc file send  E:\a.txt  /data/local/tmp/a.txt
     ```
 
--   重启设备
+-   从设备中拉取文件
 
     ```
-    hdc target boot
+    hdc file recv  /data/local/tmp/a.txt   ./a.txt
     ```
 
+-   安装应用
+
+    ```
+    hdc install E:\***.hap
+    ```
 
 -   查看日志
 
@@ -191,20 +185,6 @@ hdc当前支持如下命令：
     ```
     hdc shell
     ```
-
--   配置服务监听的socket。
-
-    ```
-    hdc -s 192.168.1.100:1234 
-    ```
-
-
--   重启至bootloader模式。
-
-    ```
-    hdc target boot bootloader
-    ```
-
 
 -   网络连接。
 
