@@ -21,7 +21,6 @@ class HdcHostUSB : public HdcUSBBase {
 public:
     HdcHostUSB(const bool serverOrDaemonIn, void *ptrMainBase, void *ctxUSBin);
     virtual ~HdcHostUSB();
-
     int Initial();
     int SendUSBRaw(HSession hSession, uint8_t *data, const int length);
     HSession ConnectDetectDaemon(const HSession hSession, const HDaemonInfo pdi);
@@ -30,14 +29,16 @@ public:
 private:
     enum UsbCheckStatus {
         HOST_USB_IGNORE = 1,
+        HOST_USB_READY,
         HOST_USB_REGISTER,
     };
-    static int LIBUSB_CALL HotplugHostUSBCallback(
-        libusb_context *ctx, libusb_device *device, libusb_hotplug_event event, void *userData);
+    static int LIBUSB_CALL HotplugHostUSBCallback(libusb_context *ctx, libusb_device *device,
+                                                  libusb_hotplug_event event, void *userData);
     static void LIBUSB_CALL ReadUSBBulkCallback(struct libusb_transfer *transfer);
     static void PenddingUSBIO(uv_idle_t *handle);
     static void LIBUSB_CALL WriteUSBBulkCallback(struct libusb_transfer *transfer);
     static void WatchDevPlugin(uv_timer_t *handle);
+    static void KickoutZombie(HSession hSession);
     int StartupUSBWork();
     int CheckActiveConfig(libusb_device *device, HUSB hUSB);
     void RegisterReadCallback(HSession hSession);
@@ -47,14 +48,15 @@ private:
     bool ReadyForWorkThread(HSession hSession);
     bool FindDeviceByID(HUSB hUSB, const char *usbMountPoint, libusb_context *ctxUSB);
     void UpdateUSBDaemonInfo(HUSB hUSB, HSession hSession, uint8_t connStatus);
-    bool DetectMyNeed(libusb_device *device);
-    static void KickoutZombie(HSession hSession);
+    bool DetectMyNeed(libusb_device *device, string &sn);
+    bool SendUsbReset(HUSB hUSB);
+    void RestoreHdcProtocol(HUSB hUsb, const uint8_t *buf, int bufSize);
 
-    libusb_hotplug_callback_handle hotplug;
     uv_idle_t usbWork;
     libusb_context *ctxUSB;
     uv_timer_t devListWatcher;
     map<string, UsbCheckStatus> mapIgnoreDevice;
+    uv_sem_t semUsbSend;
 
 private:
 };

@@ -102,7 +102,7 @@ string DaemonUsage()
           "\n"
           "paramenter mode commands:\n"
           " -h                            - Print help\n"
-          " -l 0-4                        - Print runtime log\n"
+          " -l 0-5                        - Print runtime log\n"
           " -u                            - Enable USB mod\n"
           " -t                            - Enable TCP mod\n";
     return ret;
@@ -118,7 +118,7 @@ bool GetDaemonCommandlineOptions(int argc, const char *argv[])
         switch (ch) {
             case 'l': {
                 int logLevel = atoi(optarg);
-                if (logLevel < 0 || logLevel > 4) {
+                if (logLevel < 0 || logLevel > LOG_LAST) {
                     WRITE_LOG(LOG_DEBUG, "Loglevel error!\n");
                     return -1;
                 }

@@ -31,9 +31,6 @@ HdcDaemonUnity::~HdcDaemonUnity()
 
 void HdcDaemonUnity::StopTask()
 {
-    if (!runningProtect) {
-        return;
-    }
     singalStop = true;
     ClearContext(&opContext);
 };
@@ -62,28 +59,29 @@ void HdcDaemonUnity::OnFdRead(uv_fs_t *req)
     CtxUnityIO *ctxIO = static_cast<CtxUnityIO *>(req->data);
     ContextUnity *ctx = static_cast<ContextUnity *>(ctxIO->context);
     HdcDaemonUnity *thisClass = ctx->thisClass;
+    thisClass->refCount--;
     uint8_t *buf = ctxIO->bufIO;
-    bool bFinish = false;
-    while (!thisClass->singalStop) {
-        if (req->result > 0) {
-            if (!thisClass->SendToAnother(thisClass->opContext.dataCommand, (uint8_t *)buf, req->result)) {
-                bFinish = true;
-                break;
-            }
-            thisClass->LoopFdRead(ctx);
-        } else {  // <=0
-            bFinish = true;
+    bool readContinue = false;
+    while (true) {
+        if (thisClass->singalStop || req->result <= 0) {
             break;
         }
+        if (!thisClass->SendToAnother(thisClass->opContext.dataCommand, (uint8_t *)buf, req->result)) {
+            break;
+        }
+        if (thisClass->LoopFdRead(&thisClass->opContext) < 0) {
+            break;
+        }
+        readContinue = true;
         break;
     }
-    uv_fs_req_cleanup(req);
     delete[] buf;
+    uv_fs_req_cleanup(req);
+    delete req;
     delete ctxIO;
-    if (bFinish) {
+    if (!readContinue) {
         thisClass->ClearContext(ctx);
         thisClass->TaskFinish();
-        thisClass->runningProtect = false;
     }
 }
 
@@ -91,27 +89,27 @@ void HdcDaemonUnity::OnFdRead(uv_fs_t *req)
 int HdcDaemonUnity::LoopFdRead(ContextUnity *ctx)
 {
     uv_buf_t iov;
-    int readMax = Base::GetMaxBufSize() * 1.2;
+    int readMax = Base::GetMaxBufSize();
     CtxUnityIO *contextIO = new CtxUnityIO();
     uint8_t *buf = new uint8_t[readMax]();
-    if (!contextIO || !buf) {
+    uv_fs_t *req = new uv_fs_t();
+    if (!contextIO || !buf || !req) {
         if (contextIO) {
             delete contextIO;
         }
         if (buf) {
             delete[] buf;
         }
-
+        if (req) {
+            delete req;
+        }
         WRITE_LOG(LOG_WARN, "Memory alloc failed");
-        TaskFinish();
-        runningProtect = false;
         return -1;
     }
-    uv_fs_t *req = &contextIO->fs;
     contextIO->bufIO = buf;
     contextIO->context = ctx;
     req->data = contextIO;
-    runningProtect = true;
+    refCount++;
 
     iov = uv_buf_init((char *)buf, readMax);
     uv_fs_read(loopTask, req, ctx->fd, &iov, 1, -1, OnFdRead);
@@ -121,7 +119,6 @@ int HdcDaemonUnity::LoopFdRead(ContextUnity *ctx)
 int HdcDaemonUnity::ExecuteShell(const char *shellCommand)
 {
     string sUTPath;
-    runningProtect = true;
     if ((opContext.fpOpen = popen(shellCommand, "r")) == nullptr) {
         goto FAILED;
     }
@@ -137,14 +134,15 @@ int HdcDaemonUnity::ExecuteShell(const char *shellCommand)
         }
         Base::WriteBinFile((UT_TMP_PATH + "/execute.result").c_str(), readBuf, bytesIO, false);
 #else
-        LoopFdRead(&opContext);
+        if (LoopFdRead(&opContext) < 0) {
+            break;
+        }
         return 0;
 #endif
     }
 FAILED:
     TaskFinish();
     WRITE_LOG(LOG_DEBUG, "Shell finish");
-    runningProtect = false;
     return -1;
 }
 

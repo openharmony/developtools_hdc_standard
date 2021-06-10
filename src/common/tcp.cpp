@@ -32,8 +32,8 @@ void HdcTCPBase::InitialChildClass(const bool serverOrDaemonIn, void *ptrMainBas
     clsMainBase = ptrMainBase;
 }
 
-void HdcTCPBase::RecvUDP(
-    uv_udp_t *handle, ssize_t nread, const uv_buf_t *rcvbuf, const struct sockaddr *addr, unsigned flags)
+void HdcTCPBase::RecvUDP(uv_udp_t *handle, ssize_t nread, const uv_buf_t *rcvbuf, const struct sockaddr *addr,
+                         unsigned flags)
 {
     while (true) {
         HdcTCPBase *thisClass = (HdcTCPBase *)handle->data;
@@ -90,8 +90,8 @@ void HdcTCPBase::ReadStream(uv_stream_t *tcp, ssize_t nread, const uv_buf_t *buf
         break;
     }
     if (!ret) {
-        Base::TryCloseHandle(
-            (uv_handle_t *)tcp);  // The first time is closed first, prevent the write function from continuing to write
+        // The first time is closed first, prevent the write function from continuing to write
+        Base::TryCloseHandle(reinterpret_cast<uv_handle_t *>(tcp));
         hSessionBase->FreeSession(hSession->sessionId);
     }
 }

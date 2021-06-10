@@ -98,7 +98,7 @@ void HdcDaemonApp::AsyncInstallFinish(bool runOK, const string result)
     vector<uint8_t> vecBuf;
     vecBuf.push_back(mode);
     vecBuf.push_back(runOK);
-    vecBuf.insert(vecBuf.end(), (uint8_t *)echo.c_str(), (uint8_t *)echo.c_str() + echo.size() + 1);
+    vecBuf.insert(vecBuf.end(), (uint8_t *)echo.c_str(), (uint8_t *)echo.c_str() + echo.size());
     SendToAnother(CMD_APP_FINISH, vecBuf.data(), vecBuf.size());
     refCount--;
 }

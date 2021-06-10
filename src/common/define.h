@@ -43,14 +43,16 @@ constexpr uint32_t HDC_BUF_MAX_BYTES = 1024000000;
 constexpr uint16_t MAX_IP_PORT = 65535;
 constexpr uint8_t STREAM_MAIN = 0;  // work at main thread
 constexpr uint8_t STREAM_WORK = 1;  // work at work thread
-constexpr int MAX_SN_LENGTH = 256;
+constexpr uint16_t MAX_CONNECTKEY_SIZE = 32;  // usb sn/tcp ipport
+constexpr uint8_t MAX_IO_OVERLAP = 128;
+constexpr auto TIME_BASE = 1000;  // time unit conversion base value
 
 // general one argument command argc
 constexpr int CMD_ARG1_COUNT = 2;
 // The first child versions must match, otherwise server and daemon must be upgraded
-const string VERSION_NUMBER = "1.0.2a";
+const string VERSION_NUMBER = "1.1.0a";       // same with openssl version, 1.1.2==VERNUMBER 0x10102000
 const string HANDSHAKE_MESSAGE = "OHOS HDC";  // sep not char '-', not more than 11 bytes
-const string PACKET_FLAG = "HW";
+const string PACKET_FLAG = "HW";              // must 2bytes
 const string EMPTY_ECHO = "[Empty]";
 const string MESSAGE_INFO = "[Info]";
 const string MESSAGE_FAIL = "[Fail]";
@@ -90,8 +92,10 @@ enum LogLevel {
     LOG_INFO,  // default
     LOG_WARN,
     LOG_DEBUG,
+    LOG_FULL,
+    LOG_LAST = LOG_FULL,
 };
-#define WRITE_LOG(x, y...) Base::PrintLogEx(__FUNCTION__, x, y)
+#define WRITE_LOG(x, y...) Base::PrintLogEx(__FILE__, __LINE__, x, y)
 
 enum MessageLevel {
     MSG_FAIL,
@@ -117,23 +121,25 @@ enum OperateID {
 
 enum RetErrCode {
     ERR_SUCCESS = 0,
-    ERR_GENERIC = -1000,
-    ERR_BUF_SIZE,
+    ERR_GENERIC = -1,
+    ERR_BUF_SIZE = -10000,
     ERR_BUF_ALLOC,
     ERR_BUF_OVERFLOW,
     ERR_BUF_CHECK,
     ERR_BUF_RESET,
-    ERR_FILE_OPEN,
+    ERR_BUF_COPY,
+    ERR_FILE_OPEN = -11000,
     ERR_FILE_READ,
     ERR_FILE_WRITE,
     ERR_FILE_STAT,
-    ERR_BUF_COPY,
-    ERR_PARM_FORMAT,
+    ERR_PARM_FORMAT = -12000,
     ERR_PARM_SIZE,
     ERR_PARM_FAIL,
-    ERR_API_FAIL,
-    ERR_IO_FAIL,
-    ERR_SESSION_NOFOUND,
+    ERR_API_FAIL = -13000,
+    ERR_IO_FAIL = -14000,
+    ERR_SESSION_NOFOUND = -15000,
+    ERR_HANDSHAKE_NOTMATCH = -16000,
+    ERR_HANDSHAKE_CONNECTKEY_FAILED,
 };
 
 // Flags shared by multiple modules
@@ -203,16 +209,23 @@ enum HdcCommand {
     CMD_APP_FINISH,
     CMD_APP_UNINSTALL,
 };
+
+enum UsbProtocolOption {
+    USB_OPTION_TAIL = 1,
+    USB_OPTION_RESET = 2,
+    USB_OPTION_RESERVE4 = 4,
+    USB_OPTION_RESERVE8 = 8,
+    USB_OPTION_RESERVE16 = 16,
+};
 // ################################### struct define ###################################
 #pragma pack(push)
 #pragma pack(1)
 
 struct USBHead {
     uint8_t flag[2];
-    uint16_t total;
-    uint16_t indexNum;
+    uint8_t option;
     uint32_t sessionId;
-    int dataSize;
+    uint16_t dataSize;
 };
 
 struct AsyncParam {
@@ -243,7 +256,7 @@ using HTaskInfo = TaskInformation *;
 struct HdcUSB {
 #ifdef HDC_HOST
     uint16_t retryCount;
-    libusb_device *device;  // hotplug thread
+    libusb_device *device;
     libusb_device_handle *devHandle;
     uint8_t interfaceNumber;
     // D2H device to host endpoint's address
@@ -265,11 +278,7 @@ struct HdcUSB {
     int control;  // EP0
     int bulkOut;  // EP1
     int bulkIn;   // EP2
-    bool isEPAlive;
-    uint8_t *bufRecv;
-
-    // last saved error code, non-MT safe
-    char lastDevError[24];
+    vector<uint8_t> bufRecv;
 };
 using HUSB = struct HdcUSB *;
 
