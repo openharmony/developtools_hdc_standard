@@ -86,8 +86,7 @@ void HdcHostTCP::BroadcatFindDaemon(const char *broadcastLanIP)
     // find timeout
     uv_timer_t tLastCheck;
     uv_timer_init(&loopBroadcast, &tLastCheck);
-    uv_timer_start(&tLastCheck, (uv_timer_cb)BroadcastTimer, 1000,
-        0);  // 3s timeout //debug 1s
+    uv_timer_start(&tLastCheck, (uv_timer_cb)BroadcastTimer, TIME_BASE, 0);  // timeout debug 1s
 
     uv_run(&loopBroadcast, UV_RUN_DEFAULT);
     uv_loop_close(&loopBroadcast);

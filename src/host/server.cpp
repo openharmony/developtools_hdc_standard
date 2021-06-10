@@ -203,6 +203,7 @@ string HdcServer::GetDaemonMapList(uint8_t opType)
         if (!di) {
             continue;
         }
+        echoLine = "";
         BuildDaemonVisableLine(di, fullDisplay, echoLine);
         ret += echoLine;
     }
@@ -403,11 +404,13 @@ bool HdcServer::FetchCommand(HSession hSession, const uint32_t channelId, const 
         }
         case CMD_KERNEL_ECHO: {
             MessageLevel level = (MessageLevel)*payload;
-            pSfc->EchoClient(hChannel, level, (char *)payload + 1);
+            string s(reinterpret_cast<char *>(payload + 1), payloadSize - 1);
+            pSfc->EchoClient(hChannel, level, s.c_str());
+            WRITE_LOG(LOG_DEBUG, "CMD_KERNEL_ECHO size:%d", payloadSize - 1);
             break;
         }
         case CMD_KERNEL_CHANNEL_CLOSE: {
-            WRITE_LOG(LOG_DEBUG, "CMD_KERNEL_CHANNEL_CLOSE");
+            WRITE_LOG(LOG_DEBUG, "CMD_KERNEL_CHANNEL_CLOSE channelid:%d", channelId);
             ClearOwnTasks(hSession, channelId);
             pSfc->FreeChannel(channelId);
             if (*payload) {

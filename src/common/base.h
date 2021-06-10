@@ -19,7 +19,7 @@
 namespace Hdc {
 namespace Base {
     void SetLogLevel(const uint8_t logLevel);
-    void PrintLogEx(const char *functionName, uint8_t logLevel, const char *msg, ...);
+    void PrintLogEx(const char *functionName, int line, uint8_t logLevel, const char *msg, ...);
     void PrintMessage(const char *fmt, ...);
     // tcpHandle can't be const as it's passed into uv_tcp_keepalive
     void SetTcpOptions(uv_tcp_t *tcpHandle);
@@ -101,6 +101,7 @@ namespace Base {
     // clang-format on
     string GetVersion();
     bool IdleUvTask(uv_loop_t *loop, void *data, uv_idle_cb cb);
+    bool TimerUvTask(uv_loop_t *loop, void *data, uv_timer_cb cb);
     string ReplaceAll(string str, const string from, const string to);
 }  // namespace base
 }  // namespace Hdc

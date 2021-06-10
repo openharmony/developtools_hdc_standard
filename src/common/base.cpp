@@ -30,11 +30,14 @@ namespace Base {
 
 // Commenting the code will optimize and tune all log codes, and the compilation volume will be greatly reduced
 #define ENABLE_DEBUGLOG
-
 #ifdef ENABLE_DEBUGLOG
-    void PrintLogEx(const char *functionName, uint8_t logLevel, const char *msg, ...)
+    void PrintLogEx(const char *functionName, int line, uint8_t logLevel, const char *msg, ...)
     {
+        string debugInfo;
+        string logBuf;
         string logLevelString;
+        string threadIdString;
+        string usTimeString;
         string sep = "\n";
         uint32_t currentThreadId = 0;
         if (logLevel > g_logLevel) {
@@ -54,6 +57,7 @@ namespace Base {
         if (tim == nullptr) {
             return;
         }
+        debugInfo = StringFormat("%s:%d", functionName, line);
 #ifdef _WIN32
         currentThreadId = GetCurrentThreadId();
         logLevelString = std::to_string(logLevel);
@@ -77,26 +81,33 @@ namespace Base {
                 break;
         }
 #endif
-#ifdef DEF_NULL  // if want detail running time info ,use [%d:%d:%d %ld] x x x timeUS
+        if (g_logLevel < LOG_FULL) {
+            debugInfo = "";
+            threadIdString = "";
+        } else {
+            debugInfo = "[" + debugInfo + "]";
+            threadIdString = StringFormat("[%x]", currentThreadId);
+        }
+#ifdef DEF_NULL  // if want detail running time info ,use [%d:%d:%d %ld] x x x timeUs
         struct timespec times = { 0, 0 };
         clock_gettime(CLOCK_MONOTONIC, &times);
-        long timeUS = times.tv_sec * 1000000 + times.tv_nsec / 1000;
-        printf("[%d:%d:%d %ld][%x][%s] %s%s", tim->tm_hour, tim->tm_min, tim->tm_sec, timeUS, currentThreadId,
-               logLevelString.c_str(), logDetail.c_str(), sep.c_str());
+        long timeUs = times.tv_sec * TIME_BASE * TIME_BASE + times.tv_nsec / TIME_BASE;
+        usTimeString = StringFormat(" %ld", timeUs);
 #else
-        printf("[%d:%d:%d][%x][%s] %s%s", tim->tm_hour, tim->tm_min, tim->tm_sec, currentThreadId,
-               logLevelString.c_str(), logDetail.c_str(), sep.c_str());
+        logBuf = StringFormat("[%s][%d:%d:%d%s]%s%s %s%s", logLevelString.c_str(), tim->tm_hour, tim->tm_min,
+                              tim->tm_sec, usTimeString.c_str(), threadIdString.c_str(), debugInfo.c_str(),
+                              logDetail.c_str(), sep.c_str());
 #endif
+        printf("%s", logBuf.c_str());
+        fflush(stdout);
         // logfile
         FILE *fp = fopen("/data/local/tmp/hdc.log", "a");
         if (fp == nullptr) {
             return;
         }
-        fprintf(fp, "[%d:%d:%d][%x][%s] %s%s", tim->tm_hour, tim->tm_min, tim->tm_sec, currentThreadId,
-                logLevelString.c_str(), logDetail.c_str(), sep.c_str());
+        fprintf(fp, "%s", logBuf.c_str());
         fflush(fp);
         fclose(fp);
-        fflush(stdout);
         return;
     }
 #else   // else ENABLE_DEBUGLOG.If disabled, the entire output code will be optimized by the compiler
@@ -121,7 +132,7 @@ namespace Base {
 
     void SetTcpOptions(uv_tcp_t *tcpHandle)
     {
-        constexpr int maxUVBufFactor = 10;
+        constexpr int maxBufFactor = 6;
         if (!tcpHandle) {
             WRITE_LOG(LOG_WARN, "SetTcpOptions nullptr Ptr");
             return;
@@ -131,7 +142,7 @@ namespace Base {
         // 40k, set to io 8 times is more appropriate, otherwise asynchronous IO is too fast, a lot of IO is wasted on
         // IOloop, too little transmission speed will decrease
         int buffSize = 0;
-        buffSize = GetMaxBufSize() * maxUVBufFactor;
+        buffSize = GetMaxBufSize() * maxBufFactor;
         uv_recv_buffer_size((uv_handle_t *)tcpHandle, &buffSize);
         uv_send_buffer_size((uv_handle_t *)tcpHandle, &buffSize);
     }
@@ -142,8 +153,8 @@ namespace Base {
         int remainLen = *nOrigSize - indexUsedBuf;
         // init:0, left less than expected
         if (!*nOrigSize || (remainLen < sizeWanted && (*nOrigSize + sizeWanted < sizeWanted * 2))) {
-            int nNewLen
-                = *nOrigSize + sizeWanted + EXTRA_ALLOC_SIZE;  // Memory allocation is slightly larger than the maximum
+            // Memory allocation size is slightly larger than the maximum
+            int nNewLen = *nOrigSize + sizeWanted + EXTRA_ALLOC_SIZE;
             uint8_t *bufPtrOrig = *origBuf;
             *origBuf = new uint8_t[nNewLen]();
             if (!*origBuf) {
@@ -286,7 +297,7 @@ namespace Base {
         struct timespec times = { 0, 0 };
         long time;
         clock_gettime(CLOCK_MONOTONIC, &times);
-        time = times.tv_sec * 1000 + times.tv_nsec / 1000000;
+        time = times.tv_sec * TIME_BASE + times.tv_nsec / (TIME_BASE * TIME_BASE);
         return time;
     }
 
@@ -938,6 +949,20 @@ namespace Base {
         return true;
     }
 
+    bool TimerUvTask(uv_loop_t *loop, void *data, uv_timer_cb cb)
+    {
+        uv_timer_t *timer = new uv_timer_t();
+        if (timer == nullptr) {
+            return false;
+        }
+        timer->data = data;
+        uv_timer_init(loop, timer);
+        constexpr int repeatTimeout = 250; // ms
+        uv_timer_start(timer, cb, 0, repeatTimeout);
+        // delete by callback
+        return true;
+    }
+
     string ReplaceAll(string str, const string from, const string to)
     {
         string::size_type startPos = 0;
@@ -950,8 +975,8 @@ namespace Base {
 
     string CanonicalizeSpecPath(string& src)
     {
-        char resolvedPath[PATH_MAX] = {0};
-#if defined (_WIN32)
+        char resolvedPath[PATH_MAX] = { 0 };
+#if defined(_WIN32)
         if (!_fullpath(resolvedPath, src.c_str(), PATH_MAX)) {
             WRITE_LOG(LOG_FATAL, "_fullpath %s failed", src.c_str());
             return "";

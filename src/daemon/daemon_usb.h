@@ -27,23 +27,31 @@ public:
     void OnNewHandshakeOK(const uint32_t sessionId);
 
 private:
+    struct CtxUvFileCommonIo {
+        uv_fs_t req;
+        uint8_t *buf;
+        int bufSize;
+        void *thisClass;
+        void *data;
+    };
     static void OnUSBRead(uv_fs_t *req);
     static void WatchEPTimer(uv_timer_t *handle);
     int ConnectEPPoint(HUSB hUSB);
     int DispatchToWorkThread(HSession hSession, const uint32_t sessionId, uint8_t *readBuf, int readBytes);
     bool AvailablePacket(uint8_t *ioBuf, uint32_t *sessionId);
     void CloseEndpoint(HUSB hUSB);
-    bool BeginEPRead(HSession hSession, uv_loop_t *loopDepend);
     bool ReadyForWorkThread(HSession hSession);
-    int SendUSBIOSync(HSession hSession, HUSB hMainUSB, uint8_t *data, const int length);
     int LoopUSBRead(HSession hSession);
-    HSession PrepareNewSession(uint8_t *pRecvBuf, int recvBytesIO);
+    HSession PrepareNewSession(uint32_t sessionId, uint8_t *pRecvBuf, int recvBytesIO);
     bool JumpAntiquePacket(const uint8_t &buf, ssize_t bytes) const;
+    int SendUSBIOSync(HSession hSession, HUSB hMainUSB, uint8_t *data, const int length);
 
     HSession usbMain;
     uint32_t currentSessionId = 0;  // USB mode,limit only one session
+    std::atomic<uint32_t> ref = 0;
+    uv_timer_t checkEP;             // server-use
     uv_mutex_t sendEP;
-    uv_timer_t checkEP;  // server-use
+    bool isAlive = false;
 };
 }  // namespace Hdc
 #endif

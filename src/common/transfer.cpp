@@ -77,17 +77,17 @@ int HdcTransferBase::SimpleFileIO(CtxFile *context, uint64_t index, uint8_t *sen
             if (!sendBuf || !bytes) {
                 break;
             }
-            if (memcpy_s(buf, bytes, sendBuf, bytes) != EOK) {
+            if (memcpy_s(ioContext->bufIO, bytes, sendBuf, bytes) != EOK) {
                 break;
             }
-            uv_buf_t iov = uv_buf_init(reinterpret_cast<char *>(buf), bytes);
+            uv_buf_t iov = uv_buf_init(reinterpret_cast<char *>(ioContext->bufIO), bytes);
             uv_fs_write(context->loop, req, context->fsOpenReq.result, &iov, 1, index, context->cb);
         }
         ret = true;
         break;
     }
     if (!ret) {
-        WRITE_LOG(LOG_WARN, "txf.SimpleFileIO reterr");
+        WRITE_LOG(LOG_WARN, "SimpleFileIO error");
         if (buf != nullptr) {
             delete[] buf;
             buf = nullptr;
@@ -98,7 +98,6 @@ int HdcTransferBase::SimpleFileIO(CtxFile *context, uint64_t index, uint8_t *sen
         }
         return -1;
     }
-    WRITE_LOG(LOG_WARN, "txf.SimpleFileIO okret bytes: %d", bytes);
     return bytes;
 }
 
@@ -192,7 +191,7 @@ void HdcTransferBase::OnFileIO(uv_fs_t *req)
         if (req->result <= 0) {  // Read error or master read completion
             tryFinishIO = true;
             if (req->result < 0) {
-                WRITE_LOG(LOG_DEBUG, "txf.OnFileIO error: %s", uv_strerror((int)req->result));
+                WRITE_LOG(LOG_DEBUG, "OnFileIO error: %s", uv_strerror((int)req->result));
                 context->closeNotify = true;
             }
             break;
@@ -203,8 +202,9 @@ void HdcTransferBase::OnFileIO(uv_fs_t *req)
                 tryFinishIO = true;
                 break;
             }
-            // read continu,util result >0;
-            thisClass->SimpleFileIO(context, context->indexIO, nullptr, Base::GetMaxBufSize());
+            // read continue until result >0, let single file packet +packet header less than GetMaxBufSize()
+            constexpr auto maxBufFactor = 0.8;
+            thisClass->SimpleFileIO(context, context->indexIO, nullptr, Base::GetMaxBufSize() * maxBufFactor);
         } else if (req->fs_type == UV_FS_WRITE) {  // write
             if (context->indexIO >= context->fileSize) {
                 // The active end must first read it first, but you can't make Finish first, because Slave may not
@@ -322,7 +322,7 @@ bool HdcTransferBase::SmartSlavePath(string &localPath, const char *optName)
     int r = uv_fs_lstat(nullptr, &req, localPath.c_str(), nullptr);
     uv_fs_req_cleanup(&req);
     if (r == 0 && req.statbuf.st_mode & S_IFDIR) {  // is dir
-        localPath = localPath.c_str() + fs::path::preferred_separator + string(optName);
+        localPath = Base::StringFormat("%s%c%s", localPath.c_str(), fs::path::preferred_separator, optName);
         return false;
     }
     return false;
