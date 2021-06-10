@@ -281,6 +281,7 @@ bool GetCommandlineOptions(int optArgc, const char *optArgv[])
 // hdc -l4 -t 127.0.0.1:10178 shell id
 int main(int argc, const char *argv[])
 {
+    
     string options;
     string commands;
     Hdc::SplitOptionAndCommand(argc, argv, options, commands);
