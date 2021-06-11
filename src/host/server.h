@@ -27,7 +27,7 @@ public:
     string AdminForwardMap(uint8_t opType, const string &taskString, HForwardInfo &hForwardInfoInOut);
     int CreateConnect(const string &connectKey);
     bool Initial(const char *listenString);
-    void AttachChannel(uv_stream_t *uvpipe, HSession hSession, const uint32_t channelId);
+    void AttachChannel(HSession hSession, const uint32_t channelId);
     void RegisterChannel(HSession hSession, const uint32_t channelId);
     void DeatchChannel(const uint32_t channelId);
     void StopInstance();

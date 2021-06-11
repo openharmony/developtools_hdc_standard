@@ -98,7 +98,7 @@ void HdcHostTCP::Connect(uv_connect_t *connection, int status)
     HSession hSession = (HSession)connection->data;
     delete connection;
     HdcSessionBase *ptrConnect = (HdcSessionBase *)hSession->classInstance;
-    uint8_t *byteFlag = nullptr;
+    auto ctrl = ptrConnect->BuildCtrlString(SP_START_SESSION, 0, nullptr, 0);
     if (status < 0) {
         goto Finish;
     }
@@ -118,10 +118,7 @@ void HdcHostTCP::Connect(uv_connect_t *connection, int status)
 #endif
     // The main thread is no longer read, handed over to the Child thread
     uv_read_stop((uv_stream_t *)&hSession->hWorkTCP);
-    byteFlag = new uint8_t[1];  // free by SendCallback
-    *byteFlag = SP_START_SESSION;
-    Base::SendToStreamEx((uv_stream_t *)&hSession->ctrlPipe[STREAM_MAIN], (uint8_t *)byteFlag, 1, nullptr,
-        (void *)Base::SendCallback, byteFlag);
+    Base::SendToStream((uv_stream_t *)&hSession->ctrlPipe[STREAM_MAIN], ctrl.data(), ctrl.size());
     return;
 Finish:
     WRITE_LOG(LOG_DEBUG, "Connect failed");
