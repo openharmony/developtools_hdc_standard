@@ -61,7 +61,7 @@ int HdcUSBBase::SendUSBBlock(HSession hSession, uint8_t *data, const int length)
 {
     //  Format:USBPacket1 payload1...USBPacketn payloadn；
     //  [USBHead1(PayloadHead1+Payload1)]+[USBHead2(Payload2)]+...+[USBHeadN(PayloadN)]
-    int maxIOSize = Base::GetMaxBufSize() * 1.1;
+    int maxIOSize = Base::GetMaxBufSize();
     int sizeUSBPacketHead = sizeof(USBHead);
     int singleSize = maxIOSize - sizeUSBPacketHead;
     int iMod = length % singleSize;
@@ -80,12 +80,11 @@ int HdcUSBBase::SendUSBBlock(HSession hSession, uint8_t *data, const int length)
             break;
         }
         pUSBHead->sessionId = hSession->sessionId;
-        pUSBHead->total = iCount;
-        pUSBHead->indexNum = i;
         if (i != iCount - 1) {
-            pUSBHead->dataSize = singleSize;
+            pUSBHead->dataSize = static_cast<uint16_t>(singleSize);
         } else {
-            pUSBHead->dataSize = iMod;
+            pUSBHead->dataSize = static_cast<uint16_t>(iMod);
+            pUSBHead->option = pUSBHead->option | USB_OPTION_TAIL;
         }
         uint8_t *payload = ioBuf + sizeUSBPacketHead;
         if (EOK != memcpy_s(payload, maxIOSize - sizeUSBPacketHead, (uint8_t *)data + offset, pUSBHead->dataSize)) {
@@ -93,10 +92,41 @@ int HdcUSBBase::SendUSBBlock(HSession hSession, uint8_t *data, const int length)
             break;
         }
         offset += pUSBHead->dataSize;
-
-        SendUSBRaw(hSession, ioBuf, sizeUSBPacketHead + pUSBHead->dataSize);
+        if (SendUSBRaw(hSession, ioBuf, sizeUSBPacketHead + pUSBHead->dataSize) <= 0) {
+            offset = ERR_IO_FAIL;
+            break;
+        }
     }
     delete[] ioBuf;
     return offset;
+}
+
+// hSession->dataPipe[STREAM_MAIN]
+bool HdcUSBBase::SendToHdcStream(uv_stream_t *stream, HUSB usb, uint8_t *appendData, int dataSize)
+{
+    vector<uint8_t> &bufRecv = usb->bufRecv;
+    bufRecv.insert(bufRecv.end(), appendData, appendData + dataSize);
+    int ret = ERR_SUCCESS;
+    while (bufRecv.size() > sizeof(USBHead)) {
+        USBHead *usbHeader = (USBHead *)bufRecv.data();
+        if (memcmp(usbHeader->flag, PACKET_FLAG.c_str(), PACKET_FLAG.size())) {
+            WRITE_LOG(LOG_FATAL, "Error usb packet");
+            ret = ERR_BUF_CHECK;
+            break;
+        }
+        if (bufRecv.size() < sizeof(USBHead) + usbHeader->dataSize) {
+            WRITE_LOG(LOG_DEBUG, "SendToHdcStream not enough");
+            break;  // successful, but not enough
+        }
+        // usb data to logic
+        if (Base::SendToStream(stream, bufRecv.data() + sizeof(USBHead), usbHeader->dataSize) < 0) {
+            ret = ERR_IO_FAIL;
+            WRITE_LOG(LOG_FATAL, "Error usb send to stream");
+            break;
+        }
+        bufRecv.erase(bufRecv.begin(), bufRecv.begin() + sizeof(USBHead) + usbHeader->dataSize);
+    }
+
+    return ret == ERR_SUCCESS;
 }
 }

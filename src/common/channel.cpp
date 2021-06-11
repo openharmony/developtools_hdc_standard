@@ -42,6 +42,7 @@ vector<uint8_t> HdcChannelBase::GetChannelHandshake(string &connectKey) const
 {
     vector<uint8_t> ret;
     struct ChannelHandShake handshake = {{0}};
+    Base::ZeroStruct(handshake);
     if (strcpy_s(handshake.banner, sizeof(handshake.banner), HANDSHAKE_MESSAGE.c_str()) != EOK) {
         return ret;
     }
@@ -282,7 +283,7 @@ void HdcChannelBase::AllocCallback(uv_handle_t *handle, size_t sizeWanted, uv_bu
     HChannel context = (HChannel)handle->data;
     Base::ReallocBuf(&context->ioBuf, &context->bufSize, context->availTailIndex, sizeWanted);
     buf->base = (char *)context->ioBuf + context->availTailIndex;
-    buf->len = context->bufSize - context->availTailIndex - 1;  // 16 bytes preserved, avoid overlapping
+    buf->len = context->bufSize - context->availTailIndex - 1;
     if (buf->len < 0) {
         buf->len = 0;
     }
@@ -328,7 +329,6 @@ void HdcChannelBase::FreeChannelContinue(HChannel hChannel)
         }
     }
     uv_mutex_destroy(&hChannel->sendMutex);
-    WRITE_LOG(LOG_DEBUG, "Freechannel:%d", hChannel->channelId);
     if (hChannel->ioBuf) {
         hChannel->availTailIndex = 0;
         hChannel->bufSize = 0;
@@ -346,6 +346,7 @@ void HdcChannelBase::FreeChannelContinue(HChannel hChannel)
     }
     hChannel->mainCleared = true;
     uv_mutex_unlock(&freeChannel);
+    WRITE_LOG(LOG_DEBUG, "Freechannel finish id:%d sendref:%d", hChannel->channelId, uint32_t(hChannel->sendRef));
 }
 
 void HdcChannelBase::FreeChannel(const uint32_t channelId)

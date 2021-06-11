@@ -29,7 +29,7 @@ static bool g_isPullServer = true;
 static bool g_isPcDebugRun = false;
 static bool g_isTCPorUSB = false;
 static int g_isTestMethod = 0;
-static char g_connectKey[MAX_SN_LENGTH] = "";
+static string g_connectKey = "";
 static string g_serverListenString = DEFAULT_SERVER_ADDR;
 
 namespace Hdc {
@@ -135,7 +135,7 @@ int RunPcDebugMode(bool isPullServer, bool isTCPorUSB, int isTestMethod)
     return 0;
 }
 
-int RunClientMode(string &commands, string &serverListenString, const char *connectKey, bool isPullServer)
+int RunClientMode(string &commands, string &serverListenString, string &connectKey, bool isPullServer)
 {
     uv_loop_t loopMain;
     uv_loop_init(&loopMain);
@@ -217,7 +217,7 @@ bool GetCommandlineOptions(int optArgc, const char *optArgv[])
             }
             case 'l': {
                 int logLevel = atoi(optarg);
-                if (logLevel < 0 || logLevel > 4) {
+                if (logLevel < 0 || logLevel > LOG_LAST) {
                     Base::PrintMessage("Loglevel error!");
                     needExit = true;
                     return needExit;
@@ -234,12 +234,12 @@ bool GetCommandlineOptions(int optArgc, const char *optArgv[])
                 break;
             }
             case 't': {  // key
-                if (strlen(optarg) > MAX_SN_LENGTH) {
+                if (strlen(optarg) > MAX_CONNECTKEY_SIZE) {
                     Base::PrintMessage("Sizeo of of parament '-t' %d is too long", strlen(optarg));
                     needExit = true;
                     return needExit;
                 }
-                memcpy_s(g_connectKey, sizeof(g_connectKey), optarg, sizeof(g_connectKey));
+                g_connectKey = optarg;
                 break;
             }
             case 's': {

@@ -36,7 +36,7 @@ private:
     static void AllocStdbuf(uv_handle_t *handle, size_t sizeWanted, uv_buf_t *buf);
     static void ReadStd(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf);
     static void CommandWorker(uv_timer_t *handle);
-    string AutoConnectKey(string &doCommand);
+    string AutoConnectKey(string &doCommand, const string &preConnectKey) const;
     uint32_t GetLastPID();
     bool StartKillServer(const char *cmd, bool startOrKill);
     void ModifyTty(bool setOrRestore, uv_tty_t *tty);

@@ -37,7 +37,6 @@ private:
         int fd;
     };
     struct CtxUnityIO {
-        uv_fs_t fs;
         uint8_t *bufIO;
         ContextUnity *context;
     };

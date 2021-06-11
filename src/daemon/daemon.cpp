@@ -317,7 +317,7 @@ void HdcDaemon::StopDaemon(bool restart)
 bool HdcDaemon::ServerCommand(const uint32_t sessionId, const uint32_t channelId, const uint16_t command,
                               uint8_t *bufPtr, const int size)
 {
-    return Send(sessionId, channelId, command, (uint8_t *)bufPtr, size) >= 0;
+    return Send(sessionId, channelId, command, (uint8_t *)bufPtr, size) > 0;
 }
 
 void HdcDaemon::JdwpNewFileDescriptor(const uint8_t *buf, const int bytesIO)

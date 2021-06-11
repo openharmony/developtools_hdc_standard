@@ -13,7 +13,6 @@
  * limitations under the License.
  */
 #include "daemon_usb.h"
-
 #include "usb_ffs.h"
 
 namespace Hdc {
@@ -28,6 +27,7 @@ HdcDaemonUSB::HdcDaemonUSB(const bool serverOrDaemonIn, void *ptrMainBase)
 HdcDaemonUSB::~HdcDaemonUSB()
 {
     // Closed in the IO loop, no longer closing CLOSEENDPOINT
+    uv_mutex_destroy(&sendEP);
 }
 
 void HdcDaemonUSB::Stop()
@@ -40,9 +40,9 @@ void HdcDaemonUSB::Stop()
         return;
     }
     WRITE_LOG(LOG_DEBUG, "HdcDaemonUSB Stop free main session");
-    HdcDaemon *pServ = (HdcDaemon *)clsMainBase;
+    HdcDaemon *daemon = (HdcDaemon *)clsMainBase;
     Base::TryCloseHandle((uv_handle_t *)&checkEP);
-    pServ->FreeSession(usbMain->sessionId);
+    daemon->FreeSession(usbMain->sessionId);
     if (usbMain->hUSB != nullptr) {
         CloseEndpoint(usbMain->hUSB);
     }
@@ -62,14 +62,14 @@ int HdcDaemonUSB::Initial()
         return -1;
     }
     const uint16_t usbFfsScanInterval = 3000;
-    HdcDaemon *pServ = (HdcDaemon *)clsMainBase;
-    usbMain = pServ->MallocSession(false, CONN_USB, this);
+    HdcDaemon *daemon = (HdcDaemon *)clsMainBase;
+    usbMain = daemon->MallocSession(false, CONN_USB, this);
     if (!usbMain) {
         WRITE_LOG(LOG_DEBUG, "CheckNewUSBDeviceThread malloc failed");
         return -1;
     }
     WRITE_LOG(LOG_DEBUG, "HdcDaemonUSB::Initiall");
-    uv_timer_init(&pServ->loopMain, &checkEP);
+    uv_timer_init(&daemon->loopMain, &checkEP);
     checkEP.data = this;
     uv_timer_start(&checkEP, WatchEPTimer, 0, usbFfsScanInterval);
     return 0;
@@ -110,6 +110,8 @@ int HdcDaemonUSB::ConnectEPPoint(HUSB hUSB)
             WRITE_LOG(LOG_WARN, "%s: cannot open bulk-in ep: errno=%d", USB_FFS_HDC_IN, errno);
             break;
         }
+        int flags = fcntl(hUSB->bulkIn, F_GETFL, 0);
+        fcntl(hUSB->bulkIn, flags | O_NONBLOCK);
         ret = 0;
         break;
     }
@@ -121,7 +123,7 @@ int HdcDaemonUSB::ConnectEPPoint(HUSB hUSB)
 
 void HdcDaemonUSB::CloseEndpoint(HUSB hUSB)
 {
-    if (!hUSB->isEPAlive) {
+    if (!isAlive) {
         return;
     }
     if (hUSB->bulkIn > 0) {
@@ -136,30 +138,34 @@ void HdcDaemonUSB::CloseEndpoint(HUSB hUSB)
         close(hUSB->control);
         hUSB->control = 0;
     }
-    hUSB->isEPAlive = false;
+    isAlive = false;
     currentSessionId = 0;
+    WRITE_LOG(LOG_FATAL, "DaemonUSB CloseEndpoint");
 }
 
 // Prevent other USB data misfortunes to send the program crash
 bool HdcDaemonUSB::AvailablePacket(uint8_t *ioBuf, uint32_t *sessionId)
 {
     bool ret = false;
-    const uint8_t maxUSBPacketCount = 100;
+    constexpr auto maxBufFactor = 1.2;
     while (true) {
-        struct USBHead *pHead = (struct USBHead *)ioBuf;
-        if (memcmp(pHead->flag, PACKET_FLAG.c_str(), 2)) {
+        struct USBHead *usbPayloadHeader = (struct USBHead *)ioBuf;
+        if (memcmp(usbPayloadHeader->flag, PACKET_FLAG.c_str(), PACKET_FLAG.size())) {
             break;
         }
-        if (pHead->total > maxUSBPacketCount) {
+        if (usbPayloadHeader->dataSize > MAX_SIZE_IOBUF * maxBufFactor + sizeof(USBHead)) {
             break;
         }
-        if (pHead->total < pHead->indexNum) {
+        if ((usbPayloadHeader->option & USB_OPTION_RESET)) {
+            if (currentSessionId != 0) {
+                HdcDaemon *daemon = reinterpret_cast<HdcDaemon *>(clsMainBase);
+                // The Host end program is restarted, but the USB cable is still connected
+                WRITE_LOG(LOG_WARN, "Hostside want restart daemon, restart old sessionid:%d", currentSessionId);
+                daemon->PushAsyncMessage(currentSessionId, ASYNC_FREE_SESSION, nullptr, 0);
+            }
             break;
         }
-        if (pHead->dataSize <= 0 || pHead->dataSize > MAX_SIZE_IOBUF * 2) {
-            break;
-        }
-        *sessionId = pHead->sessionId;
+        *sessionId = usbPayloadHeader->sessionId;
         ret = true;
         break;
     }
@@ -181,7 +187,7 @@ int HdcDaemonUSB::SendUSBIOSync(HSession hSession, HUSB hMainUSB, uint8_t *data,
     int childRet = 0;
     int ret = -1;
     int offset = 0;
-    if (!hMainUSB->isEPAlive) {
+    if (!isAlive) {
         goto Finish;
     }
     if (!modRunning) {
@@ -190,6 +196,13 @@ int HdcDaemonUSB::SendUSBIOSync(HSession hSession, HUSB hMainUSB, uint8_t *data,
     while (modRunning) {
         childRet = write(bulkIn, (uint8_t *)data + offset, length - offset);
         if (childRet <= 0) {
+            int err = errno;
+            if (err == EINTR) {
+                WRITE_LOG(LOG_DEBUG, "BulkinWrite write EINTR, try again");
+                continue;
+            } else {
+                WRITE_LOG(LOG_DEBUG, "BulkinWrite write fatal errno %d", err);
+            }
             break;
         }
         offset += childRet;
@@ -200,14 +213,14 @@ int HdcDaemonUSB::SendUSBIOSync(HSession hSession, HUSB hMainUSB, uint8_t *data,
     if (offset == length) {
         ret = length;
     } else {
-        WRITE_LOG(LOG_FATAL, "BulkinWrite write failed, nsize:%d really:%d, lasterror:%d", length, offset, errno);
+        WRITE_LOG(LOG_FATAL, "BulkinWrite write failed, nsize:%d really:%d", length, offset);
     }
 Finish:
     USBHead *pUSBHead = (USBHead *)data;
-    if (pUSBHead->indexNum + 1 == pUSBHead->total) {
-        hSession->sendRef--;  // send finish
+    if (pUSBHead->option & USB_OPTION_TAIL) {
+        hSession->sendRef--;
     }
-    if (ret < 0 && hMainUSB->isEPAlive) {
+    if (ret < 0 && isAlive) {
         WRITE_LOG(LOG_FATAL, "BulkinWrite CloseEndpoint");
         // It actually closed the subsession, the EP port is also closed
         CloseEndpoint(hMainUSB);
@@ -225,47 +238,48 @@ int HdcDaemonUSB::SendUSBRaw(HSession hSession, uint8_t *data, const int length)
     // it can be used exclusive File-DESC transmission mode in each thread. The late stage can be used as asynchronous +
     // SendPipe to the main thread transmission.
     uv_mutex_lock(&sendEP);
-    if (SendUSBIOSync(hSession, usbMain->hUSB, data, length) < 0) {
-        WRITE_LOG(LOG_DEBUG, "dusb.SendUSBRaw willfreesn: %p", hSession);
+    int ret = SendUSBIOSync(hSession, usbMain->hUSB, data, length);
+    if (ret < 0) {
         daemon->FreeSession(hSession->sessionId);
+        WRITE_LOG(LOG_DEBUG, "SendUSBRaw try to freesession");
     }
     uv_mutex_unlock(&sendEP);
-    return length;
+    return ret;
 }
 
 // cross thread call
 void HdcDaemonUSB::OnNewHandshakeOK(const uint32_t sessionId)
 {
-    // Because the sessionId is synchronized with the host, the current session only can be recorded after the
-    // session handshake ok
-    HdcDaemon *daemon = reinterpret_cast<HdcDaemon *>(clsMainBase);
-    // USB-ffs can't control the session through disconnect sigal like TCP,
-    // so it can only replace the old session when the new session handshake ok.
-    // limit onse session per host...
-    if (currentSessionId != 0) {
-        // The Host end program is restarted, but the USB cable is still connected
-        daemon->PushAsyncMessage(currentSessionId, ASYNC_FREE_SESSION, nullptr, 0);
-    }
-    currentSessionId = sessionId;
+    currentSessionId = sessionId;  // real Id
 }
 
-HSession HdcDaemonUSB::PrepareNewSession(uint8_t *pRecvBuf, int recvBytesIO)
+HSession HdcDaemonUSB::PrepareNewSession(uint32_t sessionId, uint8_t *pRecvBuf, int recvBytesIO)
 {
-    HdcDaemon *daemon = (HdcDaemon *)clsMainBase;
+    HdcDaemon *daemon = reinterpret_cast<HdcDaemon *>(clsMainBase);
     // new session
-    HSession hChildSession = daemon->MallocSession(false, CONN_USB, this);
+    HSession hChildSession = daemon->MallocSession(false, CONN_USB, this, sessionId);
     if (!hChildSession) {
         return nullptr;
     }
-    Base::StartWorkThread(&daemon->loopMain, daemon->SessionWorkThread, Base::FinishWorkThread, hChildSession);
-    // wait for thread up
-    constexpr int loopTime = 250;
-    while (hChildSession->childLoop.active_handles == 0) {
-        usleep(loopTime);
+    if (currentSessionId != 0) {
+        // reset old session
+        // The Host side is restarted, but the USB cable is still connected
+        WRITE_LOG(LOG_WARN, "New session coming, restart old sessionid:%d", currentSessionId);
+        daemon->PushAsyncMessage(currentSessionId, ASYNC_FREE_SESSION, nullptr, 0);
     }
-    uint8_t flag = SP_START_SESSION;
-    Base::SendToStream((uv_stream_t *)&hChildSession->ctrlPipe[STREAM_MAIN], &flag, 1);
-    WRITE_LOG(LOG_DEBUG, "Main thread usbio mirgate finish");
+    Base::StartWorkThread(&daemon->loopMain, daemon->SessionWorkThread, Base::FinishWorkThread, hChildSession);
+    auto funcNewSessionUp = [](uv_timer_t *handle) -> void {
+        HSession hChildSession = reinterpret_cast<HSession>(handle->data);
+        if (hChildSession->childLoop.active_handles == 0) {
+            return;
+        }
+        uint8_t flag = SP_START_SESSION;
+        Base::SendToStream((uv_stream_t *)&hChildSession->ctrlPipe[STREAM_MAIN], &flag, 1);
+        WRITE_LOG(LOG_DEBUG, "Main thread usbio mirgate finish");
+        Base::TryCloseHandle(reinterpret_cast<uv_handle_t*>(handle), Base::CloseTimerCallback);
+    };
+    Base::TimerUvTask(&daemon->loopMain, hChildSession, funcNewSessionUp);
+
     return hChildSession;
 }
 
@@ -274,18 +288,19 @@ int HdcDaemonUSB::DispatchToWorkThread(HSession hSession, const uint32_t session
     // Format:USBPacket1 payload1...USBPacketn
     // payloadn-[USBHead1(PayloadHead1+Payload1)]+[USBHead2(Payload2)]+...+[USBHeadN(PayloadN)]
     HSession hChildSession = nullptr;
-    int sizeUSBPacketHead = sizeof(USBHead);
     HdcDaemon *daemon = reinterpret_cast<HdcDaemon *>(hSession->classInstance);
     hChildSession = daemon->AdminSession(OP_QUERY, sessionId, nullptr);
     if (!hChildSession) {
-        hChildSession = PrepareNewSession(readBuf, readBytes);
+        hChildSession = PrepareNewSession(sessionId, readBuf, readBytes);
         if (!hChildSession) {
-            return -1;
+            return ERR_SESSION_NOFOUND;
         }
     }
-    int ret = Base::SendToStream((uv_stream_t *)&hChildSession->dataPipe[STREAM_MAIN], readBuf + sizeUSBPacketHead,
-                                 readBytes - sizeUSBPacketHead);
-    return ret;
+    if (!SendToHdcStream(reinterpret_cast<uv_stream_t*>(&hChildSession->dataPipe[STREAM_MAIN]), hChildSession->hUSB,
+        readBuf, readBytes)) {
+        return ERR_IO_FAIL;
+    }
+    return readBytes;
 }
 
 bool HdcDaemonUSB::JumpAntiquePacket(const uint8_t &buf, ssize_t bytes) const
@@ -303,16 +318,10 @@ bool HdcDaemonUSB::JumpAntiquePacket(const uint8_t &buf, ssize_t bytes) const
 // Only physically swap EP ports will be reset
 void HdcDaemonUSB::OnUSBRead(uv_fs_t *req)
 {  // Only read at the main thread
-    HSession hSession = (HSession)req->data;
-    if (hSession == nullptr) {
-        return;
-    }
-    HdcDaemonUSB *thisClass = (HdcDaemonUSB *)hSession->classModule;
-    HUSB hUSB = hSession->hUSB;
-    if (hUSB == nullptr) {
-        return;
-    }
-    uint8_t *bufPtr = hUSB->bufRecv;
+    auto ctxIo = reinterpret_cast<CtxUvFileCommonIo *>(req->data);
+    auto hSession = reinterpret_cast<HSession>(ctxIo->data);
+    auto thisClass = reinterpret_cast<HdcDaemonUSB *>(ctxIo->thisClass);
+    uint8_t *bufPtr = ctxIo->buf;
     ssize_t bytesIOBytes = req->result;
     uint32_t sessionId = 0;
     bool ret = false;
@@ -323,12 +332,13 @@ void HdcDaemonUSB::OnUSBRead(uv_fs_t *req)
             break;
         }
         if (thisClass->JumpAntiquePacket(*bufPtr, bytesIOBytes)) {
+            WRITE_LOG(LOG_DEBUG, "JumpAntiquePacket auto jump");
             ret = true;
             break;
         }
         // guess is head of packet
         if (!thisClass->AvailablePacket((uint8_t *)bufPtr, &sessionId)) {
-            WRITE_LOG(LOG_WARN, "AvailablePacket false, ret:%d buf:%-50s", bytesIOBytes, bufPtr);
+            WRITE_LOG(LOG_WARN, "AvailablePacket check failed, ret:%d buf:%-50s", bytesIOBytes, bufPtr);
             break;
         }
         if (thisClass->DispatchToWorkThread(hSession, sessionId, bufPtr, bytesIOBytes) < 0) {
@@ -342,9 +352,9 @@ void HdcDaemonUSB::OnUSBRead(uv_fs_t *req)
         ret = true;
         break;
     }
-    delete[] bufPtr;
+    delete[] ctxIo->buf;
     uv_fs_req_cleanup(req);
-    delete req;
+    delete ctxIo;
     if (!ret || !thisClass->modRunning) {
         thisClass->CloseEndpoint(hSession->hUSB);
     }
@@ -354,45 +364,37 @@ int HdcDaemonUSB::LoopUSBRead(HSession hSession)
 {
     int ret = -1;
     HUSB hUSB = hSession->hUSB;
-    HdcDaemon *pServ = (HdcDaemon *)clsMainBase;
+    HdcDaemon *daemon = reinterpret_cast<HdcDaemon *>(clsMainBase);
+    // must > available size, or it will be incorrect
+    int readMax = Base::GetMaxBufSize() + sizeof(USBHead) + EXTRA_ALLOC_SIZE;
+    auto ctxIo = new CtxUvFileCommonIo();
+    auto buf = new uint8_t[readMax]();
+    uv_fs_t *req = nullptr;
     uv_buf_t iov;
-    // Reading size is greater than the biggest package
-    int readMax = Base::GetMaxBufSize() * 1.2;
-    uv_fs_t *req = new uv_fs_t();
-    uint8_t *newBuf = new uint8_t[readMax]();
-    if (!req || !newBuf) {
-        WRITE_LOG(LOG_FATAL, "Memory alloc failed");
+    if (ctxIo == nullptr || buf == nullptr) {
         goto FAILED;
     }
-    req->data = hSession;
-    hUSB->bufRecv = newBuf;
-    iov = uv_buf_init((char *)newBuf, readMax);
-    ret = uv_fs_read(&pServ->loopMain, req, hUSB->bulkOut, &iov, 1, -1, OnUSBRead);
+    ctxIo->buf = buf;
+    ctxIo->bufSize = readMax;
+    ctxIo->data = hSession;
+    ctxIo->thisClass = this;
+    req = &ctxIo->req;
+    req->data = ctxIo;
+    iov = uv_buf_init(reinterpret_cast<char *>(ctxIo->buf), ctxIo->bufSize);
+    ret = uv_fs_read(&daemon->loopMain, req, hUSB->bulkOut, &iov, 1, -1, OnUSBRead);
     if (ret < 0) {
         WRITE_LOG(LOG_FATAL, "uv_fs_read < 0");
         goto FAILED;
     }
     return 0;
-
 FAILED:
-    if (newBuf) {
-        delete[] newBuf;
+    if (ctxIo != nullptr) {
+        delete ctxIo;
     }
-    if (req) {
-        uv_fs_req_cleanup(req);
-        delete req;
+    if (buf != nullptr) {
+        delete[] buf;
     }
     return -1;
-}
-
-bool HdcDaemonUSB::BeginEPRead(HSession hSession, uv_loop_t *loopDepend)
-{
-    HUSB hUSB = hSession->hUSB;
-    hUSB->isEPAlive = true;
-    LoopUSBRead(hSession);
-    WRITE_LOG(LOG_DEBUG, "Begin loop USB read, %s",
-              (uv_thread_self() == hSession->hWorkThread) ? "Main thread" : "Child thread");
-    return true;
 }
 
 // Because USB can connect to only one host，daemonUSB is only one Session by default
@@ -400,14 +402,14 @@ void HdcDaemonUSB::WatchEPTimer(uv_timer_t *handle)
 {
     HdcDaemonUSB *thisClass = (HdcDaemonUSB *)handle->data;
     HUSB hUSB = thisClass->usbMain->hUSB;
-    HdcDaemon *pServ = (HdcDaemon *)thisClass->clsMainBase;
-    if (hUSB->isEPAlive) {
+    if (thisClass->isAlive) {
         return;  // ok not todo...
     }
     if (thisClass->ConnectEPPoint(hUSB)) {
         return;
     }
     // connect OK
-    thisClass->BeginEPRead(thisClass->usbMain, &pServ->loopMain);
+    thisClass->isAlive = true;
+    thisClass->LoopUSBRead(thisClass->usbMain);
 }
 }  // namespace Hdc

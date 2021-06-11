@@ -54,7 +54,7 @@ public:
     static void ReadCtrlFromMain(uv_stream_t *uvpipe, ssize_t nread, const uv_buf_t *buf);
     static void ReadCtrlFromSession(uv_stream_t *uvpipe, ssize_t nread, const uv_buf_t *buf);
     HSession QueryUSBDeviceRegister(void *pDev, int busIDIn, int devIDIn);
-    HSession MallocSession(bool serverOrDaemon, const ConnType connType, void *classModule);
+    HSession MallocSession(bool serverOrDaemon, const ConnType connType, void *classModule, uint32_t sessionId = 0);
     void FreeSession(const uint32_t sessionId);
     void WorkerPendding();
     int OnRead(HSession hSession, uint8_t *bufPtr, const int bufLen);

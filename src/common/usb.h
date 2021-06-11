@@ -28,6 +28,7 @@ public:
     virtual bool ReadyForWorkThread(HSession hSession);
     int SendUSBBlock(HSession hSession, uint8_t *data, const int length);
     static void ReadUSB(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf);
+    bool SendToHdcStream(uv_stream_t *stream, HUSB usb, uint8_t *appendData, int dataSize);
 
 protected:
     void *clsMainBase;
