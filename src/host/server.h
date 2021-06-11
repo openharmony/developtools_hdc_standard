@@ -33,6 +33,7 @@ public:
     void StopInstance();
     static bool CheckToPullUptrServer(const char *listenString);
     static void UsbPreConnect(uv_timer_t *handle);
+    void NotifyInstanceSessionFree(HSession hSession);
 
     HdcHostTCP *clsTCPClt;
     HdcHostUSB *clsUSBClt;
@@ -47,7 +48,6 @@ private:
                        const int size);
     bool RedirectToTask(HTaskInfo hTaskInfo, HSession hSession, const uint32_t channelId, const uint16_t command,
                         uint8_t *payload, const int payloadSize);
-    void NotifyInstanceSessionFree(HSession hSession);
     bool RemoveInstanceTask(const uint8_t op, HTaskInfo hTask);
     void BuildForwardVisableLine(HDaemonInfo hdi, char *out, int sizeOutBuf);
     bool HandServerAuth(HSession hSession, SessionHandShake &handshake);

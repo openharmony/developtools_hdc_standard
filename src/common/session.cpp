@@ -317,7 +317,8 @@ int HdcSessionBase::MallocSessionByConnectType(HSession hSession)
             }
             hSession->hUSB = hUSB;
 #ifdef HDC_HOST
-            int max = Base::GetMaxBufSize() * 1.1;
+            constexpr auto maxBufFactor = 1.5;
+            int max = Base::GetMaxBufSize() * maxBufFactor + sizeof(USBHead);
             hUSB->bufSizeDevice = max;
             hUSB->bufSizeHost = max;
             hUSB->bufDevice = new uint8_t[hUSB->bufSizeDevice]();
@@ -334,7 +335,8 @@ int HdcSessionBase::MallocSessionByConnectType(HSession hSession)
 }
 
 // when client 0 to automatic generated，when daemon First place 1 followed by
-HSession HdcSessionBase::MallocSession(bool serverOrDaemon, const ConnType connType, void *classModule)
+HSession HdcSessionBase::MallocSession(bool serverOrDaemon, const ConnType connType, void *classModule,
+                                       uint32_t sessionId)
 {
     HSession hSession = new HdcSession();
     if (!hSession) {
@@ -347,7 +349,7 @@ HSession HdcSessionBase::MallocSession(bool serverOrDaemon, const ConnType connT
     hSession->connType = connType;
     hSession->classModule = classModule;
     hSession->isDead = false;
-    hSession->sessionId = (uint32_t)Base::GetRuntimeMSec();
+    hSession->sessionId = ((sessionId == 0) ? static_cast<uint32_t>(Base::GetRuntimeMSec()) : sessionId);
     hSession->serverOrDaemon = serverOrDaemon;
     uv_mutex_init(&hSession->sendMutex);
     hSession->hWorkThread = uv_thread_self();
@@ -485,7 +487,7 @@ void HdcSessionBase::FreeSession(const uint32_t sessionId)
         PushAsyncMessage(hSession->sessionId, ASYNC_FREE_SESSION, nullptr, 0);
         return;
     }
-    WRITE_LOG(LOG_DEBUG, "FreeSession hSession: %p", hSession);
+    WRITE_LOG(LOG_DEBUG, "FreeSession hSession:%p sendref:%u", hSession, uint16_t(hSession->sendRef));
     while (true) {
         if (!hSession || hSession->sendRef || hSession->mainCleared || hSession->isDead) {
             break;
@@ -581,27 +583,28 @@ HTaskInfo HdcSessionBase::AdminTask(const uint8_t op, HSession hSession, const u
 int HdcSessionBase::SendByProtocol(HSession hSession, uint8_t *bufPtr, const int bufLen)
 {
     if (hSession->isDead) {
-        return -1;
+        return ERR_SESSION_NOFOUND;
     }
     uv_mutex_lock(&hSession->sendMutex);
     hSession->sendRef++;
+    int ret = 0;
     switch (hSession->connType) {
         case CONN_TCP: {
             if (hSession->hWorkThread == uv_thread_self()) {
-                Base::SendToStreamEx((uv_stream_t *)&hSession->hWorkTCP, bufPtr, bufLen, nullptr,
-                                     (void *)FinishWriteSessionTCP, bufPtr);
+                ret = Base::SendToStreamEx((uv_stream_t *)&hSession->hWorkTCP, bufPtr, bufLen, nullptr,
+                                           (void *)FinishWriteSessionTCP, bufPtr);
             } else if (hSession->hWorkChildThread == uv_thread_self()) {
-                Base::SendToStreamEx((uv_stream_t *)&hSession->hChildWorkTCP, bufPtr, bufLen, nullptr,
-                                     (void *)FinishWriteSessionTCP, bufPtr);
+                ret = Base::SendToStreamEx((uv_stream_t *)&hSession->hChildWorkTCP, bufPtr, bufLen, nullptr,
+                                           (void *)FinishWriteSessionTCP, bufPtr);
             } else {
                 WRITE_LOG(LOG_FATAL, "SendByProtocol uncontrol send");
-                assert(1 != 1);
+                ret = ERR_API_FAIL;
             }
             break;
         }
         case CONN_USB: {
             HdcUSBBase *pUSB = ((HdcUSBBase *)hSession->classModule);
-            pUSB->SendUSBBlock(hSession, bufPtr, bufLen);
+            ret = pUSB->SendUSBBlock(hSession, bufPtr, bufLen);
             delete[] bufPtr;
             break;
         }
@@ -609,7 +612,7 @@ int HdcSessionBase::SendByProtocol(HSession hSession, uint8_t *bufPtr, const int
             break;
     }
     uv_mutex_unlock(&hSession->sendMutex);
-    return 0;
+    return ret;
 }
 
 int HdcSessionBase::Send(const uint32_t sessionId, const uint32_t channelId, const uint16_t commandFlag,
@@ -648,14 +651,10 @@ int HdcSessionBase::Send(const uint32_t sessionId, const uint32_t channelId, con
         }
         payloadHead->protocolVer = VER_PROTOCOL;
         payloadHead->dataSize = htonl(rc4BufLen);
-        SendByProtocol(hSession, sendBuf, sizeSendBuf);
-        ret = ERR_SUCCESS;
+        ret = SendByProtocol(hSession, sendBuf, sizeSendBuf);
         break;
     }
-    if (ret != ERR_SUCCESS) {
-        delete[] sendBuf;
-        sendBuf = nullptr;
-    }
+    // sendBuf free by SendByProtocol
     return ret;
 }
 
@@ -968,7 +967,7 @@ void HdcSessionBase::LogMsg(const uint32_t sessionId, const uint32_t channelId,
     vector<uint8_t> buf;
     buf.push_back(level);
     buf.insert(buf.end(), log.c_str(), log.c_str() + log.size());
-    ServerCommand(sessionId, channelId, CMD_KERNEL_ECHO, buf.data(), buf.size() + 1);
+    ServerCommand(sessionId, channelId, CMD_KERNEL_ECHO, buf.data(), buf.size());
 }
 
 // Heavy and time-consuming work was putted in the new thread to do, and does

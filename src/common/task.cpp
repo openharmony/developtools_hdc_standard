@@ -49,9 +49,8 @@ void HdcTaskBase::TaskFinish()
 
 bool HdcTaskBase::SendToAnother(const uint16_t command, uint8_t *bufPtr, const int size)
 {
-    HdcSessionBase *hSession = (HdcSessionBase *)taskInfo->ownerSessionClass;
-    hSession->Send(taskInfo->sessionId, taskInfo->channelId, command, bufPtr, size);
-    return true;
+    HdcSessionBase *sessionBase = reinterpret_cast<HdcSessionBase *>(taskInfo->ownerSessionClass);
+    return sessionBase->Send(taskInfo->sessionId, taskInfo->channelId, command, bufPtr, size) > 0;
 }
 
 void HdcTaskBase::LogMsg(MessageLevel level, const char *msg, ...)
@@ -60,8 +59,8 @@ void HdcTaskBase::LogMsg(MessageLevel level, const char *msg, ...)
     va_start(vaArgs, msg);
     string log = Base::StringFormat(msg, vaArgs);
     va_end(vaArgs);
-    HdcSessionBase *pSession = (HdcSessionBase *)clsSession;
-    pSession->LogMsg(taskInfo->sessionId, taskInfo->channelId, level, log.c_str());
+    HdcSessionBase *sessionBase = reinterpret_cast<HdcSessionBase *>(clsSession);
+    sessionBase->LogMsg(taskInfo->sessionId, taskInfo->channelId, level, log.c_str());
 }
 
 bool HdcTaskBase::ServerCommand(const uint16_t command, uint8_t *bufPtr, const int size)

@@ -112,7 +112,7 @@ int TestTaskCommand(int method, const string &debugServerPort, const string &deb
                           "install /d/a.hap /mnt/hgfs/vtmp/b.hap /mnt/hgfs/vtmp -lrtsdpg");  // hap
             break;
         case UT_TEST_TMP:
-            TestRunClient(debugServerPort, debugConnectKey, "install /d/helloworld.hap");
+            TestRunClient(debugServerPort, debugConnectKey, "file send /mnt/hgfs/vtmp/f.txt /data/local/tmp/f2.txt");
 #ifdef DEF_NULL
             TestRunClient(debugServerPort, debugConnectKey, "install /d/helloworld.hap");
             TestRunClient(debugServerPort, debugConnectKey, "target mount");

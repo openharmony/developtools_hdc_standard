@@ -24,7 +24,7 @@ namespace TranslateCommand {
               "---------------------------------global commands:----------------------------------\n"
               " -h/help                               - Print hdc help\n"
               " -v/version                            - Print hdc version\n"
-              " -l 0-4                                - Set runtime loglevel\n"
+              " -l 0-5                                - Set runtime loglevel\n"
               " -t connectkey                         - Use device with given connect key\n"
               "\n"
               "---------------------------------component commands:-------------------------------\n"
@@ -213,11 +213,11 @@ namespace TranslateCommand {
         } else if (!strcmp(input, CMDSTR_SHELL.c_str())) {
             outCmd->cmdFlag = CMD_SHELL_INIT;
         } else if (!strncmp(input, CMDSTR_FILE_SEND.c_str(), CMDSTR_FILE_SEND.size())
-            || !strncmp(input, CMDSTR_FILE_RECV.c_str(), CMDSTR_FILE_RECV.size())) {
+                   || !strncmp(input, CMDSTR_FILE_RECV.c_str(), CMDSTR_FILE_RECV.size())) {
             outCmd->cmdFlag = CMD_FILE_INIT;
             outCmd->paraments = input + 5;  // CMDSTR_FORWARD_FPORT CMDSTR_FORWARD_RPORT size
         } else if (!strncmp(input, string(CMDSTR_FORWARD_FPORT + " ").c_str(), CMDSTR_FORWARD_FPORT.size() + 1)
-            || !strncmp(input, string(CMDSTR_FORWARD_RPORT + " ").c_str(), CMDSTR_FORWARD_RPORT.size() + 1)) {
+                   || !strncmp(input, string(CMDSTR_FORWARD_RPORT + " ").c_str(), CMDSTR_FORWARD_RPORT.size() + 1)) {
             stringError = ForwardPort(input, outCmd);
         } else if (!strcmp(input, CMDSTR_KILL_SERVER.c_str())) {
             outCmd->cmdFlag = CMD_KERNEL_SERVER_KILL;

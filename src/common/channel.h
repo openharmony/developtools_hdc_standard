@@ -34,7 +34,7 @@ protected:
         char banner[12];  // must first index
         union {
             uint32_t channelId;
-            char connectKey[24];
+            char connectKey[MAX_CONNECTKEY_SIZE];
         };
     } __attribute__((packed));
     uint32_t MallocChannel(HChannel *hOutChannel);

@@ -137,10 +137,11 @@ bool HdcHostApp::CheckInstallContinue(AppModType mode, bool lastResult, const ch
 
 bool HdcHostApp::CommandDispatch(const uint16_t command, uint8_t *payload, const int payloadSize)
 {
-    if (!HdcTransferBase::CommandDispatch(command, payload, payloadSize))
+    if (!HdcTransferBase::CommandDispatch(command, payload, payloadSize)) {
         return false;
-
+    }
     bool ret = true;
+    constexpr int cmdOffset = 2;
     switch (command) {
         case CMD_APP_INIT: {
             ret = BeginInstall(&ctxNow, (const char *)payload);
@@ -149,7 +150,8 @@ bool HdcHostApp::CommandDispatch(const uint16_t command, uint8_t *payload, const
         case CMD_APP_FINISH: {
             AppModType mode = (AppModType)payload[0];
             bool result = (bool)payload[1];
-            ret = CheckInstallContinue(mode, result, (const char *)payload + 2);
+            string s(reinterpret_cast<char *>(payload + cmdOffset), payloadSize - cmdOffset);
+            ret = CheckInstallContinue(mode, result, s.c_str());
             break;
         }
         case CMD_APP_UNINSTALL: {

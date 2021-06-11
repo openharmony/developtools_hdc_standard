@@ -50,6 +50,7 @@ private:
     bool GetAnyTarget(HChannel hChannel);
     bool RemoveForward(HChannel hChannel, const char *paramentString);
     bool TaskCommand(HChannel hChannel, void *formatCommandInput);
+    int ChannelHandShake(HChannel hChannel, uint8_t *bufPtr, const int bytesIO);
 
     uv_tcp_t tcpListen;
     void *clsServer;

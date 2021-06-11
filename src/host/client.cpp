@@ -116,9 +116,9 @@ int HdcClient::CtrlServiceWork(const char *commandIn)
     return 0;
 }
 
-string HdcClient::AutoConnectKey(string &doCommand)
+string HdcClient::AutoConnectKey(string &doCommand, const string &preConnectKey) const
 {
-    string key;
+    string key = preConnectKey;
     bool isNoTargetCommand = false;
     vector<string> vecNoConnectKeyCommand;
     vecNoConnectKeyCommand.push_back(CMDSTR_SOFTWARE_VERSION);
@@ -153,7 +153,7 @@ int HdcClient::ExecuteCommand(const string &commandIn)
         return -1;
     }
     command = commandIn;
-    connectKey = AutoConnectKey(command);
+    connectKey = AutoConnectKey(command, connectKey);
     ConnectServerForClient(ip, port);
     uv_timer_init(loopMain, &waitTimeDoCmd);
     waitTimeDoCmd.data = this;
@@ -302,25 +302,27 @@ void HdcClient::Connect(uv_connect_t *connection, int status)
 
 int HdcClient::PreHandshake(HChannel hChannel, const uint8_t *buf)
 {
-    ChannelHandShake *psHandShake = (ChannelHandShake *)buf;
-    if (strncmp((char *)psHandShake->banner, HANDSHAKE_MESSAGE.c_str(), HANDSHAKE_MESSAGE.size())) {
+    ChannelHandShake *handShakePacket = (ChannelHandShake *)buf;
+    if (strncmp(handShakePacket->banner, HANDSHAKE_MESSAGE.c_str(), HANDSHAKE_MESSAGE.size())) {
         hChannel->availTailIndex = 0;
         WRITE_LOG(LOG_DEBUG, "Channel Hello failed");
         return ERR_BUF_CHECK;
     }
     // sync remote session id to local
     uint32_t unOld = hChannel->channelId;
-    hChannel->channelId = ntohl(psHandShake->channelId);
+    hChannel->channelId = ntohl(handShakePacket->channelId);
     AdminChannel(OP_UPDATE, unOld, hChannel);
-    WRITE_LOG(LOG_DEBUG, "Client channel handshake finished");
+    WRITE_LOG(LOG_DEBUG, "Client channel handshake finished, use connectkey:%s", connectKey.c_str());
     // send config
     // channel handshake step2
-    if (strcpy_s(psHandShake->connectKey, sizeof(psHandShake->connectKey), connectKey.c_str())) {
+    Base::ZeroBuf(handShakePacket->connectKey, sizeof(handShakePacket->connectKey));
+    if (memcpy_s(handShakePacket->connectKey, sizeof(handShakePacket->connectKey), connectKey.c_str(),
+        connectKey.size())) {
         hChannel->availTailIndex = 0;
         WRITE_LOG(LOG_DEBUG, "Channel Hello failed");
         return ERR_BUF_COPY;
     }
-    Send(hChannel->channelId, (uint8_t *)psHandShake, sizeof(ChannelHandShake));
+    Send(hChannel->channelId, reinterpret_cast<uint8_t *>(handShakePacket), sizeof(ChannelHandShake));
     hChannel->handshakeOK = true;
     return ERR_SUCCESS;
 }
@@ -335,10 +337,9 @@ int HdcClient::ReadChannel(HChannel hChannel, uint8_t *buf, const int bytesIO)
     // Do not output to console when the unit test
     return 0;
 #endif
-    vector<uint8_t> res;
-    res.insert(res.end(), buf, buf + bytesIO);
-    res.push_back(0x0);
-    fprintf(stdout, "%s", res.data());
+    WRITE_LOG(LOG_DEBUG, "Client ReadChannel :%d", bytesIO);
+    string s(reinterpret_cast<char *>(buf), bytesIO);
+    fprintf(stdout, "%s", s.c_str());
     fflush(stdout);
     return 0;
 };

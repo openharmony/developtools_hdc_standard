@@ -54,11 +54,11 @@ void HdcServerForClient::AcceptClient(uv_stream_t *server, int status)
     Base::SetTcpOptions(&hChannel->hWorkTCP);
     uv_read_start((uv_stream_t *)&hChannel->hWorkTCP, AllocCallback, ReadStream);
     // channel handshake step1
-    ChannelHandShake handShake;
+    struct ChannelHandShake handShake;
     Base::ZeroStruct(handShake);
     if (EOK == strcpy_s(handShake.banner, sizeof(handShake.banner), HANDSHAKE_MESSAGE.c_str())) {
         handShake.channelId = htonl(hChannel->channelId);
-        thisClass->Send(hChannel->channelId, (uint8_t *)&handShake, sizeof(ChannelHandShake));
+        thisClass->Send(hChannel->channelId, (uint8_t *)&handShake, sizeof(struct ChannelHandShake));
     }
 }
 
@@ -510,7 +510,6 @@ int HdcServerForClient::BindChannelToSession(HChannel hChannel, uint8_t *bufPtr,
     while (!hChannel->hChildWorkTCP.loop) {
         uv_sleep(1);
     }
-
     if (uv_fileno((const uv_handle_t *)&hChannel->hWorkTCP, &hChannel->fdChildWorkTCP) < 0) {
         return -3;
     }
@@ -518,7 +517,6 @@ int HdcServerForClient::BindChannelToSession(HChannel hChannel, uint8_t *bufPtr,
     hChannel->fdChildWorkTCP = dup(hChannel->fdChildWorkTCP);
 #endif
     uv_read_stop((uv_stream_t *)&hChannel->hWorkTCP);  // disable parent
-
     // Send work thread enabled listening
     flag[0] = SP_ATTACH_CHANNEL;
     Base::SendToStream((uv_stream_t *)&hSession->ctrlPipe[STREAM_MAIN], flag, 5);
@@ -543,30 +541,43 @@ bool HdcServerForClient::CheckAutoFillTarget(HChannel hChannel)
     return true;
 }
 
+int HdcServerForClient::ChannelHandShake(HChannel hChannel, uint8_t *bufPtr, const int bytesIO)
+{
+    vector<uint8_t> rebuildHandshake;
+    rebuildHandshake.insert(rebuildHandshake.end(), bufPtr, bufPtr + bytesIO);
+    rebuildHandshake.push_back(0x00);
+    struct ChannelHandShake *handShake = reinterpret_cast<struct ChannelHandShake *>(rebuildHandshake.data());
+    if (strncmp(handShake->banner, HANDSHAKE_MESSAGE.c_str(), HANDSHAKE_MESSAGE.size())) {
+        hChannel->availTailIndex = 0;
+        WRITE_LOG(LOG_DEBUG, "Channel Hello failed");
+        return ERR_HANDSHAKE_NOTMATCH;
+    }
+    if (strlen(handShake->connectKey) > sizeof(handShake->connectKey)) {
+        hChannel->availTailIndex = 0;
+        WRITE_LOG(LOG_DEBUG, "Connectkey's size incorrect");
+        return ERR_HANDSHAKE_CONNECTKEY_FAILED;
+    }
+    // channel handshake step3
+    WRITE_LOG(LOG_DEBUG, "ServerForClient channel handshake finished");
+    hChannel->connectKey = handShake->connectKey;
+    hChannel->handshakeOK = true;
+    if (!CheckAutoFillTarget(hChannel)) {
+        return 0;
+    }
+    if (BindChannelToSession(hChannel, nullptr, 0)) {
+        hChannel->availTailIndex = 0;
+        WRITE_LOG(LOG_DEBUG, "BindChannelToSession failed");
+        return ERR_GENERIC;
+    }
+    return 0;
+}
+
 // Here is Server to get data, the source is the SERVER's ChildWork to send data
 int HdcServerForClient::ReadChannel(HChannel hChannel, uint8_t *bufPtr, const int bytesIO)
 {
     int ret = 0;
     if (!hChannel->handshakeOK) {
-        ChannelHandShake *handShake = (ChannelHandShake *)bufPtr;
-        if (strncmp(handShake->banner, HANDSHAKE_MESSAGE.c_str(), HANDSHAKE_MESSAGE.size())) {
-            hChannel->availTailIndex = 0;
-            WRITE_LOG(LOG_DEBUG, "Channel Hello failed");
-            return -1;
-        }
-        // channel handshake step3
-        WRITE_LOG(LOG_DEBUG, "ServerForClient channel handshake finished");
-        hChannel->connectKey = handShake->connectKey;
-        hChannel->handshakeOK = true;
-        if (!CheckAutoFillTarget(hChannel)) {
-            return 0;
-        }
-        if (BindChannelToSession(hChannel, nullptr, 0)) {
-            hChannel->availTailIndex = 0;
-            WRITE_LOG(LOG_DEBUG, "BindChannelToSession failed");
-            return -2;
-        }
-        return 0;
+        return ChannelHandShake(hChannel, bufPtr, bytesIO);
     }
     TranslateCommand::FormatCommand formatCommand;
     Base::ZeroStruct(formatCommand);
