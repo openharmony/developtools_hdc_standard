@@ -17,10 +17,12 @@
 #include "common.h"
 
 namespace Hdc {
-int WriteHexToDebugFile(const char *fileName, const uint8_t *buf, const int bufLen);
-int ReadHexFromDebugFile(const char *fileName, uint8_t *buf, const int bufLen);
-void DetermineThread(HSession hSession);
-int PrintfHexBuf(const uint8_t *buf, int bufLen);
+namespace Debug {
+    int WriteHexToDebugFile(const char *fileName, const uint8_t *buf, const int bufLen);
+    int ReadHexFromDebugFile(const char *fileName, uint8_t *buf, const int bufLen);
+    void DetermineThread(HSession hSession);
+    int PrintfHexBuf(const uint8_t *buf, int bufLen);
+}
 }  // namespace Hdc
 
 #endif

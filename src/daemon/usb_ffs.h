@@ -14,8 +14,10 @@
  */
 #ifndef HDC_USBFFS_H
 #define HDC_USBFFS_H
+// clang-format off
 #include <linux/usb/functionfs.h>
 #include "daemon_common.h"
+// clang-format on
 
 namespace Hdc {
 constexpr auto HDC_USBDR_SND = 0x0;
@@ -199,16 +201,16 @@ static const struct {
     .hs_descs = hs_descriptors,
     .ss_descs = ss_descriptors,
     .os_header = {
-            .interface = CPU_TO_LE32(0),
+            .interface = 0,
             .dwLength = CPU_TO_LE32(sizeof(USB_FFS_DESC.os_header) + sizeof(USB_FFS_DESC.os_desc)),
-            .bcdVersion = CPU_TO_LE32(1),
-            .wIndex = CPU_TO_LE32(4),
-            .bCount = CPU_TO_LE32(1),
-            .Reserved = CPU_TO_LE32(0),
+            .bcdVersion = CPU_TO_LE16(1),
+            .wIndex = CPU_TO_LE16(4),
+            .bCount = 1,
+            .Reserved = 0,
         },
     .os_desc = {
             .bFirstInterfaceNumber = 0,
-            .Reserved1 = CPU_TO_LE32(1),
+            .Reserved1 = 1,
             .CompatibleID = { 'W', 'I', 'N', 'U', 'S', 'B', '\0', '\0'},
             .SubCompatibleID = {0},
             .Reserved2 = {0},

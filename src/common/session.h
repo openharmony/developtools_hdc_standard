@@ -30,11 +30,16 @@ public:
         string connectKey;
         string buf;
     };
-
+    struct CtrlStruct {
+        InnerCtrlCommand command;
+        uint32_t channelId;
+        uint8_t dataSize;
+        uint8_t data[BUF_SIZE_MICRO];
+    };
     HdcSessionBase(bool serverOrDaemonIn);
     virtual ~HdcSessionBase();
     virtual void RegisterChannel(HSession hSession, const uint32_t channelId) {};
-    virtual void AttachChannel(uv_stream_t *uvpipe, HSession hSession, const uint32_t channelId) {};
+    virtual void AttachChannel(HSession hSession, const uint32_t channelId) {};
     virtual void DeatchChannel(const uint32_t channelId) {};
     virtual bool RedirectToTask(HTaskInfo hTaskInfo, HSession hSession, const uint32_t channelId,
                                 const uint16_t command, uint8_t *payload, const int payloadSize)
@@ -87,6 +92,8 @@ public:
     {
         return wantRestart;
     }
+    static vector<uint8_t> BuildCtrlString(InnerCtrlCommand command, uint32_t channelId,
+        const uint8_t *data, int dataSize);
     uv_loop_t loopMain;
     bool serverOrDaemon;
     uv_async_t asyncMainLoop;
@@ -144,7 +151,7 @@ private:
     {
     }
     int DecryptPayload(HSession hSession, uint8_t *pEncryptBuf, const int bufLen);
-    bool DispatchMainThreadCommand(uv_stream_t *uvpipe, HSession hSession, const uint8_t *baseBuf, const int bytesIO);
+    bool DispatchMainThreadCommand(HSession hSession, const CtrlStruct *ctrl);
     bool DispatchSessionThreadCommand(uv_stream_t *uvpipe, HSession hSession, const uint8_t *baseBuf,
                                       const int bytesIO);
     bool BeginRemoveTask(HTaskInfo hTask);

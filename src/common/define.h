@@ -33,6 +33,7 @@ const string STRING_EMPTY = "";
 const string DEFAULT_SERVER_ADDR = "127.0.0.1:8710";
 
 // ################################ macro define ###################################
+constexpr uint16_t BUF_SIZE_MICRO = 16;
 constexpr uint16_t BUF_SIZE_TINY = 64;
 constexpr uint16_t BUF_SIZE_SMALL = 256;
 constexpr uint16_t BUF_SIZE_MEDIUM = 512;
@@ -41,8 +42,8 @@ constexpr uint16_t BUF_SIZE_DEFAULT2 = BUF_SIZE_DEFAULT * 2;
 constexpr uint8_t DWORD_SERIALIZE_SIZE = 4;
 constexpr uint32_t HDC_BUF_MAX_BYTES = 1024000000;
 constexpr uint16_t MAX_IP_PORT = 65535;
-constexpr uint8_t STREAM_MAIN = 0;  // work at main thread
-constexpr uint8_t STREAM_WORK = 1;  // work at work thread
+constexpr uint8_t STREAM_MAIN = 0;            // work at main thread
+constexpr uint8_t STREAM_WORK = 1;            // work at work thread
 constexpr uint16_t MAX_CONNECTKEY_SIZE = 32;  // usb sn/tcp ipport
 constexpr uint8_t MAX_IO_OVERLAP = 128;
 constexpr auto TIME_BASE = 1000;  // time unit conversion base value
@@ -50,7 +51,7 @@ constexpr auto TIME_BASE = 1000;  // time unit conversion base value
 // general one argument command argc
 constexpr int CMD_ARG1_COUNT = 2;
 // The first child versions must match, otherwise server and daemon must be upgraded
-const string VERSION_NUMBER = "1.1.0a";       // same with openssl version, 1.1.2==VERNUMBER 0x10102000
+const string VERSION_NUMBER = "1.1.0b";       // same with openssl version, 1.1.2==VERNUMBER 0x10102000
 const string HANDSHAKE_MESSAGE = "OHOS HDC";  // sep not char '-', not more than 11 bytes
 const string PACKET_FLAG = "HW";              // must 2bytes
 const string EMPTY_ECHO = "[Empty]";
@@ -93,7 +94,7 @@ enum LogLevel {
     LOG_WARN,
     LOG_DEBUG,
     LOG_FULL,
-    LOG_LAST = LOG_FULL,
+    LOG_LAST = LOG_FULL,  // tail, not use
 };
 #define WRITE_LOG(x, y...) Base::PrintLogEx(__FILE__, __LINE__, x, y)
 
@@ -147,7 +148,7 @@ enum AsyncEvent {
     ASYNC_STOP_MAINLOOP = 0,
     ASYNC_FREE_SESSION,
 };
-enum SocketpairEvent {
+enum InnerCtrlCommand {
     SP_START_SESSION = 0,
     SP_STOP_SESSION,
     SP_REGISTER_CHANNEL,

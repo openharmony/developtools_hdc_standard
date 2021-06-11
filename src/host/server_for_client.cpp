@@ -502,11 +502,8 @@ int HdcServerForClient::BindChannelToSession(HChannel hChannel, uint8_t *bufPtr,
         return -2;
     }
 
-    uint8_t flag[5];
-    flag[0] = SP_REGISTER_CHANNEL;
-    if (memcpy_s(flag + 1, sizeof(flag) - 1, &hChannel->channelId, 4)) {
-    }
-    Base::SendToStream((uv_stream_t *)&hSession->ctrlPipe[STREAM_MAIN], flag, 5);
+    auto ctrl = HdcSessionBase::BuildCtrlString(SP_REGISTER_CHANNEL, hChannel->channelId, nullptr, 0);
+    Base::SendToStream((uv_stream_t *)&hSession->ctrlPipe[STREAM_MAIN], ctrl.data(), ctrl.size());
     while (!hChannel->hChildWorkTCP.loop) {
         uv_sleep(1);
     }
@@ -517,9 +514,8 @@ int HdcServerForClient::BindChannelToSession(HChannel hChannel, uint8_t *bufPtr,
     hChannel->fdChildWorkTCP = dup(hChannel->fdChildWorkTCP);
 #endif
     uv_read_stop((uv_stream_t *)&hChannel->hWorkTCP);  // disable parent
-    // Send work thread enabled listening
-    flag[0] = SP_ATTACH_CHANNEL;
-    Base::SendToStream((uv_stream_t *)&hSession->ctrlPipe[STREAM_MAIN], flag, 5);
+    auto ctrlAttach = HdcSessionBase::BuildCtrlString(SP_ATTACH_CHANNEL, hChannel->channelId, nullptr, 0);
+    Base::SendToStream((uv_stream_t *)&hSession->ctrlPipe[STREAM_MAIN], ctrlAttach.data(), ctrlAttach.size());
     return 0;
 }
 

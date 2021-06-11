@@ -101,10 +101,9 @@ int HdcUSBBase::SendUSBBlock(HSession hSession, uint8_t *data, const int length)
     return offset;
 }
 
-// hSession->dataPipe[STREAM_MAIN]
-bool HdcUSBBase::SendToHdcStream(uv_stream_t *stream, HUSB usb, uint8_t *appendData, int dataSize)
+bool HdcUSBBase::SendToHdcStream(HSession hSession, uv_stream_t *stream, uint8_t *appendData, int dataSize)
 {
-    vector<uint8_t> &bufRecv = usb->bufRecv;
+    vector<uint8_t> &bufRecv = hSession->hUSB->bufRecv;
     bufRecv.insert(bufRecv.end(), appendData, appendData + dataSize);
     int ret = ERR_SUCCESS;
     while (bufRecv.size() > sizeof(USBHead)) {
@@ -116,17 +115,23 @@ bool HdcUSBBase::SendToHdcStream(uv_stream_t *stream, HUSB usb, uint8_t *appendD
         }
         if (bufRecv.size() < sizeof(USBHead) + usbHeader->dataSize) {
             WRITE_LOG(LOG_DEBUG, "SendToHdcStream not enough");
-            break;  // successful, but not enough
+            break;  // successful , but not enough
         }
-        // usb data to logic
-        if (Base::SendToStream(stream, bufRecv.data() + sizeof(USBHead), usbHeader->dataSize) < 0) {
-            ret = ERR_IO_FAIL;
-            WRITE_LOG(LOG_FATAL, "Error usb send to stream");
+        if (usbHeader->sessionId != hSession->sessionId) {
+            SendUsbReset(hSession->hUSB, usbHeader->sessionId);
+            ret = ERR_SESSION_NOFOUND;
+            WRITE_LOG(LOG_FATAL, "SendToHdcStream sessionId not matched");
             break;
+        } else {
+            // usb data to logic
+            if (Base::SendToStream(stream, bufRecv.data() + sizeof(USBHead), usbHeader->dataSize) < 0) {
+                ret = ERR_IO_FAIL;
+                WRITE_LOG(LOG_FATAL, "Error usb send to stream");
+                break;
+            }
         }
         bufRecv.erase(bufRecv.begin(), bufRecv.begin() + sizeof(USBHead) + usbHeader->dataSize);
     }
-
     return ret == ERR_SUCCESS;
 }
 }

@@ -233,18 +233,12 @@ bool HdcDaemonUnity::RebootDevice(const uint8_t *cmd, const int cmdSize)
 {
     sync();
     string propertyVal;
-    int ret = -1;
     if (!cmdSize) {
         propertyVal = "reboot";
     } else {
         propertyVal = Base::StringFormat("reboot,%s", cmd);
     }
-    if (ret > 0) {
-        Base::SetHdcProperty(rebootProperty.c_str(), propertyVal.c_str());
-        return true;
-    } else {
-        return false;
-    }
+    return Base::SetHdcProperty(rebootProperty.c_str(), propertyVal.c_str());
 }
 
 bool HdcDaemonUnity::SetDeviceRunMode(void *daemonIn, const char *cmd)
