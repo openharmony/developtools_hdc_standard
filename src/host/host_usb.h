@@ -49,7 +49,7 @@ private:
     bool FindDeviceByID(HUSB hUSB, const char *usbMountPoint, libusb_context *ctxUSB);
     void UpdateUSBDaemonInfo(HUSB hUSB, HSession hSession, uint8_t connStatus);
     bool DetectMyNeed(libusb_device *device, string &sn);
-    bool SendUsbReset(HUSB hUSB);
+    void SendUsbReset(HUSB usb, uint32_t sessionId);
     void RestoreHdcProtocol(HUSB hUsb, const uint8_t *buf, int bufSize);
 
     uv_idle_t usbWork;

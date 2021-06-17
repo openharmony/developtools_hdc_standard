@@ -49,7 +49,7 @@ private:
     HSession usbMain;
     uint32_t currentSessionId = 0;  // USB mode,limit only one session
     std::atomic<uint32_t> ref = 0;
-    uv_timer_t checkEP;             // server-use
+    uv_timer_t checkEP;  // server-use
     uv_mutex_t sendEP;
     bool isAlive = false;
 };

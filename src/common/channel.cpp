@@ -41,7 +41,9 @@ HdcChannelBase::~HdcChannelBase()
 vector<uint8_t> HdcChannelBase::GetChannelHandshake(string &connectKey) const
 {
     vector<uint8_t> ret;
+    // clang-format off
     struct ChannelHandShake handshake = {{0}};
+    // clang-format on
     Base::ZeroStruct(handshake);
     if (strcpy_s(handshake.banner, sizeof(handshake.banner), HANDSHAKE_MESSAGE.c_str()) != EOK) {
         return ret;
@@ -317,13 +319,9 @@ void HdcChannelBase::FreeChannelContinue(HChannel hChannel)
     // Call from main thread only
     NotifyInstanceChannelFree(hChannel);
     if (hChannel->hChildWorkTCP.loop) {
-        uint8_t abyteFlag[5] = { 0 };
-        abyteFlag[0] = SP_DEATCH_CHANNEL;
-        if (memcpy_s(abyteFlag + 1, sizeof(abyteFlag) - 1, &hChannel->channelId, 4)) {
-        }
-        Base::SendToStream((uv_stream_t *)&hChannel->targetSession->ctrlPipe[STREAM_MAIN], (uint8_t *)&abyteFlag, 5);
-        // If there is blocking problem in the later stage, we can consider changing the whole release process to
-        // asynchronous implementation like FreeSession
+        auto ctrl = HdcSessionBase::BuildCtrlString(SP_DEATCH_CHANNEL, hChannel->channelId, nullptr, 0);
+        Base::SendToStream(reinterpret_cast<uv_stream_t*>(&hChannel->targetSession->ctrlPipe[STREAM_MAIN]),
+            ctrl.data(), ctrl.size());
         while (!hChannel->childCleared) {
             usleep(1000);
         }

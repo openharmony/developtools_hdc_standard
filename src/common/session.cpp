@@ -357,7 +357,7 @@ HSession HdcSessionBase::MallocSession(bool serverOrDaemon, const ConnType connT
     hSession->listKey = new list<void *>;
     hSession->uvRef = 0;
     // pullup child
-    WRITE_LOG(LOG_DEBUG, "HdcSessionBase::New Session, ptr:%p", hSession);
+    WRITE_LOG(LOG_DEBUG, "HdcSessionBase NewSession, sessionId:%d", hSession->sessionId);
 
     uv_tcp_init(&loopMain, &hSession->ctrlPipe[STREAM_MAIN]);
     hSession->uvRef++;
@@ -438,7 +438,7 @@ void HdcSessionBase::FreeSessionFinally(uv_idle_t *handle)
     // all hsession uv handle has been clear
     thisClass->AdminSession(OP_REMOVE, hSession->sessionId, nullptr);
     hSession->mainCleared = true;
-    WRITE_LOG(LOG_DEBUG, "FreeSessionFinally hSession: %p finish", hSession);
+    WRITE_LOG(LOG_DEBUG, "FreeSessionFinally sessionId:%d finish", hSession->sessionId);
     delete hSession;
     hSession = nullptr;  // fix CodeMars SetNullAfterFree issue
     Base::TryCloseHandle((const uv_handle_t *)handle, Base::CloseIdleCallback);
@@ -487,9 +487,9 @@ void HdcSessionBase::FreeSession(const uint32_t sessionId)
         PushAsyncMessage(hSession->sessionId, ASYNC_FREE_SESSION, nullptr, 0);
         return;
     }
-    WRITE_LOG(LOG_DEBUG, "FreeSession hSession:%p sendref:%u", hSession, uint16_t(hSession->sendRef));
+    WRITE_LOG(LOG_DEBUG, "FreeSession sessionid:%d sendref:%u", hSession->sessionId, uint16_t(hSession->sendRef));
     while (true) {
-        if (!hSession || hSession->sendRef || hSession->mainCleared || hSession->isDead) {
+        if (hSession->sendRef || hSession->isDead) {
             break;
         }
         bNotTodo = false;
@@ -502,9 +502,9 @@ void HdcSessionBase::FreeSession(const uint32_t sessionId)
     NotifyInstanceSessionFree(hSession);  // Notify Server or Daemon, just UI or display commandline
     // wait workthread to free
     if (hSession->ctrlPipe[STREAM_WORK].loop) {
-        // If the sub-thread has been bound and run
-        uint8_t flag = SP_STOP_SESSION;
-        Base::SendToStream((uv_stream_t *)&hSession->ctrlPipe[STREAM_MAIN], (uint8_t *)&flag, 1);
+        auto ctrl = BuildCtrlString(SP_STOP_SESSION, 0, nullptr, 0);
+        Base::SendToStream((uv_stream_t *)&hSession->ctrlPipe[STREAM_MAIN], ctrl.data(), ctrl.size());
+        WRITE_LOG(LOG_DEBUG, "FreeSession, send workthread fo free. sessionId:%d", hSession->sessionId);
         auto callbackCheckFreeSessionContinue = [](uv_timer_t *handle) -> void {
             HSession hSession = (HSession)handle->data;
             HdcSessionBase *thisClass = (HdcSessionBase *)hSession->classInstance;
@@ -585,9 +585,9 @@ int HdcSessionBase::SendByProtocol(HSession hSession, uint8_t *bufPtr, const int
     if (hSession->isDead) {
         return ERR_SESSION_NOFOUND;
     }
+    int ret = 0;
     uv_mutex_lock(&hSession->sendMutex);
     hSession->sendRef++;
-    int ret = 0;
     switch (hSession->connType) {
         case CONN_TCP: {
             if (hSession->hWorkThread == uv_thread_self()) {
@@ -796,6 +796,8 @@ void HdcSessionBase::ReadCtrlFromSession(uv_stream_t *uvpipe, ssize_t nread, con
             WRITE_LOG(LOG_WARN, "HdcSessionBase read overlap data");
             break;
         }
+        // only one command, no need to split command from stream
+        // if add more commands, consider the format command
         hSessionBase->DispatchSessionThreadCommand(uvpipe, hSession, (uint8_t *)buf->base, nread);
         break;
     }
@@ -839,18 +841,41 @@ bool HdcSessionBase::WorkThreadStartSession(HSession hSession)
     return true;
 }
 
-bool HdcSessionBase::DispatchMainThreadCommand(uv_stream_t *uvpipe, HSession hSession, const uint8_t *baseBuf,
-                                               const int bytesIO)
+vector<uint8_t> HdcSessionBase::BuildCtrlString(InnerCtrlCommand command, uint32_t channelId,
+                                                const uint8_t *data, int dataSize)
+{
+    vector<uint8_t> ret;
+    while (true) {
+        if (dataSize > BUF_SIZE_MICRO) {
+            break;
+        }
+        CtrlStruct ctrl;
+        Base::ZeroStruct(ctrl);
+        ctrl.command = command;
+        ctrl.channelId = channelId;
+        ctrl.dataSize = dataSize;
+        if (dataSize > 0 && data != nullptr && memcpy_s(ctrl.data, sizeof(ctrl.data), data, dataSize) != EOK) {
+            break;
+        }
+        uint8_t *buf = reinterpret_cast<uint8_t *>(&ctrl);
+        ret.insert(ret.end(), buf, buf + sizeof(CtrlStruct));
+        break;
+    }
+    return ret;
+}
+
+bool HdcSessionBase::DispatchMainThreadCommand(HSession hSession, const CtrlStruct *ctrl)
 {
     bool ret = true;
-    uint8_t flag = *(uint8_t *)baseBuf;
-
-    switch (flag) {
+    uint32_t channelId = ctrl->channelId;  // if send not set, it is zero
+    switch (ctrl->command) {
         case SP_START_SESSION: {
+            WRITE_LOG(LOG_DEBUG, "Dispatch MainThreadCommand  START_SESSION");
             ret = WorkThreadStartSession(hSession);
             break;
         }
         case SP_STOP_SESSION: {
+            WRITE_LOG(LOG_DEBUG, "Dispatch MainThreadCommand STOP_SESSION");
             Base::TryCloseHandle((uv_handle_t *)&hSession->hChildWorkTCP);
             Base::TryCloseHandle((uv_handle_t *)&hSession->ctrlPipe[STREAM_WORK]);
             Base::TryCloseHandle((uv_handle_t *)&hSession->dataPipe[STREAM_WORK]);
@@ -861,7 +886,6 @@ bool HdcSessionBase::DispatchMainThreadCommand(uv_stream_t *uvpipe, HSession hSe
             if (!serverOrDaemon) {
                 break;  // Only Server has this feature
             }
-            uint32_t channelId = *(uint32_t *)(baseBuf + 1);
             RegisterChannel(hSession, channelId);
             break;
         }
@@ -869,15 +893,13 @@ bool HdcSessionBase::DispatchMainThreadCommand(uv_stream_t *uvpipe, HSession hSe
             if (!serverOrDaemon) {
                 break;  // Only Server has this feature
             }
-            uint32_t channelId = *(uint32_t *)(baseBuf + 1);
-            AttachChannel(uvpipe, hSession, channelId);
+            AttachChannel(hSession, channelId);
             break;
         }
         case SP_DEATCH_CHANNEL: {
             if (!serverOrDaemon) {
                 break;  // Only Server has this feature
             }
-            uint32_t channelId = *(uint32_t *)(baseBuf + 1);
             DeatchChannel(channelId);
             break;
         }
@@ -894,20 +916,20 @@ void HdcSessionBase::ReadCtrlFromMain(uv_stream_t *uvpipe, ssize_t nread, const 
 {
     HSession hSession = (HSession)uvpipe->data;
     HdcSessionBase *hSessionBase = (HdcSessionBase *)hSession->classInstance;
-
-    while (true) {
+    int formatCommandSize = sizeof(CtrlStruct);
+    int index = 0;
+    while (index < nread) {
+        if (nread % formatCommandSize != 0) {
+            WRITE_LOG(LOG_FATAL, "ReadCtrlFromMain size failed, nread == %d", nread);
+            break;
+        }
         if (nread < 0) {
             WRITE_LOG(LOG_DEBUG, "SessionCtrl failed,%s", uv_strerror(nread));
             break;
         }
-        // In addition to the special transmission of the control instruction, the number of bytes will not be lower
-        // than the Packethead length, and the control command is one byte.
-        if (nread > 64) {
-            WRITE_LOG(LOG_WARN, "HdcSessionBase read overlap data");
-            break;
-        }
-        hSessionBase->DispatchMainThreadCommand(uvpipe, hSession, (uint8_t *)buf->base, nread);
-        break;
+        CtrlStruct *ctrl = reinterpret_cast<CtrlStruct *>(buf->base + index);
+        index += sizeof(CtrlStruct);
+        hSessionBase->DispatchMainThreadCommand(hSession, ctrl);
     }
     delete[] buf->base;
 }
@@ -947,12 +969,13 @@ void HdcSessionBase::SessionWorkThread(uv_work_t *arg)
         WRITE_LOG(LOG_DEBUG, "SessionCtrl err2, %s fd:%d", uv_strerror(childRet), hSession->ctrlFd[STREAM_WORK]);
     }
     uv_read_start((uv_stream_t *)&hSession->ctrlPipe[STREAM_WORK], Base::AllocBufferCallback, ReadCtrlFromMain);
-    WRITE_LOG(LOG_DEBUG, "!!!BeginThread:ChildSession, hSession：%p childLoop:%p", hSession, &hSession->childLoop);
+    WRITE_LOG(LOG_DEBUG, "!!!Workthread run begin, sessionId:%d", hSession->sessionId);
     uv_run(&hSession->childLoop, UV_RUN_DEFAULT);  // work pendding
+    WRITE_LOG(LOG_DEBUG, "!!!Workthread run again, sessionId:%d", hSession->sessionId);
     // main loop has exit
-    thisClass->ReChildLoopForSessionClear(hSession);  // work pendding
+    thisClass->ReChildLoopForSessionClear(hSession);  // work pending again
     hSession->childCleared = true;
-    WRITE_LOG(LOG_DEBUG, "Session childUV finish, hSession：%p childLoop:%p", hSession, &hSession->childLoop);
+    WRITE_LOG(LOG_DEBUG, "!!!Workthread run finish, sessionId:%d", hSession->sessionId);
 }
 
 // clang-format off

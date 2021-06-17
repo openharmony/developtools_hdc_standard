@@ -75,7 +75,7 @@ namespace Base {
     int Base64DecodeBuf(const uint8_t *input, const int length, uint8_t *bufOut);
     string Base64Decode(const uint8_t *input, const int length);
     void ReverseBytes(void *start, int size);
-    string CanonicalizeSpecPath(string& src);
+    string CanonicalizeSpecPath(string &src);
     // Just zero a POD type, such as a structure or union
     template<class T> int ZeroStruct(T &structBuf)
     {

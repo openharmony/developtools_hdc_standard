@@ -62,11 +62,12 @@ void HdcDaemonTCP::TransmitConfig(const sockaddr *addrSrc, uv_udp_t *handle)
 
 void HdcDaemonTCP::AcceptClient(uv_stream_t *server, int status)
 {
-    uint8_t *byteFlag = nullptr;
     uv_loop_t *ptrLoop = server->loop;
     uv_tcp_t *pServTCP = (uv_tcp_t *)server;
     HdcDaemonTCP *thisClass = (HdcDaemonTCP *)pServTCP->data;
     HdcSessionBase *ptrConnect = (HdcSessionBase *)thisClass->clsMainBase;
+    HdcSessionBase *daemon = reinterpret_cast<HdcSessionBase *>(thisClass->clsMainBase);
+    auto ctrl = daemon->BuildCtrlString(SP_START_SESSION, 0, nullptr, 0);
     HSession hSession = ptrConnect->MallocSession(false, CONN_TCP, thisClass);
     if (!hSession) {
         return;
@@ -86,13 +87,8 @@ void HdcDaemonTCP::AcceptClient(uv_stream_t *server, int status)
 #ifdef UNIT_TEST
     hSession->fdChildWorkTCP = dup(hSession->fdChildWorkTCP);
 #endif
-
     uv_read_stop((uv_stream_t *)&hSession->hWorkTCP);
-    // Send a HWORKTCP handle via PIPE[0]
-    byteFlag = new uint8_t[1];
-    *byteFlag = SP_START_SESSION;
-    Base::SendToStreamEx((uv_stream_t *)&hSession->ctrlPipe[STREAM_MAIN], (uint8_t *)byteFlag, 1, nullptr,
-        (void *)Base::SendCallback, byteFlag);
+    Base::SendToStream((uv_stream_t *)&hSession->ctrlPipe[STREAM_MAIN], ctrl.data(), ctrl.size());
     return;
 Finish:
     ptrConnect->FreeSession(hSession->sessionId);

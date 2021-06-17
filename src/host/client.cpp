@@ -316,8 +316,10 @@ int HdcClient::PreHandshake(HChannel hChannel, const uint8_t *buf)
     // send config
     // channel handshake step2
     Base::ZeroBuf(handShakePacket->connectKey, sizeof(handShakePacket->connectKey));
+    // clang-format off
     if (memcpy_s(handShakePacket->connectKey, sizeof(handShakePacket->connectKey), connectKey.c_str(),
         connectKey.size())) {
+    // clang-format on
         hChannel->availTailIndex = 0;
         WRITE_LOG(LOG_DEBUG, "Channel Hello failed");
         return ERR_BUF_COPY;
