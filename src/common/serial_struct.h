@@ -1214,7 +1214,7 @@ namespace SerialStruct {
         size_t _pos;
     };
 
-    // mycode
+    // mytype
     template<> struct Serializer<uint8_t> {
         static void Serialize(uint32_t tag, uint8_t value, FlagsType<>, Writer &out, bool force = false)
         {
@@ -1246,7 +1246,7 @@ namespace SerialStruct {
             return false;
         }
     };
-    // mycode finish
+    // mytype finish
     template<class T> std::string SerializeToString(const T &value)
     {
         std::string out;

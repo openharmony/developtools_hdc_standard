@@ -63,23 +63,38 @@ int HdcHostUSB::Initial()
     return 0;
 }
 
-bool HdcHostUSB::SendUsbReset(HUSB hUSB)
+void HdcHostUSB::SendUsbReset(HUSB hUSB, uint32_t sessionId)
 {
-    USBHead usbPayloadHeader;
-    Base::ZeroStruct(usbPayloadHeader);
-    usbPayloadHeader.option |= USB_OPTION_RESET;
-    if (memcpy_s(usbPayloadHeader.flag, sizeof(usbPayloadHeader.flag),
+    USBHead *usbPayloadHeader = new USBHead();
+    usbPayloadHeader->option |= USB_OPTION_RESET;
+    usbPayloadHeader->sessionId = sessionId;
+    if (memcpy_s(usbPayloadHeader->flag, sizeof(usbPayloadHeader->flag),
         PACKET_FLAG.c_str(), PACKET_FLAG.size()) != EOK) {
-        return false;
+        delete usbPayloadHeader;
+        return;
     }
-    // if daemon failed, here willbe block USB_TIMEOUT
-    int transferred = 0;
-    libusb_bulk_transfer(hUSB->devHandle, hUSB->epHost, (uint8_t *)&usbPayloadHeader, sizeof(USBHead),
-        &transferred, TIME_BASE);
-    if (transferred != sizeof(USBHead)) {
-        return false;
+    auto resetUsbCallback = [](struct libusb_transfer *transfer) -> void LIBUSB_CALL {
+        USBHead *usbHead = (USBHead *)transfer->user_data;
+        if (LIBUSB_TRANSFER_COMPLETED != transfer->status) {
+            WRITE_LOG(LOG_FATAL, "SendUSBRaw status:%d", transfer->status);
+        }
+        delete usbHead;
+        libusb_free_transfer(transfer);
+        // has send soft reset, next reset daemon's send
+        libusb_reset_device(transfer->dev_handle);
+        WRITE_LOG(LOG_DEBUG, "Device reset singal send");
+    };
+    libusb_transfer *transferUsb = libusb_alloc_transfer(0);
+    // clang-format off
+    libusb_fill_bulk_transfer(transferUsb, hUSB->devHandle, hUSB->epHost, (uint8_t *)usbPayloadHeader, sizeof(USBHead),
+        resetUsbCallback, usbPayloadHeader, GLOBAL_TIMEOUT * TIME_BASE);
+    // clang-format on
+    int err = libusb_submit_transfer(transferUsb);
+    if (err < 0) {
+        WRITE_LOG(LOG_FATAL, "libusb_submit_transfer failed, err:%d", err);
+        delete usbPayloadHeader;
+        return;
     }
-    return true;
 }
 
 bool HdcHostUSB::DetectMyNeed(libusb_device *device, string &sn)
@@ -92,22 +107,19 @@ bool HdcHostUSB::DetectMyNeed(libusb_device *device, string &sn)
         delete hUSB;
         return false;
     }
-    while (true) {
-        WRITE_LOG(LOG_INFO, "Needed device found, busid:%d devid:%d connectkey:%s", hUSB->busId, hUSB->devId,
-                  hUSB->serialNumber.c_str());
-        // USB device is automatically connected after recognition, auto connect USB
-        UpdateUSBDaemonInfo(hUSB, nullptr, STATUS_READY);
-        HdcServer *hdcServer = (HdcServer *)clsMainBase;
-        HSession hSession = hdcServer->MallocSession(true, CONN_USB, this);
-        hSession->connectKey = hUSB->serialNumber;
-        uv_timer_t *waitTimeDoCmd = new uv_timer_t;
-        uv_timer_init(&hdcServer->loopMain, waitTimeDoCmd);
-        waitTimeDoCmd->data = hSession;
-        uv_timer_start(waitTimeDoCmd, hdcServer->UsbPreConnect, 10, 100);
-        mapIgnoreDevice[sn] = HOST_USB_REGISTER;
-        ret = true;
-        break;
-    }
+    WRITE_LOG(LOG_INFO, "Needed device found, busid:%d devid:%d connectkey:%s", hUSB->busId, hUSB->devId,
+              hUSB->serialNumber.c_str());
+    // USB device is automatically connected after recognition, auto connect USB
+    UpdateUSBDaemonInfo(hUSB, nullptr, STATUS_READY);
+    HdcServer *hdcServer = (HdcServer *)clsMainBase;
+    HSession hSession = hdcServer->MallocSession(true, CONN_USB, this);
+    hSession->connectKey = hUSB->serialNumber;
+    uv_timer_t *waitTimeDoCmd = new uv_timer_t;
+    uv_timer_init(&hdcServer->loopMain, waitTimeDoCmd);
+    waitTimeDoCmd->data = hSession;
+    uv_timer_start(waitTimeDoCmd, hdcServer->UsbPreConnect, 10, 100);
+    mapIgnoreDevice[sn] = HOST_USB_REGISTER;
+    ret = true;
     libusb_release_interface(hUSB->devHandle, hUSB->interfaceNumber);
     libusb_close(hUSB->devHandle);
     hUSB->devHandle = nullptr;
@@ -131,7 +143,7 @@ void HdcHostUSB::KickoutZombie(HSession hSession)
 {
     HdcServer *ptrConnect = (HdcServer *)hSession->classInstance;
     HUSB hUSB = hSession->hUSB;
-    if (!hUSB->devHandle) {
+    if (!hUSB->devHandle || hSession->isDead) {
         return;
     }
     if (LIBUSB_ERROR_NO_DEVICE != libusb_kernel_driver_active(hUSB->devHandle, hUSB->interfaceNumber)) {
@@ -309,7 +321,7 @@ void LIBUSB_CALL HdcHostUSB::ReadUSBBulkCallback(struct libusb_transfer *transfe
             WRITE_LOG(LOG_FATAL, "Host usb not LIBUSB_TRANSFER_COMPLETED, status:%d", transfer->status);
             break;
         }
-        if (!thisClass->SendToHdcStream(reinterpret_cast<uv_stream_t *>(&hSession->dataPipe[STREAM_MAIN]), hUSB,
+        if (!thisClass->SendToHdcStream(hSession, reinterpret_cast<uv_stream_t *>(&hSession->dataPipe[STREAM_MAIN]),
                                         hUSB->bufDevice, transfer->actual_length)) {
             break;
         }
@@ -505,12 +517,8 @@ HSession HdcHostUSB::ConnectDetectDaemon(const HSession hSession, const HDaemonI
     while (hSession->childLoop.active_handles == 0) {
         uv_sleep(1);
     }
-    // junk data to pullup acceptchild
-    uint8_t *byteFlag = new uint8_t[1];
-    *byteFlag = SP_START_SESSION;
-    Base::SendToStreamEx((uv_stream_t *)&hSession->ctrlPipe[STREAM_MAIN], (uint8_t *)byteFlag, 1, nullptr,
-                         (void *)Base::SendCallback, byteFlag);
-
+    auto ctrl = pServer->BuildCtrlString(SP_START_SESSION, 0, nullptr, 0);
+    Base::SendToStream((uv_stream_t *)&hSession->ctrlPipe[STREAM_MAIN], ctrl.data(), ctrl.size());
     return hSession;
 }
 }  // namespace Hdc

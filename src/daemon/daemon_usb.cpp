@@ -139,7 +139,6 @@ void HdcDaemonUSB::CloseEndpoint(HUSB hUSB)
         hUSB->control = 0;
     }
     isAlive = false;
-    currentSessionId = 0;
     WRITE_LOG(LOG_FATAL, "DaemonUSB CloseEndpoint");
 }
 
@@ -157,12 +156,10 @@ bool HdcDaemonUSB::AvailablePacket(uint8_t *ioBuf, uint32_t *sessionId)
             break;
         }
         if ((usbPayloadHeader->option & USB_OPTION_RESET)) {
-            if (currentSessionId != 0) {
-                HdcDaemon *daemon = reinterpret_cast<HdcDaemon *>(clsMainBase);
-                // The Host end program is restarted, but the USB cable is still connected
-                WRITE_LOG(LOG_WARN, "Hostside want restart daemon, restart old sessionid:%d", currentSessionId);
-                daemon->PushAsyncMessage(currentSessionId, ASYNC_FREE_SESSION, nullptr, 0);
-            }
+            HdcDaemon *daemon = reinterpret_cast<HdcDaemon *>(clsMainBase);
+            // The Host end program is restarted, but the USB cable is still connected
+            WRITE_LOG(LOG_WARN, "Hostside want restart daemon, restart old sessionid:%d", usbPayloadHeader->sessionId);
+            daemon->PushAsyncMessage(usbPayloadHeader->sessionId, ASYNC_FREE_SESSION, nullptr, 0);
             break;
         }
         *sessionId = usbPayloadHeader->sessionId;
@@ -193,7 +190,7 @@ int HdcDaemonUSB::SendUSBIOSync(HSession hSession, HUSB hMainUSB, uint8_t *data,
     if (!modRunning) {
         goto Finish;
     }
-    while (modRunning) {
+    while (modRunning && !hSession->isDead) {
         childRet = write(bulkIn, (uint8_t *)data + offset, length - offset);
         if (childRet <= 0) {
             int err = errno;
@@ -270,16 +267,18 @@ HSession HdcDaemonUSB::PrepareNewSession(uint32_t sessionId, uint8_t *pRecvBuf, 
     Base::StartWorkThread(&daemon->loopMain, daemon->SessionWorkThread, Base::FinishWorkThread, hChildSession);
     auto funcNewSessionUp = [](uv_timer_t *handle) -> void {
         HSession hChildSession = reinterpret_cast<HSession>(handle->data);
+        HdcDaemon *daemon = reinterpret_cast<HdcDaemon *>(hChildSession->classInstance);
         if (hChildSession->childLoop.active_handles == 0) {
             return;
         }
-        uint8_t flag = SP_START_SESSION;
-        Base::SendToStream((uv_stream_t *)&hChildSession->ctrlPipe[STREAM_MAIN], &flag, 1);
-        WRITE_LOG(LOG_DEBUG, "Main thread usbio mirgate finish");
-        Base::TryCloseHandle(reinterpret_cast<uv_handle_t*>(handle), Base::CloseTimerCallback);
+        if (!hChildSession->isDead) {
+            auto ctrl = daemon->BuildCtrlString(SP_START_SESSION, 0, nullptr, 0);
+            Base::SendToStream((uv_stream_t *)&hChildSession->ctrlPipe[STREAM_MAIN], ctrl.data(), ctrl.size());
+            WRITE_LOG(LOG_DEBUG, "Main thread usbio mirgate finish");
+        }
+        Base::TryCloseHandle(reinterpret_cast<uv_handle_t *>(handle), Base::CloseTimerCallback);
     };
     Base::TimerUvTask(&daemon->loopMain, hChildSession, funcNewSessionUp);
-
     return hChildSession;
 }
 
@@ -296,7 +295,7 @@ int HdcDaemonUSB::DispatchToWorkThread(HSession hSession, const uint32_t session
             return ERR_SESSION_NOFOUND;
         }
     }
-    if (!SendToHdcStream(reinterpret_cast<uv_stream_t*>(&hChildSession->dataPipe[STREAM_MAIN]), hChildSession->hUSB,
+    if (!SendToHdcStream(hChildSession, reinterpret_cast<uv_stream_t *>(&hChildSession->dataPipe[STREAM_MAIN]),
         readBuf, readBytes)) {
         return ERR_IO_FAIL;
     }

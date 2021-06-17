@@ -957,7 +957,7 @@ namespace Base {
         }
         timer->data = data;
         uv_timer_init(loop, timer);
-        constexpr int repeatTimeout = 250; // ms
+        constexpr int repeatTimeout = 250;  // ms
         uv_timer_start(timer, cb, 0, repeatTimeout);
         // delete by callback
         return true;
@@ -973,7 +973,7 @@ namespace Base {
         return str;
     }
 
-    string CanonicalizeSpecPath(string& src)
+    string CanonicalizeSpecPath(string &src)
     {
         char resolvedPath[PATH_MAX] = { 0 };
 #if defined(_WIN32)

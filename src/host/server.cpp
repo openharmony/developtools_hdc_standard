@@ -602,7 +602,7 @@ void HdcServer::RegisterChannel(HSession hSession, const uint32_t channelId)
     hChannel->targetSession = hSession;
 }
 
-void HdcServer::AttachChannel(uv_stream_t *uvpipe, HSession hSession, const uint32_t channelId)
+void HdcServer::AttachChannel(HSession hSession, const uint32_t channelId)
 {
     HdcServerForClient *hSfc = static_cast<HdcServerForClient *>(clsServerForClient);
     HChannel hChannel = hSfc->AdminChannel(OP_QUERY, channelId, nullptr);
