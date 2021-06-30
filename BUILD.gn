@@ -50,7 +50,6 @@ ohos_executable("hdcd") {
   sources += hdc_common_sources
 
   defines = [
-    "HDC_DEBUG",
     "HARMONY_PROJECT",
   ]
 

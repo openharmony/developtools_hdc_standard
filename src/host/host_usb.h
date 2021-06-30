@@ -25,6 +25,7 @@ public:
     int SendUSBRaw(HSession hSession, uint8_t *data, const int length);
     HSession ConnectDetectDaemon(const HSession hSession, const HDaemonInfo pdi);
     void Stop();
+    void RemoveIgnoreDevice(string &mountInfo);
 
 private:
     enum UsbCheckStatus {
@@ -49,7 +50,7 @@ private:
     bool FindDeviceByID(HUSB hUSB, const char *usbMountPoint, libusb_context *ctxUSB);
     void UpdateUSBDaemonInfo(HUSB hUSB, HSession hSession, uint8_t connStatus);
     bool DetectMyNeed(libusb_device *device, string &sn);
-    void SendUsbReset(HUSB usb, uint32_t sessionId);
+    void SendUsbReset(HUSB hUSB, uint32_t sessionId);
     void RestoreHdcProtocol(HUSB hUsb, const uint8_t *buf, int bufSize);
 
     uv_idle_t usbWork;

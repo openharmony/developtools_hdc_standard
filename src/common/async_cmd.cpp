@@ -72,6 +72,7 @@ void AsyncCmd::ExitCallback(uv_process_t *req, int64_t exitStatus, int tersignal
     thisClass->running = false;
     WRITE_LOG(LOG_DEBUG, "AsyncCmd::ExitCallback");
     Base::TryCloseHandle((uv_handle_t *)req);
+    thisClass->cmdResult = STRING_EMPTY;
 }
 
 bool AsyncCmd::Initial(uv_loop_t *loopIn, const CmdResultCallback callback)

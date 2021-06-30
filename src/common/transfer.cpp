@@ -67,7 +67,7 @@ int HdcTransferBase::SimpleFileIO(CtxFile *context, uint64_t index, uint8_t *sen
         ioContext->bufIO = buf;
         ioContext->context = context;
         req->data = ioContext;
-        refCount++;
+        ++refCount;
         if (context->master) {  // master just read, and slave just write.when master/read, sendBuf can be nullptr
             uv_buf_t iov = uv_buf_init(reinterpret_cast<char *>(buf), bytes);
             uv_fs_read(context->loop, req, context->fsOpenReq.result, &iov, 1, index, context->cb);
@@ -110,7 +110,7 @@ void HdcTransferBase::OnFileClose(uv_fs_t *req)
         // close-step2
         thisClass->WhenTransferFinish(context);
     }
-    thisClass->refCount--;
+    --thisClass->refCount;
     return;
 }
 
@@ -173,9 +173,9 @@ bool HdcTransferBase::SendIOPayload(CtxFile *context, int index, uint8_t *data, 
         delete[] sendBuf;
         return false;
     }
-    SendToAnother(commandData, sendBuf, payloadPrefixReserve + compressSize);
+    bool ret = SendToAnother(commandData, sendBuf, payloadPrefixReserve + compressSize) > 0;
     delete[] sendBuf;
-    return true;
+    return ret;
 }
 
 void HdcTransferBase::OnFileIO(uv_fs_t *req)
@@ -186,7 +186,7 @@ void HdcTransferBase::OnFileIO(uv_fs_t *req)
     HdcTransferBase *thisClass = (HdcTransferBase *)context->thisClass;
     uint8_t *bufIO = contextIO->bufIO;
     uv_fs_req_cleanup(req);
-    thisClass->refCount--;
+    --thisClass->refCount;
     while (true) {
         if (req->result <= 0) {  // Read error or master read completion
             tryFinishIO = true;
@@ -222,7 +222,7 @@ void HdcTransferBase::OnFileIO(uv_fs_t *req)
     delete contextIO;  // Req is part of the Contextio structure, no free release
     if (tryFinishIO) {
         // close-step1
-        thisClass->refCount++;
+        ++thisClass->refCount;
         uv_fs_close(thisClass->loopTask, &context->fsCloseReq, context->fsOpenReq.result, OnFileClose);
     }
 }
@@ -232,7 +232,7 @@ void HdcTransferBase::OnFileOpen(uv_fs_t *req)
     CtxFile *context = (CtxFile *)req->data;
     HdcTransferBase *thisClass = (HdcTransferBase *)context->thisClass;
     uv_fs_req_cleanup(req);
-    thisClass->refCount--;
+    --thisClass->refCount;
     if (req->result < 0) {
         thisClass->LogMsg(MSG_FAIL, "Error opening file: %s, path:%s", uv_strerror((int)req->result),
                           context->localPath.c_str());
@@ -304,7 +304,7 @@ int HdcTransferBase::GetSubFiles(const char *path, string filter, vector<string>
             string fullPath = string(path) + "/";
             fullPath += fileName;
             out->push_back(fullPath);
-            retNum++;
+            ++retNum;
         }
     }
     uv_fs_req_cleanup(&req);
@@ -323,7 +323,6 @@ bool HdcTransferBase::SmartSlavePath(string &localPath, const char *optName)
     uv_fs_req_cleanup(&req);
     if (r == 0 && req.statbuf.st_mode & S_IFDIR) {  // is dir
         localPath = Base::StringFormat("%s%c%s", localPath.c_str(), fs::path::preferred_separator, optName);
-        return false;
     }
     return false;
 }

@@ -104,7 +104,7 @@ int RSA2RSAPublicKey(RSA *rsa, RSAPublicKey *publicKey)
         BN_mod_inverse(rsaN0inv, rsaRem, r32, ctx);
         publicKey->wordModulusSize = RSANUMWORDS;
         publicKey->rsaN0inv = 0 - BN_get_word(rsaN0inv);
-        for (i = 0; i < RSANUMWORDS; i++) {
+        for (i = 0; i < RSANUMWORDS; ++i) {
             BN_div(rsaRR, rsaRem, rsaRR, r32, ctx);
             publicKey->rr[i] = BN_get_word(rsaRem);
             BN_div(n, rsaRem, n, r32, ctx);
@@ -431,7 +431,7 @@ void LoadDaemonKey(list<void *> *listPublicKey)
     int num = sizeof(keyPaths) / sizeof(keyPaths[0]);
     struct stat buf;
 
-    for (int i = 0; i < num; i++) {
+    for (int i = 0; i < num; ++i) {
         char *p = keyPaths[i];
         if (!stat(p, &buf)) {
             WRITE_LOG(LOG_DEBUG, "Loading keys from '%s'", p);
@@ -463,7 +463,7 @@ bool KeylistIncrement(list<void *> *listKey, uint8_t &authKeyIndex, void **out)
         return false;
     }
     auto listIndex = listKey->begin();
-    std::advance(listIndex, authKeyIndex++);
+    std::advance(listIndex, ++authKeyIndex);
     *out = *listIndex;
     if (!*out) {
         return false;

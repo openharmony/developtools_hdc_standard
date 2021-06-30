@@ -16,7 +16,7 @@
 
 namespace Hdc {
 HdcFileDescriptor::HdcFileDescriptor(uv_loop_t *loopIn, int fdToRead, void *callerContextIn,
-    CallBackWhenRead callbackReadIn, CmdResultCallback callbackFinishIn)
+                                     CallBackWhenRead callbackReadIn, CmdResultCallback callbackFinishIn)
 {
     loop = loopIn;
     workContinue = true;
@@ -75,7 +75,7 @@ void HdcFileDescriptor::OnFileIO(uv_fs_t *req)
     delete[] buf;
     delete ctxIO;
 
-    thisClass->refIO--;
+    --thisClass->refIO;
     if (bFinish) {
         thisClass->callbackFinish(thisClass->callerContext, fetalFinish, "OnRead finish");
         thisClass->workContinue = false;
@@ -104,7 +104,7 @@ int HdcFileDescriptor::LoopRead()
     contextIO->bufIO = buf;
     contextIO->thisClass = this;
     req->data = contextIO;
-    refIO++;
+    ++refIO;
 
     iov = uv_buf_init((char *)buf, readMax);
     uv_fs_read(loop, req, fdIO, &iov, 1, -1, OnFileIO);
@@ -144,7 +144,7 @@ int HdcFileDescriptor::WriteWithMem(uint8_t *data, int size)
     contextIO->bufIO = data;
     contextIO->thisClass = this;
     req->data = contextIO;
-    refIO++;
+    ++refIO;
 
     uv_buf_t iov = uv_buf_init((char *)data, size);
     uv_fs_write(loop, req, fdIO, &iov, 1, -1, OnFileIO);
