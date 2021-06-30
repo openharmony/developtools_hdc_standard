@@ -83,6 +83,7 @@ bool HdcShell::CommandDispatch(const uint16_t command, uint8_t *payload, const i
 
 int HdcShell::ChildForkDo(const char *devname, int ptm, const char *cmd, const char *arg0, const char *arg1)
 {
+    setsid();
     int pts = open(devname, O_RDWR | O_CLOEXEC);
     if (pts < 0) {
         return -1;
@@ -99,7 +100,6 @@ int HdcShell::ChildForkDo(const char *devname, int ptm, const char *cmd, const c
         write(fd, "0", 1);
         close(fd);
     }
-    setsid();
     char *env = nullptr;
     if ((env = getenv("HOME")) && chdir(env) < 0) {
     }

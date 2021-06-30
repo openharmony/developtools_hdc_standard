@@ -80,7 +80,7 @@ void HdcHostUnity::OnFileIO(uv_fs_t *req)
     HdcHostUnity *thisClass = (HdcHostUnity *)context->thisClass;
     uint8_t *bufIO = contextIO->bufIO;
     uv_fs_req_cleanup(req);
-    context->ref--;
+    --context->ref;
     if (!context->ref) {
         thisClass->runningProtect = false;
     }
@@ -115,7 +115,7 @@ bool HdcHostUnity::AppendLocalLog(const char *bufLog, const int sizeLog)
     contextIO->bufIO = buf;
     contextIO->context = &opContext;
     req->data = contextIO;
-    opContext.ref++;
+    ++opContext.ref;
     runningProtect = true;
 
     if (memcpy_s(buf, sizeLog, bufLog, sizeLog)) {

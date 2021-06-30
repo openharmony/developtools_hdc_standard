@@ -31,7 +31,7 @@ void HdcDaemonForward::SetupJdwpPointCallBack(uv_idle_t *handle)
     thisClass->SetupPointContinue(ctxPoint, 1);  // It usually works
     Base::TryCloseHandle((const uv_handle_t *)handle, Base::CloseIdleCallback);
     WRITE_LOG(LOG_DEBUG, "Setup JdwpPointCallBack finish");
-    thisClass->refCount--;
+    --thisClass->refCount;
     return;
 }
 
@@ -49,7 +49,7 @@ bool HdcDaemonForward::SetupJdwpPoint(HCtxForward ctxPoint)
     // do slave connect
     // fd[0] for forward, fd[1] for jdwp
     // forward to close fd[0], fd[1] for jdwp close
-    int fds[2] = {0};
+    int fds[2] = { 0 };
     bool ret = false;
     Base::CreateSocketPair(fds);
     if (uv_tcp_init(loopTask, &ctxPoint->tcp)) {
@@ -73,7 +73,7 @@ bool HdcDaemonForward::SetupJdwpPoint(HCtxForward ctxPoint)
         return ret;
     }
 
-    refCount++;
+    ++refCount;
     Base::IdleUvTask(loopTask, ctxPoint, SetupJdwpPointCallBack);
     return ret;
 }

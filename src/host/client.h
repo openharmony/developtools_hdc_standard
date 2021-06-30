@@ -41,6 +41,7 @@ private:
     bool StartKillServer(const char *cmd, bool startOrKill);
     void ModifyTty(bool setOrRestore, uv_tty_t *tty);
     int PreHandshake(HChannel hChannel, const uint8_t *buf);
+    void NotifyInstanceChannelFree(HChannel hChannel);
 
 #ifndef _WIN32
     termios terminalState;

@@ -19,18 +19,21 @@ namespace Hdc {
 HdcClient::HdcClient(const bool serverOrClient, const string &addrString, uv_loop_t *loopMainIn)
     : HdcChannelBase(serverOrClient, addrString, loopMainIn)
 {
-    MallocChannel(&channel);
+    MallocChannel(&channel);  // free by logic
     debugRetryCount = 0;
 }
 
 HdcClient::~HdcClient()
 {
+    Base::TryCloseLoop(loopMain, "ExecuteCommand finish");
+}
+
+void HdcClient::NotifyInstanceChannelFree(HChannel hChannel)
+{
     if (bShellInteractive) {
         WRITE_LOG(LOG_DEBUG, "Restore tty");
-        ModifyTty(false, &channel->stdinTty);
+        ModifyTty(false, &hChannel->stdinTty);
     }
-    FreeChannel(channel->channelId);
-    Base::TryCloseLoop(loopMain, "ExecuteCommand finish");
 }
 
 uint32_t HdcClient::GetLastPID()
@@ -138,7 +141,7 @@ string HdcClient::AutoConnectKey(string &doCommand, const string &preConnectKey)
     if (isNoTargetCommand) {
         key = "";
     } else {
-        if (!key.size()) {
+        if (!preConnectKey.size()) {
             key = CMDSTR_CONNECT_ANY;
         }
     }
@@ -167,7 +170,7 @@ int HdcClient::Initial(const string &connectKeyIn)
     connectKey = connectKeyIn;
     if (!channelHostPort.size() || !channelHost.size() || !channelPort) {
         WRITE_LOG(LOG_FATAL, "Listen string initial failed");
-        return -2;
+        return ERR_PARM_FAIL;
     }
     return 0;
 }
@@ -185,10 +188,9 @@ int HdcClient::ConnectServerForClient(const char *ip, uint16_t port)
 
 void HdcClient::CommandWorker(uv_timer_t *handle)
 {
-    const uint16_t maxWaitRetry = 300;
+    const uint16_t maxWaitRetry = 500;
     HdcClient *thisClass = (HdcClient *)handle->data;
-    if (thisClass->debugRetryCount++ > maxWaitRetry) {
-        // 8s
+    if (++thisClass->debugRetryCount > maxWaitRetry) {
         uv_timer_stop(handle);
         uv_stop(thisClass->loopMain);
         WRITE_LOG(LOG_DEBUG, "Connect server failed");
@@ -255,33 +257,25 @@ void HdcClient::BindLocalStd(HChannel hChannel)
     if (command == CMDSTR_SHELL) {
         bShellInteractive = true;
     }
-    if (UV_TTY == uv_guess_handle(STDIN_FILENO)) {
-        WRITE_LOG(LOG_DEBUG, "Tty std mode");
-        if (uv_tty_init(loopMain, &hChannel->stdoutTty, STDOUT_FILENO, 0)
-            || uv_tty_init(loopMain, &hChannel->stdinTty, STDIN_FILENO, 1)) {
-            WRITE_LOG(LOG_DEBUG, "uv_tty_init failed");
-            return;
-        }
-        hChannel->stdoutTty.data = hChannel;
-        hChannel->stdinTty.data = hChannel;
-        if (bShellInteractive) {
-            WRITE_LOG(LOG_DEBUG, "uv_tty_init uv_tty_set_mode");
-            ModifyTty(true, &hChannel->stdinTty);
-            uv_read_start((uv_stream_t *)&hChannel->stdinTty, AllocStdbuf, ReadStd);
-        }
-    } else {  // not use, to remove
-        WRITE_LOG(LOG_WARN, "Pipe std mode");
-        if (uv_pipe_init(loopMain, &hChannel->stdinPipe, 0) || uv_pipe_open(&hChannel->stdinPipe, STDIN_FILENO)) {
-            return;
-        }
-        if (uv_pipe_init(loopMain, &hChannel->stdoutPipe, 0) || uv_pipe_open(&hChannel->stdoutPipe, STDOUT_FILENO)) {
-            return;
-        }
-        hChannel->stdoutPipe.data = hChannel;
-        hChannel->stdinPipe.data = hChannel;
-        if (bShellInteractive) {  // Only the shell interactive mode is enabled
-            uv_read_start((uv_stream_t *)&hChannel->stdinPipe, AllocStdbuf, ReadStd);
-        }
+    if (uv_guess_handle(STDIN_FILENO) != UV_TTY) {
+        WRITE_LOG(LOG_FATAL, "Not support std mode");
+        return;
+    }
+
+    WRITE_LOG(LOG_DEBUG, "Tty std mode");
+    if (uv_tty_init(loopMain, &hChannel->stdoutTty, STDOUT_FILENO, 0)
+        || uv_tty_init(loopMain, &hChannel->stdinTty, STDIN_FILENO, 1)) {
+        WRITE_LOG(LOG_DEBUG, "uv_tty_init failed");
+        return;
+    }
+    hChannel->stdoutTty.data = hChannel;
+    ++hChannel->uvRef;
+    hChannel->stdinTty.data = hChannel;
+    ++hChannel->uvRef;
+    if (bShellInteractive) {
+        WRITE_LOG(LOG_DEBUG, "uv_tty_init uv_tty_set_mode");
+        ModifyTty(true, &hChannel->stdinTty);
+        uv_read_start((uv_stream_t *)&hChannel->stdinTty, AllocStdbuf, ReadStd);
     }
 }
 
@@ -302,29 +296,26 @@ void HdcClient::Connect(uv_connect_t *connection, int status)
 
 int HdcClient::PreHandshake(HChannel hChannel, const uint8_t *buf)
 {
-    ChannelHandShake *handShakePacket = (ChannelHandShake *)buf;
-    if (strncmp(handShakePacket->banner, HANDSHAKE_MESSAGE.c_str(), HANDSHAKE_MESSAGE.size())) {
+    ChannelHandShake *hShake = (ChannelHandShake *)buf;
+    if (strncmp(hShake->banner, HANDSHAKE_MESSAGE.c_str(), HANDSHAKE_MESSAGE.size())) {
         hChannel->availTailIndex = 0;
         WRITE_LOG(LOG_DEBUG, "Channel Hello failed");
         return ERR_BUF_CHECK;
     }
     // sync remote session id to local
     uint32_t unOld = hChannel->channelId;
-    hChannel->channelId = ntohl(handShakePacket->channelId);
+    hChannel->channelId = ntohl(hShake->channelId);
     AdminChannel(OP_UPDATE, unOld, hChannel);
     WRITE_LOG(LOG_DEBUG, "Client channel handshake finished, use connectkey:%s", connectKey.c_str());
     // send config
     // channel handshake step2
-    Base::ZeroBuf(handShakePacket->connectKey, sizeof(handShakePacket->connectKey));
-    // clang-format off
-    if (memcpy_s(handShakePacket->connectKey, sizeof(handShakePacket->connectKey), connectKey.c_str(),
-        connectKey.size())) {
-    // clang-format on
+    if (memset_s(hShake->connectKey, sizeof(hShake->connectKey), 0, sizeof(hShake->connectKey)) != EOK
+        || memcpy_s(hShake->connectKey, sizeof(hShake->connectKey), connectKey.c_str(), connectKey.size()) != EOK) {
         hChannel->availTailIndex = 0;
         WRITE_LOG(LOG_DEBUG, "Channel Hello failed");
         return ERR_BUF_COPY;
     }
-    Send(hChannel->channelId, reinterpret_cast<uint8_t *>(handShakePacket), sizeof(ChannelHandShake));
+    Send(hChannel->channelId, reinterpret_cast<uint8_t *>(hShake), sizeof(ChannelHandShake));
     hChannel->handshakeOK = true;
     return ERR_SUCCESS;
 }

@@ -112,7 +112,12 @@ int TestTaskCommand(int method, const string &debugServerPort, const string &deb
                           "install /d/a.hap /mnt/hgfs/vtmp/b.hap /mnt/hgfs/vtmp -lrtsdpg");  // hap
             break;
         case UT_TEST_TMP:
-            TestRunClient(debugServerPort, debugConnectKey, "file send /mnt/hgfs/vtmp/f.txt /data/local/tmp/f2.txt");
+            while (true) {
+                uv_sleep(50);
+                TestRunClient(debugServerPort, debugConnectKey, "list targets");
+                TestRunClient(debugServerPort, debugConnectKey, "shell id");
+                TestRunClient(debugServerPort, debugConnectKey, "shell bm dump -a");
+            }
 #ifdef DEF_NULL
             TestRunClient(debugServerPort, debugConnectKey, "install /d/helloworld.hap");
             TestRunClient(debugServerPort, debugConnectKey, "target mount");
@@ -122,6 +127,10 @@ int TestTaskCommand(int method, const string &debugServerPort, const string &deb
             TestRunClient(debugServerPort, debugConnectKey, "install /d -rt");
             TestRunClient(debugServerPort, debugConnectKey, "fport tcp:8081 tcp:8082");
             TestRunClient(debugServerPort, debugConnectKey, "fport tcp:8081 dev:/dev/urandom");
+            TestRunClient(debugServerPort, debugConnectKey, "shell hilog");
+            TestRunClient(debugServerPort, debugConnectKey, "file send /mnt/hgfs/vtmp/f.txt /tmp/f2.txt");
+            TestRunClient(debugServerPort, debugConnectKey, "file recv /tmp/f2.txt /mnt/hgfs/vtmp/f2.txt");
+            TestRunClient(debugServerPort, debugConnectKey, "shell find /proc");
 #endif
             break;
         default:

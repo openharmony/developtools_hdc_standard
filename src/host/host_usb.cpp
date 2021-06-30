@@ -13,7 +13,6 @@
  * limitations under the License.
  */
 #include "host_usb.h"
-
 #include "server.h"
 
 namespace Hdc {
@@ -66,10 +65,9 @@ int HdcHostUSB::Initial()
 void HdcHostUSB::SendUsbReset(HUSB hUSB, uint32_t sessionId)
 {
     USBHead *usbPayloadHeader = new USBHead();
-    usbPayloadHeader->option |= USB_OPTION_RESET;
+    usbPayloadHeader->option = USB_OPTION_RESET;
     usbPayloadHeader->sessionId = sessionId;
-    if (memcpy_s(usbPayloadHeader->flag, sizeof(usbPayloadHeader->flag),
-        PACKET_FLAG.c_str(), PACKET_FLAG.size()) != EOK) {
+    if (memcpy_s(usbPayloadHeader->flag, sizeof(usbPayloadHeader->flag), PACKET_FLAG.c_str(), 2) != EOK) {
         delete usbPayloadHeader;
         return;
     }
@@ -79,9 +77,9 @@ void HdcHostUSB::SendUsbReset(HUSB hUSB, uint32_t sessionId)
             WRITE_LOG(LOG_FATAL, "SendUSBRaw status:%d", transfer->status);
         }
         delete usbHead;
+        libusb_reset_device(transfer->dev_handle);
         libusb_free_transfer(transfer);
         // has send soft reset, next reset daemon's send
-        libusb_reset_device(transfer->dev_handle);
         WRITE_LOG(LOG_DEBUG, "Device reset singal send");
     };
     libusb_transfer *transferUsb = libusb_alloc_transfer(0);
@@ -152,6 +150,14 @@ void HdcHostUSB::KickoutZombie(HSession hSession)
     ptrConnect->FreeSession(hSession->sessionId);
 }
 
+void HdcHostUSB::RemoveIgnoreDevice(string &mountInfo)
+{
+    if (mapIgnoreDevice.count(mountInfo)) {
+        mapIgnoreDevice.erase(mountInfo);
+        WRITE_LOG(LOG_DEBUG, "Remove %s from mapIgnoreDevice", mountInfo.c_str());
+    }
+}
+
 void HdcHostUSB::WatchDevPlugin(uv_timer_t *handle)
 {
     HdcHostUSB *thisClass = (HdcHostUSB *)handle->data;
@@ -168,7 +174,7 @@ void HdcHostUSB::WatchDevPlugin(uv_timer_t *handle)
     }
     int i = 0;
     // linux replug devid increment，windows will be not
-    while ((dev = devs[i++]) != nullptr) {
+    while ((dev = devs[i++]) != nullptr) {  // must postfix++
         string szTmpKey = Base::StringFormat("%d-%d", libusb_get_bus_number(dev), libusb_get_device_address(dev));
         // check is in ignore list
         UsbCheckStatus statusCheck = thisClass->mapIgnoreDevice[szTmpKey];
@@ -278,7 +284,7 @@ int HdcHostUSB::CheckActiveConfig(libusb_device *device, HUSB hUSB)
     if (libusb_get_active_config_descriptor(device, &descConfig)) {
         return -1;
     }
-    for (j = 0; j < descConfig->bNumInterfaces; j++) {
+    for (j = 0; j < descConfig->bNumInterfaces; ++j) {
         const struct libusb_interface *interface = &descConfig->interface[j];
         if (interface->num_altsetting >= 1) {
             const struct libusb_interface_descriptor *ifDescriptor = &interface->altsetting[0];
@@ -287,7 +293,7 @@ int HdcHostUSB::CheckActiveConfig(libusb_device *device, HUSB hUSB)
             }
             hUSB->interfaceNumber = ifDescriptor->bInterfaceNumber;
             unsigned int k = 0;
-            for (k = 0; k < ifDescriptor->bNumEndpoints; k++) {
+            for (k = 0; k < ifDescriptor->bNumEndpoints; ++k) {
                 const struct libusb_endpoint_descriptor *ep_desc = &ifDescriptor->endpoint[k];
                 if ((ep_desc->bmAttributes & 0x03) == LIBUSB_TRANSFER_TYPE_BULK) {
                     if (ep_desc->bEndpointAddress & LIBUSB_ENDPOINT_IN) {
@@ -341,21 +347,22 @@ void LIBUSB_CALL HdcHostUSB::ReadUSBBulkCallback(struct libusb_transfer *transfe
         server->FreeSession(hSession->sessionId);
         WRITE_LOG(LOG_WARN, "ReadUSBBulkCallback failed");
         libusb_free_transfer(transfer);
+        hUSB->transferRecv = nullptr;
     }
 }
 
 void HdcHostUSB::RegisterReadCallback(HSession hSession)
 {
     HUSB hUSB = hSession->hUSB;
-    if (hSession->isDead || !modRunning) {
+    if (hSession->isDead || !modRunning || hSession->hUSB->transferRecv) {
         return;
     }
-    libusb_transfer *transferUsb = libusb_alloc_transfer(0);
-    libusb_fill_bulk_transfer(transferUsb, hUSB->devHandle, hUSB->epDevice, hUSB->bufDevice,
+    hSession->hUSB->transferRecv = libusb_alloc_transfer(0);
+    libusb_fill_bulk_transfer(hSession->hUSB->transferRecv, hUSB->devHandle, hUSB->epDevice, hUSB->bufDevice,
                               hUSB->bufSizeDevice,                // Note: in_buffer is where input data
                               ReadUSBBulkCallback, hSession, 0);  // no user data
-    transferUsb->user_data = hSession;
-    libusb_submit_transfer(transferUsb);
+    hSession->hUSB->transferRecv->user_data = hSession;
+    libusb_submit_transfer(hSession->hUSB->transferRecv);
 }
 
 // ==0 Represents new equipment and is what we need,<0  my need
@@ -396,11 +403,14 @@ void LIBUSB_CALL HdcHostUSB::WriteUSBBulkCallback(struct libusb_transfer *transf
     HdcSessionBase *server = reinterpret_cast<HdcSessionBase *>(hSession->classInstance);
     HdcHostUSB *thisClass = reinterpret_cast<HdcHostUSB *>(hSession->classModule);
     if (usbHead->option & USB_OPTION_TAIL) {
-        hSession->sendRef--;
+        --hSession->sendRef;
     }
     uv_sem_post(&thisClass->semUsbSend);
     if (LIBUSB_TRANSFER_COMPLETED != transfer->status || (hSession->isDead && 0 == hSession->sendRef)) {
         WRITE_LOG(LOG_FATAL, "SendUSBRaw status:%d", transfer->status);
+        if (hSession->hUSB->transferRecv != nullptr) {
+            libusb_cancel_transfer(hSession->hUSB->transferRecv);
+        }
         server->FreeSession(hSession->sessionId);
     }
     delete[] transfer->buffer;
@@ -437,9 +447,12 @@ int HdcHostUSB::SendUSBRaw(HSession hSession, uint8_t *data, const int length)
         break;
     }
     if (ret < 0) {
-        hSession->sendRef--;
+        --hSession->sendRef;
         if (sendBuf != nullptr) {
             delete[] sendBuf;
+        }
+        if (hUSB->transferRecv != nullptr) {
+            libusb_cancel_transfer(hUSB->transferRecv);
         }
         libusb_free_transfer(transferUsb);
     }
@@ -469,7 +482,7 @@ bool HdcHostUSB::FindDeviceByID(HUSB hUSB, const char *usbMountPoint, libusb_con
         return false;
 
     int i = 0;
-    for (i = 0; i < device_num; i++) {
+    for (i = 0; i < device_num; ++i) {
         struct libusb_device_descriptor desc;
         if (LIBUSB_SUCCESS != libusb_get_device_descriptor(listDevices[i], &desc)) {
             break;

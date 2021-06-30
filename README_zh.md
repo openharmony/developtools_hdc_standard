@@ -197,5 +197,5 @@ hdc当前支持如下命令：
 
 研发工具链子系统
 
-**developtools\_hdc\_standard**
 
+**developtools\_hdc\_standard**

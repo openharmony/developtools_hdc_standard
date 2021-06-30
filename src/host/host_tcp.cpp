@@ -102,22 +102,17 @@ void HdcHostTCP::Connect(uv_connect_t *connection, int status)
     if (status < 0) {
         goto Finish;
     }
+    if ((hSession->fdChildWorkTCP = Base::DuplicateUvSocket(&hSession->hWorkTCP)) < 0) {
+        goto Finish;
+    }
+    uv_read_stop((uv_stream_t *)&hSession->hWorkTCP);
     Base::SetTcpOptions((uv_tcp_t *)&hSession->hWorkTCP);
     WRITE_LOG(LOG_DEBUG, "HdcHostTCP::Connect");
     Base::StartWorkThread(&ptrConnect->loopMain, ptrConnect->SessionWorkThread, Base::FinishWorkThread, hSession);
     // wait for thread up
     while (hSession->childLoop.active_handles == 0) {
-        uv_sleep(1);
+        uv_sleep(MINOR_TIMEOUT);
     }
-    // junk data to pullup acceptchild
-    if (uv_fileno((const uv_handle_t *)&hSession->hWorkTCP, &hSession->fdChildWorkTCP)) {
-        goto Finish;
-    }
-#ifdef UNIT_TEST
-    hSession->fdChildWorkTCP = dup(hSession->fdChildWorkTCP);
-#endif
-    // The main thread is no longer read, handed over to the Child thread
-    uv_read_stop((uv_stream_t *)&hSession->hWorkTCP);
     Base::SendToStream((uv_stream_t *)&hSession->ctrlPipe[STREAM_MAIN], ctrl.data(), ctrl.size());
     return;
 Finish:
@@ -158,7 +153,7 @@ void HdcHostTCP::FindLanDaemon()
     lstDaemonResult.clear();
     uv_interface_addresses(&info, &count);
     i = count;
-    while (i--) {
+    while (--i) {
         uv_interface_address_t interface = info[i];
         if (interface.address.address4.sin_family == AF_INET6) {
             continue;

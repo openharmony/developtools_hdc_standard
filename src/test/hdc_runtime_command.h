@@ -40,7 +40,7 @@ enum UTType {
 };
 
 const string DEBUG_ADDRESS = Hdc::DEFAULT_SERVER_ADDR;
-const string DEBUG_TCP_CONNECT_KEY = "192.168.0.205:10178";
+const string DEBUG_TCP_CONNECT_KEY = "127.0.0.1:10178";
 const string DEBUG_USB_CONNECT_KEY = "any";
 
 int TestRuntimeCommand(const int method, const string &debugServerPort, const string &debugConnectKey);

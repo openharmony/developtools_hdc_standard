@@ -36,7 +36,7 @@ bool HdcHostApp::BeginInstall(CtxFile *context, const char *command)
         goto Finish;
     }
 
-    for (int i = 0; i < argc; i++) {
+    for (int i = 0; i < argc; ++i) {
         if (!strncmp(argv[i], "-", 1)) {
             if (options.size()) {
                 options += " ";
@@ -82,7 +82,7 @@ bool HdcHostApp::BeginSideload(CtxFile *context, const char *localPath)
 
 void HdcHostApp::RunQueue(CtxFile *context)
 {
-    refCount++;
+    ++refCount;
     context->localPath = context->taskQueue.back();
     uv_fs_open(loopTask, &context->fsOpenReq, context->localPath.c_str(), O_RDONLY, 0, OnFileOpen);
     context->master = true;

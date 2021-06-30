@@ -44,6 +44,10 @@ protected:
     }
     virtual void NotifyInstanceChannelFree(HChannel hChannel) {};
     void Send(const uint32_t channelId, uint8_t *bufPtr, const int size);
+    virtual bool ChannelSendSessionCtrlMsg(vector<uint8_t> &ctrlMsg, uint32_t sessionId)
+    {
+        return true;  // just server use
+    }
 
     string channelHostPort;
     string channelHost;
@@ -53,12 +57,13 @@ protected:
     uv_rwlock_t mainAsync;
     uv_async_t asyncMainLoop;
     list<void *> lstMainThreadOP;
-    uv_mutex_t freeChannel;
 
 private:
     static void MainAsyncCallback(uv_async_t *handle);
     static void WriteCallback(uv_write_t *req, int status);
     static void AsyncMainLoopTask(uv_idle_t *handle);
+    static void FreeChannelOpeate(uv_timer_t *handle);
+    static void FreeChannelFinally(uv_idle_t *handle);
     void ClearChannels();
     void FreeChannelContinue(HChannel hChannel);
     bool SetChannelTCPString(const string &addrString);
