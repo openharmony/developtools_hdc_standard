@@ -67,6 +67,7 @@ void HdcDaemonTCP::AcceptClient(uv_stream_t *server, int status)
     HdcDaemonTCP *thisClass = (HdcDaemonTCP *)pServTCP->data;
     HdcSessionBase *ptrConnect = (HdcSessionBase *)thisClass->clsMainBase;
     HdcSessionBase *daemon = reinterpret_cast<HdcSessionBase *>(thisClass->clsMainBase);
+    const uint16_t maxWaitTime = 250;
     auto ctrl = daemon->BuildCtrlString(SP_START_SESSION, 0, nullptr, 0);
     HSession hSession = ptrConnect->MallocSession(false, CONN_TCP, thisClass);
     if (!hSession) {
@@ -75,19 +76,16 @@ void HdcDaemonTCP::AcceptClient(uv_stream_t *server, int status)
     if (uv_accept(server, (uv_stream_t *)&hSession->hWorkTCP) < 0) {
         goto Finish;
     }
+    if ((hSession->fdChildWorkTCP = Base::DuplicateUvSocket(&hSession->hWorkTCP)) < 0) {
+        goto Finish;
+    };
+    uv_read_stop((uv_stream_t *)&hSession->hWorkTCP);
     Base::SetTcpOptions(&hSession->hWorkTCP);
     Base::StartWorkThread(ptrLoop, ptrConnect->SessionWorkThread, Base::FinishWorkThread, hSession);
     // wait for thread up
     while (hSession->childLoop.active_handles == 0) {
-        usleep(1000);
+        usleep(maxWaitTime);
     }
-    if (uv_fileno((const uv_handle_t *)&hSession->hWorkTCP, &hSession->fdChildWorkTCP) < 0) {
-        goto Finish;
-    }
-#ifdef UNIT_TEST
-    hSession->fdChildWorkTCP = dup(hSession->fdChildWorkTCP);
-#endif
-    uv_read_stop((uv_stream_t *)&hSession->hWorkTCP);
     Base::SendToStream((uv_stream_t *)&hSession->ctrlPipe[STREAM_MAIN], ctrl.data(), ctrl.size());
     return;
 Finish:

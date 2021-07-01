@@ -59,7 +59,7 @@ void HdcDaemonUnity::OnFdRead(uv_fs_t *req)
     CtxUnityIO *ctxIO = static_cast<CtxUnityIO *>(req->data);
     ContextUnity *ctx = static_cast<ContextUnity *>(ctxIO->context);
     HdcDaemonUnity *thisClass = ctx->thisClass;
-    thisClass->refCount--;
+    --thisClass->refCount;
     uint8_t *buf = ctxIO->bufIO;
     bool readContinue = false;
     while (true) {
@@ -109,7 +109,7 @@ int HdcDaemonUnity::LoopFdRead(ContextUnity *ctx)
     contextIO->bufIO = buf;
     contextIO->context = ctx;
     req->data = contextIO;
-    refCount++;
+    ++refCount;
 
     iov = uv_buf_init((char *)buf, readMax);
     uv_fs_read(loopTask, req, ctx->fd, &iov, 1, -1, OnFdRead);

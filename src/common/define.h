@@ -26,6 +26,8 @@ constexpr uint8_t SIZE_THREAD_POOL = 8;
 constexpr uint8_t GLOBAL_TIMEOUT = 60;
 constexpr uint16_t DEFAULT_PORT = 8710;
 constexpr uint16_t EXTRA_ALLOC_SIZE = 2048;
+constexpr uint8_t MINOR_TIMEOUT = 5;
+constexpr bool ENABLE_IO_CHECKSUM = false;
 
 const string UT_TMP_PATH = "/tmp/hdc-ut";
 const string SERVER_NAME = "HDCServer";
@@ -45,13 +47,13 @@ constexpr uint16_t MAX_IP_PORT = 65535;
 constexpr uint8_t STREAM_MAIN = 0;            // work at main thread
 constexpr uint8_t STREAM_WORK = 1;            // work at work thread
 constexpr uint16_t MAX_CONNECTKEY_SIZE = 32;  // usb sn/tcp ipport
-constexpr uint8_t MAX_IO_OVERLAP = 128;
+constexpr uint8_t MAX_IO_OVERLAP = 16;
 constexpr auto TIME_BASE = 1000;  // time unit conversion base value
 
 // general one argument command argc
 constexpr int CMD_ARG1_COUNT = 2;
 // The first child versions must match, otherwise server and daemon must be upgraded
-const string VERSION_NUMBER = "1.1.0b";       // same with openssl version, 1.1.2==VERNUMBER 0x10102000
+const string VERSION_NUMBER = "1.1.0d";       // same with openssl version, 1.1.2==VERNUMBER 0x10102000
 const string HANDSHAKE_MESSAGE = "OHOS HDC";  // sep not char '-', not more than 11 bytes
 const string PACKET_FLAG = "HW";              // must 2bytes
 const string EMPTY_ECHO = "[Empty]";
@@ -138,9 +140,14 @@ enum RetErrCode {
     ERR_PARM_FAIL,
     ERR_API_FAIL = -13000,
     ERR_IO_FAIL = -14000,
+    ERR_IO_TIMEOUT,
     ERR_SESSION_NOFOUND = -15000,
+    ERR_SESSION_OFFLINE,
+    ERR_SESSION_DEAD,
     ERR_HANDSHAKE_NOTMATCH = -16000,
     ERR_HANDSHAKE_CONNECTKEY_FAILED,
+    ERR_SOCKET_FAIL = -17000,
+    ERR_SOCKET_DUPLICATE,
 };
 
 // Flags shared by multiple modules
@@ -151,7 +158,6 @@ enum AsyncEvent {
 enum InnerCtrlCommand {
     SP_START_SESSION = 0,
     SP_STOP_SESSION,
-    SP_REGISTER_CHANNEL,
     SP_ATTACH_CHANNEL,
     SP_DEATCH_CHANNEL,
     SP_JDWP_NEWFD,
@@ -162,7 +168,6 @@ enum HdcCommand {
     CMD_KERNEL_HELP = 0,
     CMD_KERNEL_HANDSHAKE,
     CMD_KERNEL_CHANNEL_CLOSE,
-    CMD_KERNEL_CHANNEL_DETCH,
     CMD_KERNEL_SERVER_KILL,
     CMD_KERNEL_TARGET_DISCOVER,
     CMD_KERNEL_TARGET_LIST,
@@ -273,10 +278,10 @@ struct HdcUSB {
     string serialNumber;
     string usbMountPoint;
     libusb_context *ctxUSB = nullptr;  // child-use, main null
+    libusb_transfer *transferRecv;
 #endif
     // usb accessory FunctionFS
     // USB main thread use, sub-thread disable, sub-thread uses the main thread USB handle
-    int control;  // EP0
     int bulkOut;  // EP1
     int bulkIn;   // EP2
     vector<uint8_t> bufRecv;
@@ -290,11 +295,9 @@ struct HdcSession {
     string connectKey;
     uint8_t connType;  // ConnType
     uint32_t sessionId;
-    uv_mutex_t sendMutex;
     std::atomic<uint16_t> sendRef;
     uint8_t uvRef;  // libuv handle ref -- just main thread now
     bool childCleared;
-    bool mainCleared;
     map<uint32_t, HTaskInfo> *mapTask;
     // class ptr
     void *classInstance;  //  HdcSessionBase instance, HdcServer or HdcDaemon
@@ -316,7 +319,7 @@ struct HdcSession {
     uv_tcp_t dataPipe[2];
     int dataFd[2];           // data channel socketpair
     uv_tcp_t hChildWorkTCP;  // work channel，separate thread for server/daemon
-    uv_os_fd_t fdChildWorkTCP;
+    uv_os_sock_t fdChildWorkTCP;
     // usb handle
     HUSB hUSB;
     // tcp handle
@@ -329,28 +332,25 @@ using HSession = struct HdcSession *;
 struct HdcChannel {
     void *clsChannel;  // ptr Class of serverForClient or client
     uint32_t channelId;
-    uv_mutex_t sendMutex;  // lock of send
     string connectKey;
     uv_tcp_t hWorkTCP;  // work channel for client, forward channel for server
     uv_thread_t hWorkThread;
+    uint8_t uvRef;  // libuv handle ref -- just main thread now
     bool handshakeOK;
-    bool channelDead;
+    bool isDead;
     bool serverOrClient;  // client's channel/ server's channel
     bool childCleared;
-    bool mainCleared;
     bool interactiveShellMode;  // Is shell interactive mode
     std::atomic<uint16_t> sendRef;
-    HSession targetSession;
+    uint32_t targetSessionId;
     // child work
     uv_tcp_t hChildWorkTCP;  // work channel for server, no use in client
-    uv_os_fd_t fdChildWorkTCP;
+    uv_os_sock_t fdChildWorkTCP;
     // read io cache
     int bufSize;         // total buffer size
     int availTailIndex;  // buffer available data size
     uint8_t *ioBuf;
     // std
-    uv_pipe_t stdinPipe;
-    uv_pipe_t stdoutPipe;
     uv_tty_t stdinTty;
     uv_tty_t stdoutTty;
     char bufStd[128];

@@ -22,7 +22,6 @@ HdcChannelBase::HdcChannelBase(const bool serverOrClient, const string &addrStri
     uv_rwlock_init(&mainAsync);
     uv_async_init(loopMain, &asyncMainLoop, MainAsyncCallback);
     uv_rwlock_init(&lockMapChannel);
-    uv_mutex_init(&freeChannel);
 }
 
 HdcChannelBase::~HdcChannelBase()
@@ -35,7 +34,6 @@ HdcChannelBase::~HdcChannelBase()
 
     uv_rwlock_destroy(&mainAsync);
     uv_rwlock_destroy(&lockMapChannel);
-    uv_mutex_destroy(&freeChannel);
 }
 
 vector<uint8_t> HdcChannelBase::GetChannelHandshake(string &connectKey) const
@@ -84,24 +82,12 @@ bool HdcChannelBase::SetChannelTCPString(const string &addrString)
 
 void HdcChannelBase::ClearChannels()
 {
-    map<uint32_t, HChannel>::iterator iter;
-    for (iter = mapChannel.begin(); iter != mapChannel.end();) {
-        uint32_t channelId = iter->first;
-        HChannel hChannel = iter->second;
-        if (!hChannel->mainCleared) {
-            FreeChannel(channelId);
-            while (!hChannel->mainCleared) {
-                usleep(1000);
-            }
+    for (auto v : mapChannel) {
+        HChannel hChannel = (HChannel)v.second;
+        if (!hChannel->isDead) {
+            FreeChannel(hChannel->channelId);
         }
-        uv_rwlock_wrlock(&lockMapChannel);
-        mapChannel.erase(iter++->first);
-        uv_rwlock_wrunlock(&lockMapChannel);
-        delete hChannel;
     }
-    uv_rwlock_wrlock(&lockMapChannel);
-    mapChannel.clear();
-    uv_rwlock_wrunlock(&lockMapChannel);
 }
 
 void HdcChannelBase::WorkerPendding()
@@ -121,7 +107,10 @@ void HdcChannelBase::ReadStream(uv_stream_t *tcp, ssize_t nread, const uv_buf_t 
 
     if (nread == UV_ENOBUFS) {
         WRITE_LOG(LOG_DEBUG, "HdcChannelBase::ReadStream Pipe IOBuf max");
-    } else if (nread <= 0) {
+    } else if (nread == 0) {
+        // maybe just afer accept, second client req
+        WRITE_LOG(LOG_DEBUG, "HdcChannelBase::ReadStream idle read");
+    } else if (nread < 0) {
         Base::TryCloseHandle((uv_handle_t *)tcp);
         WRITE_LOG(LOG_DEBUG, "HdcChannelBase::ReadStream failed2:%s", uv_err_name(nread));
         needExit = true;
@@ -147,8 +136,7 @@ void HdcChannelBase::ReadStream(uv_stream_t *tcp, ssize_t nread, const uv_buf_t 
         indexBuf += DWORD_SERIALIZE_SIZE + size;
     }
     if (indexBuf > 0 && hChannel->availTailIndex > 0) {
-        if (EOK
-            != memmove_s(hChannel->ioBuf, hChannel->bufSize, hChannel->ioBuf + indexBuf, hChannel->availTailIndex)) {
+        if (memmove_s(hChannel->ioBuf, hChannel->bufSize, hChannel->ioBuf + indexBuf, hChannel->availTailIndex)) {
             needExit = true;
             goto Finish;
         }
@@ -156,22 +144,22 @@ void HdcChannelBase::ReadStream(uv_stream_t *tcp, ssize_t nread, const uv_buf_t 
 
 Finish:
     if (needExit) {
-        WRITE_LOG(LOG_DEBUG, "Read Stream needExit");
         thisClass->FreeChannel(hChannel->channelId);
+        WRITE_LOG(LOG_DEBUG, "Read Stream needExit, FreeChannel finish");
     }
 }
 
 void HdcChannelBase::WriteCallback(uv_write_t *req, int status)
 {
     HChannel hChannel = (HChannel)req->handle->data;
-    hChannel->sendRef--;
+    --hChannel->sendRef;
     HdcChannelBase *thisClass = (HdcChannelBase *)hChannel->clsChannel;
     if (status < 0) {
         Base::TryCloseHandle((uv_handle_t *)req->handle);
-    }
-    if (hChannel->channelDead && !hChannel->sendRef) {
-        thisClass->FreeChannel(hChannel->channelId);
-        WRITE_LOG(LOG_DEBUG, "WriteCallback TryCloseHandle");
+        if (!hChannel->isDead && !hChannel->sendRef) {
+            thisClass->FreeChannel(hChannel->channelId);
+            WRITE_LOG(LOG_DEBUG, "WriteCallback TryCloseHandle");
+        }
     }
     delete[]((uint8_t *)req->data);
     delete req;
@@ -252,7 +240,7 @@ void HdcChannelBase::Send(const uint32_t channelId, uint8_t *bufPtr, const int s
     uv_stream_t *sendStream = nullptr;
     int sizeNewBuf = size + DWORD_SERIALIZE_SIZE;
     HChannel hChannel = (HChannel)AdminChannel(OP_QUERY, channelId, nullptr);
-    if (!hChannel || hChannel->channelDead) {
+    if (!hChannel || hChannel->isDead) {
         return;
     }
     auto data = new uint8_t[sizeNewBuf]();
@@ -264,8 +252,7 @@ void HdcChannelBase::Send(const uint32_t channelId, uint8_t *bufPtr, const int s
         delete[] data;
         return;
     }
-    uv_mutex_lock(&hChannel->sendMutex);
-    hChannel->sendRef++;
+    ++hChannel->sendRef;
     if (hChannel->hWorkThread == uv_thread_self()) {
         sendStream = (uv_stream_t *)&hChannel->hWorkTCP;
     } else {
@@ -274,7 +261,6 @@ void HdcChannelBase::Send(const uint32_t channelId, uint8_t *bufPtr, const int s
     if (uv_is_writable(sendStream)) {
         Base::SendToStreamEx(sendStream, data, sizeNewBuf, nullptr, (void *)WriteCallback, data);
     }
-    uv_mutex_unlock(&hChannel->sendMutex);
 }
 
 void HdcChannelBase::AllocCallback(uv_handle_t *handle, size_t sizeWanted, uv_buf_t *buf)
@@ -300,85 +286,104 @@ uint32_t HdcChannelBase::MallocChannel(HChannel *hOutChannel)
     uint32_t channelId = Base::GetRuntimeMSec();
     if (isServerOrClient) {
         hChannel->serverOrClient = isServerOrClient;
-        channelId++;  // Use different value for serverForClient&client in per process
+        ++channelId;  // Use different value for serverForClient&client in per process
     }
     uv_tcp_init(loopMain, &hChannel->hWorkTCP);
+    ++hChannel->uvRef;
     hChannel->hWorkThread = uv_thread_self();
     hChannel->hWorkTCP.data = hChannel;
     hChannel->clsChannel = this;
     hChannel->channelId = channelId;
     AdminChannel(OP_ADD, channelId, hChannel);
     *hOutChannel = hChannel;
-    uv_mutex_init(&hChannel->sendMutex);
     WRITE_LOG(LOG_DEBUG, "Mallocchannel:%d", channelId);
     return channelId;
 }
 
+// work when libuv-handle at struct of HdcSession has all callback finished
+void HdcChannelBase::FreeChannelFinally(uv_idle_t *handle)
+{
+    HChannel hChannel = (HChannel)handle->data;
+    HdcChannelBase *thisClass = (HdcChannelBase *)hChannel->clsChannel;
+    if (hChannel->uvRef > 0) {
+        return;
+    }
+    thisClass->NotifyInstanceChannelFree(hChannel);
+    thisClass->AdminChannel(OP_REMOVE, hChannel->channelId, nullptr);
+    WRITE_LOG(LOG_DEBUG, "!!!FreeChannelFinally channelId:%d finish", hChannel->channelId);
+    if (!hChannel->serverOrClient) {
+        uv_stop(thisClass->loopMain);
+    }
+    delete hChannel;
+    Base::TryCloseHandle((const uv_handle_t *)handle, Base::CloseIdleCallback);
+}
+
 void HdcChannelBase::FreeChannelContinue(HChannel hChannel)
 {
-    // Call from main thread only
-    NotifyInstanceChannelFree(hChannel);
-    if (hChannel->hChildWorkTCP.loop) {
-        auto ctrl = HdcSessionBase::BuildCtrlString(SP_DEATCH_CHANNEL, hChannel->channelId, nullptr, 0);
-        Base::SendToStream(reinterpret_cast<uv_stream_t*>(&hChannel->targetSession->ctrlPipe[STREAM_MAIN]),
-            ctrl.data(), ctrl.size());
-        while (!hChannel->childCleared) {
-            usleep(1000);
-        }
-    }
-    uv_mutex_destroy(&hChannel->sendMutex);
+    auto closeChannelHandle = [](uv_handle_t *handle) -> void {
+        HChannel hChannel = (HChannel)handle->data;
+        --hChannel->uvRef;
+        Base::TryCloseHandle((uv_handle_t *)handle);
+    };
+    hChannel->availTailIndex = 0;
     if (hChannel->ioBuf) {
-        hChannel->availTailIndex = 0;
-        hChannel->bufSize = 0;
         delete[] hChannel->ioBuf;
         hChannel->ioBuf = nullptr;
     }
-    Base::TryCloseHandle((uv_handle_t *)&hChannel->hWorkTCP);
-    // Notify main thread exit for client instance
     if (!hChannel->serverOrClient) {
-        Base::TryCloseHandle((uv_handle_t *)&hChannel->stdinPipe);
-        Base::TryCloseHandle((uv_handle_t *)&hChannel->stdoutPipe);
-        Base::TryCloseHandle((uv_handle_t *)&hChannel->stdinTty);
-        Base::TryCloseHandle((uv_handle_t *)&hChannel->stdoutTty);
-        uv_stop(loopMain);
+        Base::TryCloseHandle((uv_handle_t *)&hChannel->stdinTty, closeChannelHandle);
+        Base::TryCloseHandle((uv_handle_t *)&hChannel->stdoutTty, closeChannelHandle);
     }
-    hChannel->mainCleared = true;
-    uv_mutex_unlock(&freeChannel);
-    WRITE_LOG(LOG_DEBUG, "Freechannel finish id:%d sendref:%d", hChannel->channelId, uint32_t(hChannel->sendRef));
+    if (uv_is_closing((const uv_handle_t *)&hChannel->hWorkTCP)) {
+        --hChannel->uvRef;
+    } else {
+        Base::TryCloseHandle((uv_handle_t *)&hChannel->hWorkTCP, closeChannelHandle);
+    }
+    Base::IdleUvTask(loopMain, hChannel, FreeChannelFinally);
+}
+
+void HdcChannelBase::FreeChannelOpeate(uv_timer_t *handle)
+{
+    HChannel hChannel = (HChannel)handle->data;
+    HdcChannelBase *thisClass = (HdcChannelBase *)hChannel->clsChannel;
+    if (hChannel->sendRef > 0) {
+        return;
+    }
+    if (hChannel->hChildWorkTCP.loop) {
+        auto ctrl = HdcSessionBase::BuildCtrlString(SP_DEATCH_CHANNEL, hChannel->channelId, nullptr, 0);
+        thisClass->ChannelSendSessionCtrlMsg(ctrl, hChannel->targetSessionId);
+        auto callbackCheckFreeChannelContinue = [](uv_timer_t *handle) -> void {
+            HChannel hChannel = (HChannel)handle->data;
+            HdcChannelBase *thisClass = (HdcChannelBase *)hChannel->clsChannel;
+            if (!hChannel->childCleared) {
+                return;
+            }
+            Base::TryCloseHandle((uv_handle_t *)handle, Base::CloseTimerCallback);
+            thisClass->FreeChannelContinue(hChannel);
+        };
+        Base::TimerUvTask(thisClass->loopMain, hChannel, callbackCheckFreeChannelContinue);
+    } else {
+        thisClass->FreeChannelContinue(hChannel);
+    }
+    Base::TryCloseHandle((uv_handle_t *)handle, Base::CloseTimerCallback);
 }
 
 void HdcChannelBase::FreeChannel(const uint32_t channelId)
 {
-    bool bNotTodo = true;
     HChannel hChannel = AdminChannel(OP_QUERY, channelId, nullptr);
     if (!hChannel) {
         return;
     }
-    hChannel->channelDead = true;
     // Two cases: alloc in main thread, or work thread
     if (hChannel->hWorkThread != uv_thread_self()) {
         PushAsyncMessage(hChannel->channelId, ASYNC_FREE_SESSION, nullptr, 0);
         return;
     }
-    uv_mutex_lock(&freeChannel);
-    while (true) {
-        if (!hChannel) {
-            break;
-        }
-        if (hChannel->sendRef) {
-            break;  // still sending, early exit
-        }
-        if (hChannel->mainCleared) {
-            break;
-        }
-        bNotTodo = false;
-        break;
-    }
-    if (bNotTodo) {
-        uv_mutex_unlock(&freeChannel);
+    if (hChannel->isDead) {
         return;
     }
-    FreeChannelContinue(hChannel);
+    Base::TimerUvTask(loopMain, hChannel, FreeChannelOpeate, MINOR_TIMEOUT);  // do immediately
+    hChannel->isDead = true;
 }
 
 HChannel HdcChannelBase::AdminChannel(const uint8_t op, const uint32_t channelId, HChannel hInput)

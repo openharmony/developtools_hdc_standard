@@ -40,29 +40,40 @@ void HdcFile::StopTask()
 bool HdcFile::BeginTransfer(CtxFile *context, const char *command)
 {
     int argc = 0;
+    int srcOffset = 0;
     bool ret = false;
+    const string CMD_OPTION_TSTMP = "-a";
+    const string CMD_OPTION_SYNC = "-sync";
+    const string CMD_OPTION_ZIP = "-z";
     char **argv = Base::SplitCommandToArgs(command, &argc);
-    if (argc < 2) {
+    if (argc < CMD_ARG1_COUNT) {
         goto Finish;
     }
     context->localPath = argv[argc - 2];
+    for (int i = 0; i < argc - CMD_ARG1_COUNT; i++) {
+        if (argv[i] == CMD_OPTION_ZIP) {
+            context->transferConfig.compressType = COMPRESS_LZ4;
+            srcOffset += strlen(argv[i]) + 1;
+        } else if (argv[i] == CMD_OPTION_SYNC) {
+            context->transferConfig.updateIfNew = true;
+            srcOffset += strlen(argv[i]) + 1;
+        } else if (argv[i] == CMD_OPTION_TSTMP) {
+            context->transferConfig.holdTimestamp = true;
+            srcOffset += strlen(argv[i]) + 1;
+        }
+    }
     context->remotePath = argv[argc - 1];
+    if (argc > CMD_ARG1_COUNT) {
+        context->localPath
+            = std::string(command + srcOffset, strlen(command) - srcOffset - context->remotePath.size() - 1);
+    } else {
+        context->localPath = argv[0];
+    }
     if (!Base::CheckDirectoryOrPath(context->localPath.c_str(), true, true)) {
         goto Finish;
     }
     context->localName = Base::GetFullFilePath(context->localPath);
-    for (int i = 0; i < argc - 2; i++) {
-        if (!strcmp(argv[i], "-z")) {
-            context->transferConfig.compressType = COMPRESS_LZ4;
-        }
-        if (!strcmp(argv[i], "-sync")) {
-            context->transferConfig.updateIfNew = true;
-        }
-        if (!strcmp(argv[i], "-a")) {
-            context->transferConfig.holdTimestamp = true;
-        }
-    }
-    refCount++;
+    ++refCount;
     uv_fs_open(loopTask, &context->fsOpenReq, context->localPath.c_str(), O_RDONLY, 0, OnFileOpen);
     context->master = true;
     ret = true;
@@ -122,7 +133,7 @@ bool HdcFile::SlaveCheck(uint8_t *payload, const int payloadSize)
         }
     }
     // begin work
-    refCount++;
+    ++refCount;
     uv_fs_open(loopTask, &ctxNow.fsOpenReq, ctxNow.localPath.c_str(), UV_FS_O_TRUNC | UV_FS_O_CREAT | UV_FS_O_WRONLY,
                S_IWUSR | S_IRUSR, OnFileOpen);
     ctxNow.transferBegin = Base::GetRuntimeMSec();
@@ -145,9 +156,9 @@ bool HdcFile::CommandDispatch(const uint16_t command, uint8_t *payload, const in
         }
         case CMD_FILE_FINISH: {
             if (*payload) {  // close-step3
-                (*payload)--;
+                --(*payload);
                 SendToAnother(CMD_FILE_FINISH, payload, 1);
-                refCount++;
+                ++refCount;
                 uv_fs_close(loopTask, &ctxNow.fsCloseReq, ctxNow.fsOpenReq.result, OnFileClose);
             } else {  // close-step3
                 TransferSummary(&ctxNow);

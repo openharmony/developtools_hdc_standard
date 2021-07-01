@@ -89,11 +89,7 @@ namespace Base {
     // just zero memory buf, such as pointer
     template<class T> int ZeroBuf(T &arrayBuf, int size)
     {
-        if (arrayBuf == nullptr) {
-            return ERR_BUF_RESET;
-        } else {
-            return memset_s(arrayBuf, size, 0, size);
-        }
+        return memset_s(arrayBuf, size, 0, size);
     }
     // clang-format off
     const string StringFormat(const char * const formater, ...);
@@ -101,8 +97,18 @@ namespace Base {
     // clang-format on
     string GetVersion();
     bool IdleUvTask(uv_loop_t *loop, void *data, uv_idle_cb cb);
-    bool TimerUvTask(uv_loop_t *loop, void *data, uv_timer_cb cb);
+    bool TimerUvTask(uv_loop_t *loop, void *data, uv_timer_cb cb, int repeatTimeout = 250);
+    bool DelayDo(uv_loop_t *loop, const int delayMs, const uint8_t flag, string msg, void *data,
+                 std::function<void(const uint8_t, string &, const void *)> cb);
+    inline bool DelayDoSimple(uv_loop_t *loop, const int delayMs,
+                              std::function<void(const uint8_t, string &, const void *)> cb)
+    {
+        return DelayDo(loop, delayMs, 0, "", nullptr, cb);
+    }
     string ReplaceAll(string str, const string from, const string to);
+    uint8_t CalcCheckSum(const uint8_t *data, int len);
+    string GetFileNameAny(string &path);
+    uv_os_sock_t DuplicateUvSocket(uv_tcp_t *tcp);
 }  // namespace base
 }  // namespace Hdc
 

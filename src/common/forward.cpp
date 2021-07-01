@@ -38,7 +38,7 @@ bool HdcForwardBase::ReadyForRelease()
 void HdcForwardBase::StopTask()
 {
     map<uint32_t, HCtxForward>::iterator iter;
-    for (iter = mapCtxPoint.begin(); iter != mapCtxPoint.end(); iter++) {
+    for (iter = mapCtxPoint.begin(); iter != mapCtxPoint.end(); ++iter) {
         HCtxForward ctx = iter->second;
         FreeContext(ctx, 0, false);
     }
@@ -123,7 +123,7 @@ void HdcForwardBase::FreeContextCallBack(HCtxForward ctx)
 {
     AdminContext(OP_REMOVE, ctx->id, nullptr);
     delete ctx;
-    refCount--;
+    --refCount;
 }
 
 void HdcForwardBase::FreeJDWP(HCtxForward ctx)

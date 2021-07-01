@@ -28,12 +28,11 @@ public:
     int CreateConnect(const string &connectKey);
     bool Initial(const char *listenString);
     void AttachChannel(HSession hSession, const uint32_t channelId);
-    void RegisterChannel(HSession hSession, const uint32_t channelId);
     void DeatchChannel(const uint32_t channelId);
     void StopInstance();
     static bool CheckToPullUptrServer(const char *listenString);
     static void UsbPreConnect(uv_timer_t *handle);
-    void NotifyInstanceSessionFree(HSession hSession);
+    void NotifyInstanceSessionFree(HSession hSession, bool freeOrClear);
 
     HdcHostTCP *clsTCPClt;
     HdcHostUSB *clsUSBClt;

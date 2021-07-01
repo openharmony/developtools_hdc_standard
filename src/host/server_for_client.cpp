@@ -51,8 +51,18 @@ void HdcServerForClient::AcceptClient(uv_stream_t *server, int status)
         thisClass->FreeChannel(uid);
         return;
     }
-    Base::SetTcpOptions(&hChannel->hWorkTCP);
-    uv_read_start((uv_stream_t *)&hChannel->hWorkTCP, AllocCallback, ReadStream);
+    WRITE_LOG(LOG_DEBUG, "HdcServerForClient acceptClient");
+    // limit first recv
+    int bufMaxSize = 0;
+    uv_recv_buffer_size((uv_handle_t *)&hChannel->hWorkTCP, &bufMaxSize);
+    auto funcChannelHeaderAlloc = [](uv_handle_t *handle, size_t sizeWanted, uv_buf_t *buf) -> void {
+        HChannel context = (HChannel)handle->data;
+        Base::ReallocBuf(&context->ioBuf, &context->bufSize, context->availTailIndex, sizeWanted);
+        buf->base = (char *)context->ioBuf + context->availTailIndex;
+        buf->len = sizeof(struct ChannelHandShake) + DWORD_SERIALIZE_SIZE;  // only recv static size
+    };
+    // first packet static size, after this packet will be dup for normal recv
+    uv_read_start((uv_stream_t *)&hChannel->hWorkTCP, funcChannelHeaderAlloc, ReadStream);
     // channel handshake step1
     struct ChannelHandShake handShake;
     Base::ZeroStruct(handShake);
@@ -62,7 +72,6 @@ void HdcServerForClient::AcceptClient(uv_stream_t *server, int status)
     }
 }
 
-// https://andycong.top/2020/03/27/libuv%E5%A4%9A%E7%BA%BF%E7%A8%8B%E4%B8%AD%E4%BD%BF%E7%94%A8uv-accept/
 void HdcServerForClient::SetTCPListen()
 {
     tcpListen.data = this;
@@ -152,7 +161,7 @@ void HdcServerForClient::OrderFindTargets(HChannel hChannel)
     HdcDaemonInformation di;
     while (!lst.empty()) {
         Base::ZeroStruct(di);
-        count++;
+        ++count;
         di.connectKey = lst.front();
         di.connType = CONN_TCP;
         di.connStatus = STATUS_READY;
@@ -165,12 +174,6 @@ void HdcServerForClient::OrderFindTargets(HChannel hChannel)
     string bufString = std::to_string(count);
     Base::WriteBinFile((UT_TMP_PATH + "/base.result").c_str(), (uint8_t *)bufString.c_str(), bufString.size(), false);
 #endif
-}
-
-void HdcServerForClient::FinishMainThreadTimer(uv_handle_t *handle)
-{
-    uv_timer_t *req = (uv_timer_t *)handle;
-    delete req;
 }
 
 void HdcServerForClient::OrderConnecTargetResult(uv_timer_t *req)
@@ -199,7 +202,7 @@ void HdcServerForClient::OrderConnecTargetResult(uv_timer_t *req)
             break;
         } else {
             uint16_t *bRetryCount = (uint16_t *)hChannel->bufStd;
-            (*bRetryCount)++;
+            ++(*bRetryCount);
             if (*bRetryCount > 500) {
                 // 5s
                 bExitRepet = true;
@@ -212,7 +215,7 @@ void HdcServerForClient::OrderConnecTargetResult(uv_timer_t *req)
     }
     if (bExitRepet) {
         thisClass->FreeChannel(hChannel->channelId);
-        uv_close((uv_handle_t *)req, FinishMainThreadTimer);
+        Base::TryCloseHandle((const uv_handle_t *)req, Base::CloseTimerCallback);
     }
 }
 
@@ -230,10 +233,7 @@ bool HdcServerForClient::NewConnectTry(void *ptrServer, HChannel hChannel, const
         childRet = snprintf_s(hChannel->bufStd + 2, sizeof(hChannel->bufStd) - 2, sizeof(hChannel->bufStd) - 3, "%s",
                               (char *)connectKey.c_str());
         if (childRet > 0) {
-            uv_timer_t *waitTimeDoCmd = new uv_timer_t();
-            uv_timer_init(loopMain, waitTimeDoCmd);
-            waitTimeDoCmd->data = hChannel;
-            uv_timer_start(waitTimeDoCmd, OrderConnecTargetResult, 10, 10);
+            Base::TimerUvTask(loopMain, hChannel, OrderConnecTargetResult, 10);
             ret = true;
         }
     }
@@ -418,7 +418,11 @@ bool HdcServerForClient::TaskCommand(HChannel hChannel, void *formatCommandInput
         sizeCmdFlag = 9;
     }
     if (!strncmp(formatCommand->paraments.c_str(), cmdFlag.c_str(), sizeCmdFlag)) {  // local do
-        ptrServer->DispatchTaskData(hChannel->targetSession, hChannel->channelId, formatCommand->cmdFlag,
+        HSession hSession = FindAliveSession(hChannel->targetSessionId);
+        if (!hSession) {
+            return false;
+        }
+        ptrServer->DispatchTaskData(hSession, hChannel->channelId, formatCommand->cmdFlag,
                                     (uint8_t *)formatCommand->paraments.c_str() + sizeCmdFlag, sizeSend - sizeCmdFlag);
     } else {  // Send to Daemon-side to do
         SendToDaemon(hChannel, formatCommand->cmdFlag, (uint8_t *)formatCommand->paraments.c_str() + sizeCmdFlag,
@@ -487,35 +491,56 @@ bool HdcServerForClient::DoCommand(HChannel hChannel, void *formatCommandInput)
     return ret;
 }
 
-int HdcServerForClient::BindChannelToSession(HChannel hChannel, uint8_t *bufPtr, const int bytesIO)
+// just call from BindChannelToSession
+HSession HdcServerForClient::FindAliveSessionFromDaemonMap(const HChannel hChannel)
 {
+    HSession hSession = nullptr;
     HDaemonInfo hdi = nullptr;
     HdcServer *ptrServer = (HdcServer *)clsServer;
     ptrServer->AdminDaemonMap(OP_QUERY, hChannel->connectKey, hdi);
     if (!hdi) {
         EchoClient(hChannel, MSG_FAIL, "Not match target founded, check connect-key please");
-        return -1;
+        return nullptr;
     }
-    HSession hSession = (HSession)hdi->hSession;
     if (hdi->connStatus != STATUS_CONNECTED) {
         EchoClient(hChannel, MSG_FAIL, "Device not founded or connected");
-        return -2;
+        return nullptr;
+    }
+    if (hdi->hSession->isDead) {
+        EchoClient(hChannel, MSG_FAIL, "Bind tartget session is dead");
+        return nullptr;
+    }
+    hSession = (HSession)hdi->hSession;
+    return hSession;
+}
+
+int HdcServerForClient::BindChannelToSession(HChannel hChannel, uint8_t *bufPtr, const int bytesIO)
+{
+    HSession hSession = nullptr;
+    if ((hSession = FindAliveSessionFromDaemonMap(hChannel)) == nullptr) {
+        return ERR_SESSION_NOFOUND;
+    }
+    if ((hChannel->fdChildWorkTCP = Base::DuplicateUvSocket(&hChannel->hWorkTCP)) < 0) {
+        WRITE_LOG(LOG_FATAL, "Duplicate socket failed, cid:%d", hChannel->channelId);
+        return ERR_SOCKET_DUPLICATE;
     }
 
-    auto ctrl = HdcSessionBase::BuildCtrlString(SP_REGISTER_CHANNEL, hChannel->channelId, nullptr, 0);
-    Base::SendToStream((uv_stream_t *)&hSession->ctrlPipe[STREAM_MAIN], ctrl.data(), ctrl.size());
-    while (!hChannel->hChildWorkTCP.loop) {
-        uv_sleep(1);
-    }
-    if (uv_fileno((const uv_handle_t *)&hChannel->hWorkTCP, &hChannel->fdChildWorkTCP) < 0) {
-        return -3;
-    }
-#ifdef UNIT_TEST
-    hChannel->fdChildWorkTCP = dup(hChannel->fdChildWorkTCP);
-#endif
-    uv_read_stop((uv_stream_t *)&hChannel->hWorkTCP);  // disable parent
-    auto ctrlAttach = HdcSessionBase::BuildCtrlString(SP_ATTACH_CHANNEL, hChannel->channelId, nullptr, 0);
-    Base::SendToStream((uv_stream_t *)&hSession->ctrlPipe[STREAM_MAIN], ctrlAttach.data(), ctrlAttach.size());
+    uv_close_cb funcWorkTcpClose = [](uv_handle_t *handle) -> void {
+        HChannel hChannel = (HChannel)handle->data;
+        auto thisClass = (HdcServerForClient *)hChannel->clsChannel;
+        HSession hSession = nullptr;
+        if ((hSession = thisClass->FindAliveSessionFromDaemonMap(hChannel)) == nullptr) {
+            return;
+        }
+        WRITE_LOG(LOG_DEBUG, "Bind channel to session  channelid:%d fdChildWorkTCP:%d", hChannel->channelId,
+                  hChannel->fdChildWorkTCP);
+        auto ctrl = HdcSessionBase::BuildCtrlString(SP_ATTACH_CHANNEL, hChannel->channelId, nullptr, 0);
+        Base::SendToStream((uv_stream_t *)&hSession->ctrlPipe[STREAM_MAIN], ctrl.data(), ctrl.size());
+        while (!hChannel->hChildWorkTCP.loop) {
+            uv_sleep(1);
+        }
+    };
+    uv_close((uv_handle_t *)&hChannel->hWorkTCP, funcWorkTcpClose);
     return 0;
 }
 
@@ -560,6 +585,7 @@ int HdcServerForClient::ChannelHandShake(HChannel hChannel, uint8_t *bufPtr, con
     if (!CheckAutoFillTarget(hChannel)) {
         return 0;
     }
+    // channel handshake stBindChannelToSession
     if (BindChannelToSession(hChannel, nullptr, 0)) {
         hChannel->availTailIndex = 0;
         WRITE_LOG(LOG_DEBUG, "BindChannelToSession failed");
@@ -596,8 +622,7 @@ int HdcServerForClient::ReadChannel(HChannel hChannel, uint8_t *bufPtr, const in
         formatCommand.cmdFlag = CMD_KERNEL_ECHO_RAW;
     }
     if (!DoCommand(hChannel, &formatCommand)) {
-        ret = -3;
-        return ret;
+        return -3;  // error or want close
     }
     ret = bytesIO;
     return ret;
@@ -606,9 +631,32 @@ int HdcServerForClient::ReadChannel(HChannel hChannel, uint8_t *bufPtr, const in
 void HdcServerForClient::NotifyInstanceChannelFree(HChannel hChannel)
 {
     HdcServer *ptrServer = (HdcServer *)clsServer;
-    if (hChannel->targetSession) {
-        uint8_t count = 1;
-        ptrServer->Send(hChannel->targetSession->sessionId, hChannel->channelId, CMD_KERNEL_CHANNEL_CLOSE, &count, 1);
+    HSession hSession = FindAliveSession(hChannel->targetSessionId);
+    if (!hSession) {
+        return;
     }
-};
+    uint8_t count = 1;
+    ptrServer->Send(hSession->sessionId, hChannel->channelId, CMD_KERNEL_CHANNEL_CLOSE, &count, 1);
+}
+
+// avoid session dead
+HSession HdcServerForClient::FindAliveSession(uint32_t sessionId)
+{
+    HdcServer *ptrServer = (HdcServer *)clsServer;
+    HSession hSession = ptrServer->AdminSession(OP_QUERY, sessionId, nullptr);
+    if (!hSession || hSession->isDead) {
+        return nullptr;
+    } else {
+        return hSession;
+    }
+}
+
+bool HdcServerForClient::ChannelSendSessionCtrlMsg(vector<uint8_t> &ctrlMsg, uint32_t sessionId)
+{
+    HSession hSession = FindAliveSession(sessionId);
+    if (!hSession) {
+        return false;
+    }
+    return Base::SendToStream((uv_stream_t *)&hSession->ctrlPipe[STREAM_MAIN], ctrlMsg.data(), ctrlMsg.size()) > 0;
+}
 }  // namespace Hdc

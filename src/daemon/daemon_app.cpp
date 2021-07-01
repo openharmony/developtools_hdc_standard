@@ -71,7 +71,7 @@ bool HdcDaemonApp::CommandDispatch(const uint16_t command, uint8_t *payload, con
             ctxNow.localPath = dstPath;
             ctxNow.transferBegin = Base::GetRuntimeMSec();
             ctxNow.fileSize = ctxNow.transferConfig.fileSize;
-            refCount++;
+            ++refCount;
             uv_fs_open(loopTask, &ctxNow.fsOpenReq, ctxNow.localPath.c_str(),
                        UV_FS_O_TRUNC | UV_FS_O_CREAT | UV_FS_O_WRONLY, S_IRUSR, OnFileOpen);
             break;
@@ -100,12 +100,12 @@ void HdcDaemonApp::AsyncInstallFinish(bool runOK, const string result)
     vecBuf.push_back(runOK);
     vecBuf.insert(vecBuf.end(), (uint8_t *)echo.c_str(), (uint8_t *)echo.c_str() + echo.size());
     SendToAnother(CMD_APP_FINISH, vecBuf.data(), vecBuf.size());
-    refCount--;
+    --refCount;
 }
 
 void HdcDaemonApp::PackageShell(bool installOrUninstall, const char *options, const char *package)
 {
-    refCount++;
+    ++refCount;
     // asynccmd Other processes, no RunningProtect protection
     chmod(package, 0644);
     string doBuf;

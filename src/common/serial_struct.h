@@ -1213,7 +1213,6 @@ namespace SerialStruct {
         const std::string &_in;
         size_t _pos;
     };
-
     // mytype
     template<> struct Serializer<uint8_t> {
         static void Serialize(uint32_t tag, uint8_t value, FlagsType<>, Writer &out, bool force = false)
@@ -1241,6 +1240,37 @@ namespace SerialStruct {
             uint32_t intermedaite_value;
             if (Serializer<uint32_t>::ParsePacked(intermedaite_value, FlagsType<>(), in)) {
                 value = static_cast<uint8_t>(intermedaite_value);
+                return true;
+            }
+            return false;
+        }
+    };
+     template<> struct Serializer<uint16_t> {
+        static void Serialize(uint32_t tag, uint16_t value, FlagsType<>, Writer &out, bool force = false)
+        {
+            Serializer<uint32_t>::Serialize(tag, value, FlagsType(), out, force);
+        }
+
+        static void SerializePacked(uint16_t value, FlagsType<>, Writer &out)
+        {
+            Serializer<uint32_t>::SerializePacked(value, FlagsType(), out);
+        }
+
+        static bool Parse(WireType wire_type, uint16_t &value, FlagsType<>, reader &in)
+        {
+            uint32_t intermedaite_value;
+            if (Serializer<uint32_t>::Parse(wire_type, intermedaite_value, FlagsType<>(), in)) {
+                value = static_cast<uint16_t>(intermedaite_value);
+                return true;
+            }
+            return false;
+        }
+
+        static bool ParsePacked(uint16_t &value, FlagsType<>, reader &in)
+        {
+            uint32_t intermedaite_value;
+            if (Serializer<uint32_t>::ParsePacked(intermedaite_value, FlagsType<>(), in)) {
+                value = static_cast<uint16_t>(intermedaite_value);
                 return true;
             }
             return false;
@@ -1300,6 +1330,16 @@ namespace SerialStruct {
                            Field<3, &Hdc::HdcSessionBase::SessionHandShake::sessionId>("sessionId"),
                            Field<4, &Hdc::HdcSessionBase::SessionHandShake::connectKey>("connectKey"),
                            Field<5, &Hdc::HdcSessionBase::SessionHandShake::buf>("buf"));
+        }
+    };
+
+    template<> struct Descriptor<Hdc::HdcSessionBase::PayloadProtect> {
+        static auto type()
+        {
+            return Message(Field<1, &Hdc::HdcSessionBase::PayloadProtect::channelId>("channelId"),
+                           Field<2, &Hdc::HdcSessionBase::PayloadProtect::commandFlag>("commandFlag"),
+                           Field<3, &Hdc::HdcSessionBase::PayloadProtect::checkSum>("checkSum"),
+                           Field<4, &Hdc::HdcSessionBase::PayloadProtect::vCode>("vCode"));
         }
     };
 }  // SerialStruct

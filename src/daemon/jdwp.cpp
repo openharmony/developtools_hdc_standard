@@ -38,7 +38,7 @@ void HdcJdwp::Stop()
 {
     auto funcListenPipeClose = [](uv_handle_t *handle) -> void {
         HdcJdwp *thisClass = (HdcJdwp *)handle->data;
-        thisClass->refCount--;
+        --thisClass->refCount;
     };
     Base::TryCloseHandle((const uv_handle_t *)&listenPipe, funcListenPipeClose);
     for (auto &&obj : mapCtxJdwp) {
@@ -56,7 +56,7 @@ void *HdcJdwp::MallocContext()
     }
     ctx->thisClass = this;
     ctx->pipe.data = ctx;
-    refCount++;
+    ++refCount;
     return ctx;
 }
 
@@ -71,7 +71,7 @@ void HdcJdwp::FreeContext(HCtxJdwp ctx)
     AdminContext(OP_REMOVE, ctx->pid, nullptr);
     auto funcReqClose = [](uv_idle_t *handle) -> void {
         HCtxJdwp ctx = (HCtxJdwp)handle->data;
-        ctx->thisClass->refCount--;
+        --ctx->thisClass->refCount;
         Base::TryCloseHandle((uv_handle_t *)handle, Base::CloseIdleCallback);
         delete ctx;
     };
@@ -171,6 +171,7 @@ bool HdcJdwp::JdwpListen()
         WRITE_LOG(LOG_WARN, "could not create vm debug control socket. %d: %s", errno, strerror(errno));
         return false;
     }
+    fcntl(s, F_SETFD, FD_CLOEXEC);
     while (true) {
         addrlen = (pathlen + sizeof(addr.sun_family));
         if (bind(s, (struct sockaddr *)&addr, addrlen) < 0) {
@@ -185,7 +186,7 @@ bool HdcJdwp::JdwpListen()
         if (uv_listen((uv_stream_t *)&listenPipe, DEFAULT_BACKLOG, AcceptClient)) {
             break;
         }
-        refCount++;
+        ++refCount;
         ret = true;
         break;
     }
@@ -244,7 +245,7 @@ void HdcJdwp::SendCallbackJdwpNewFD(uv_write_t *req, int status)
     // close my process's fd
     Base::TryCloseHandle((const uv_handle_t *)&ctx->jvmTCP);
     delete req;
-    ctx->thisClass->refCount--;
+    --ctx->thisClass->refCount;
 }
 
 // Each session calls the interface through the main thread message queue, which cannot be called directly across
@@ -272,7 +273,7 @@ bool HdcJdwp::SendJdwpNewFD(uint32_t targetPID, int fd)
             break;
         }
         // clang-format on
-        refCount++;
+        ++refCount;
         ret = true;
         WRITE_LOG(LOG_DEBUG, "SendJdwpNewFD successful targetPID:%d fd%d", targetPID, fd);
         break;
