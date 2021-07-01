@@ -37,7 +37,6 @@ private:
     void OrderFindTargets(HChannel hChannel);
     bool NewConnectTry(void *ptrServer, HChannel hChannel, const string &connectKey);
     static void OrderConnecTargetResult(uv_timer_t *req);
-    static void FinishMainThreadTimer(uv_handle_t *handle);
     bool SendToDaemon(HChannel hChannel, const uint16_t commandFlag, uint8_t *bufPtr, const int bufSize);
     int BindChannelToSession(HChannel hChannel, uint8_t *bufPtr, const int bytesIO);
     void NotifyInstanceChannelFree(HChannel hChannel);
@@ -51,6 +50,9 @@ private:
     bool RemoveForward(HChannel hChannel, const char *paramentString);
     bool TaskCommand(HChannel hChannel, void *formatCommandInput);
     int ChannelHandShake(HChannel hChannel, uint8_t *bufPtr, const int bytesIO);
+    bool ChannelSendSessionCtrlMsg(vector<uint8_t> &ctrlMsg, uint32_t sessionId);
+    HSession FindAliveSession(uint32_t sessionId);
+    HSession FindAliveSessionFromDaemonMap(const HChannel hChannel);
 
     uv_tcp_t tcpListen;
     void *clsServer;

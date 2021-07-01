@@ -37,21 +37,23 @@ private:
     static void OnUSBRead(uv_fs_t *req);
     static void WatchEPTimer(uv_timer_t *handle);
     int ConnectEPPoint(HUSB hUSB);
-    int DispatchToWorkThread(HSession hSession, const uint32_t sessionId, uint8_t *readBuf, int readBytes);
+    int DispatchToWorkThread(const uint32_t sessionId, uint8_t *readBuf, int readBytes);
     bool AvailablePacket(uint8_t *ioBuf, uint32_t *sessionId);
-    void CloseEndpoint(HUSB hUSB);
+    void CloseEndpoint(HUSB hUSB, bool closeCtrlEp = false);
     bool ReadyForWorkThread(HSession hSession);
-    int LoopUSBRead(HSession hSession);
+    int LoopUSBRead(HUSB hUSB);
     HSession PrepareNewSession(uint32_t sessionId, uint8_t *pRecvBuf, int recvBytesIO);
     bool JumpAntiquePacket(const uint8_t &buf, ssize_t bytes) const;
     int SendUSBIOSync(HSession hSession, HUSB hMainUSB, uint8_t *data, const int length);
+    int CloseBulkEp(bool bulkInOut, int bulkFd, uv_loop_t *loop);
 
-    HSession usbMain;
+    HdcUSB usbHandle;
     uint32_t currentSessionId = 0;  // USB mode,limit only one session
     std::atomic<uint32_t> ref = 0;
     uv_timer_t checkEP;  // server-use
     uv_mutex_t sendEP;
     bool isAlive = false;
+    int controlEp = 0;  // EP0
 };
 }  // namespace Hdc
 #endif

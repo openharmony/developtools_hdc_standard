@@ -83,13 +83,13 @@ int SplitOptionAndCommand(int argc, const char **argv, string &outOption, string
 {
     bool foundCommand = false;
     int resultChild = 0;
-    for (int i = 0; i < argc; i++) {
+    for (int i = 0; i < argc; ++i) {
         if (!foundCommand) {
             resultChild = IsRegisterCommand(outCommand, argv[i], (i == argc - 1) ? nullptr : argv[i + 1]);
             if (resultChild > 0) {
                 foundCommand = true;
                 if (resultChild == 2) {
-                    i++;
+                    ++i;
                 }
                 continue;
             }

@@ -13,12 +13,14 @@
  * limitations under the License.
  */
 #include "base.h"
+#include <chrono>
 #include <cstdio>
 #include <cstring>
 #include <openssl/bio.h>
 #include <openssl/buffer.h>
 #include <openssl/evp.h>
 #include <random>
+using namespace std::chrono;
 
 namespace Hdc {
 namespace Base {
@@ -31,15 +33,94 @@ namespace Base {
 // Commenting the code will optimize and tune all log codes, and the compilation volume will be greatly reduced
 #define ENABLE_DEBUGLOG
 #ifdef ENABLE_DEBUGLOG
+    void GetLogDebugFunctioname(string &debugInfo, int line, string &threadIdString)
+    {
+        uint32_t currentThreadId = 0;
+        string tmpString = GetFileNameAny(debugInfo);
+#ifdef _WIN32
+        currentThreadId = GetCurrentThreadId();
+#else
+        currentThreadId = uv_thread_self();  // 64 just use 32bit
+#endif
+        debugInfo = StringFormat("%s:%d", tmpString.c_str(), line);
+        if (g_logLevel < LOG_FULL) {
+            debugInfo = "";
+            threadIdString = "";
+        } else {
+            debugInfo = "[" + debugInfo + "]";
+            threadIdString = StringFormat("[%x]", currentThreadId);
+        }
+    }
+
+    bool IsWindowsSupportAnsiColor()
+    {
+#ifdef _WIN32
+        // Set output mode to handle virtual terminal sequences
+        HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
+        if (hOut == INVALID_HANDLE_VALUE) {
+            return false;
+        }
+        DWORD dwMode = 0;
+        if (!GetConsoleMode(hOut, &dwMode)) {
+            return false;
+        }
+        dwMode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+        if (!SetConsoleMode(hOut, dwMode)) {
+            return false;
+        }
+#endif
+        return true;
+    }
+
+    void GetLogLevelAndTime(uint8_t logLevel, string &logLevelString, string &timeString)
+    {
+        system_clock::time_point timeNow = system_clock::now();          // now time
+        system_clock::duration sinceUnix0 = timeNow.time_since_epoch();  // since 1970
+        time_t sSinceUnix0 = duration_cast<seconds>(sinceUnix0).count();
+        std::tm tim = *std::localtime(&sSinceUnix0);
+        bool enableAnsiColor = false;
+#ifdef _WIN32
+        enableAnsiColor = IsWindowsSupportAnsiColor();
+#else
+        enableAnsiColor = true;
+#endif
+        if (enableAnsiColor) {
+            switch (logLevel) {
+                case LOG_FATAL:
+                    logLevelString = "\033[1;31mF\033[0m";
+                    break;
+                case LOG_INFO:
+                    logLevelString = "\033[1;32mI\033[0m";
+                    break;
+                case LOG_WARN:
+                    logLevelString = "\033[1;33mW\033[0m";
+                    break;
+                case LOG_DEBUG:
+                    logLevelString = "\033[1;36mD\033[0m";
+                    break;
+                default:
+                    logLevelString = "\033[1;36mD\033[0m";
+                    break;
+            }
+        } else {
+            logLevelString = std::to_string(logLevel);
+        }
+        string msTimeSurplus;
+        if (g_logLevel > LOG_DEBUG) {
+            const auto sSinceUnix0Rest = duration_cast<microseconds>(sinceUnix0).count() % (TIME_BASE * TIME_BASE);
+            msTimeSurplus = StringFormat(".%06llu", sSinceUnix0Rest);
+        }
+        timeString = StringFormat("%d:%d:%d%s", tim.tm_hour, tim.tm_min, tim.tm_sec, msTimeSurplus.c_str());
+    }
+
     void PrintLogEx(const char *functionName, int line, uint8_t logLevel, const char *msg, ...)
     {
         string debugInfo;
         string logBuf;
         string logLevelString;
         string threadIdString;
-        string usTimeString;
         string sep = "\n";
-        uint32_t currentThreadId = 0;
+        string timeString;
         if (logLevel > g_logLevel) {
             return;
         }
@@ -50,54 +131,12 @@ namespace Base {
         if (logDetail.back() == '\n') {
             sep = "\r\n";
         }
-        time_t timeLog;
-        struct tm *tim;
-        timeLog = time(nullptr);
-        tim = localtime(&timeLog);
-        if (tim == nullptr) {
-            return;
-        }
-        debugInfo = StringFormat("%s:%d", functionName, line);
-#ifdef _WIN32
-        currentThreadId = GetCurrentThreadId();
-        logLevelString = std::to_string(logLevel);
-#else
-        currentThreadId = uv_thread_self();
-        switch (logLevel) {
-            case LOG_FATAL:
-                logLevelString = "\033[1;31mF\033[0m";
-                break;
-            case LOG_INFO:
-                logLevelString = "\033[1;32mI\033[0m";
-                break;
-            case LOG_WARN:
-                logLevelString = "\033[1;33mW\033[0m";
-                break;
-            case LOG_DEBUG:
-                logLevelString = "\033[1;36mD\033[0m";
-                break;
-            default:
-                logLevelString = "\033[1;36mD\033[0m";
-                break;
-        }
-#endif
-        if (g_logLevel < LOG_FULL) {
-            debugInfo = "";
-            threadIdString = "";
-        } else {
-            debugInfo = "[" + debugInfo + "]";
-            threadIdString = StringFormat("[%x]", currentThreadId);
-        }
-#ifdef DEF_NULL  // if want detail running time info ,use [%d:%d:%d %ld] x x x timeUs
-        struct timespec times = { 0, 0 };
-        clock_gettime(CLOCK_MONOTONIC, &times);
-        long timeUs = times.tv_sec * TIME_BASE * TIME_BASE + times.tv_nsec / TIME_BASE;
-        usTimeString = StringFormat(" %ld", timeUs);
-#else
-        logBuf = StringFormat("[%s][%d:%d:%d%s]%s%s %s%s", logLevelString.c_str(), tim->tm_hour, tim->tm_min,
-                              tim->tm_sec, usTimeString.c_str(), threadIdString.c_str(), debugInfo.c_str(),
-                              logDetail.c_str(), sep.c_str());
-#endif
+        debugInfo = functionName;
+        GetLogDebugFunctioname(debugInfo, line, threadIdString);
+        GetLogLevelAndTime(logLevel, logLevelString, timeString);
+        logBuf = StringFormat("[%s][%s]%s%s %s%s", logLevelString.c_str(), timeString.c_str(), threadIdString.c_str(),
+                              debugInfo.c_str(), logDetail.c_str(), sep.c_str());
+
         printf("%s", logBuf.c_str());
         fflush(stdout);
         // logfile
@@ -125,6 +164,20 @@ namespace Base {
         va_end(ap);
     }
 
+    string GetFileNameAny(string &path)
+    {
+        // if can linkwith -lstdc++fs, use std::filesystem::path(path).filename();
+        string tmpString = path;
+        size_t tmpNum = 0;
+        if ((tmpNum = tmpString.rfind('/')) == std::string::npos) {
+            if ((tmpNum = tmpString.rfind('\\')) == std::string::npos) {
+                return tmpString;
+            }
+        }
+        tmpString = tmpString.substr(tmpNum + 1, tmpString.size() - tmpNum);
+        return tmpString;
+    }
+
     int GetMaxBufSize()
     {
         return MAX_SIZE_IOBUF;
@@ -132,19 +185,18 @@ namespace Base {
 
     void SetTcpOptions(uv_tcp_t *tcpHandle)
     {
-        constexpr int maxBufFactor = 6;
+        constexpr int maxBufFactor = 10;
         if (!tcpHandle) {
             WRITE_LOG(LOG_WARN, "SetTcpOptions nullptr Ptr");
             return;
         }
         int timeout = GLOBAL_TIMEOUT;
         uv_tcp_keepalive(tcpHandle, 1, timeout / 2);
-        // 40k, set to io 8 times is more appropriate, otherwise asynchronous IO is too fast, a lot of IO is wasted on
-        // IOloop, too little transmission speed will decrease
-        int buffSize = 0;
-        buffSize = GetMaxBufSize() * maxBufFactor;
-        uv_recv_buffer_size((uv_handle_t *)tcpHandle, &buffSize);
-        uv_send_buffer_size((uv_handle_t *)tcpHandle, &buffSize);
+        // if MAX_SIZE_IOBUF==5k,bufMaxSize at least 40k. It must be set to io 8 times is more appropriate,
+        // otherwise asynchronous IO is too fast, a lot of IO is wasted on IOloop, transmission speed will decrease
+        int bufMaxSize = GetMaxBufSize() * maxBufFactor;
+        uv_recv_buffer_size((uv_handle_t *)tcpHandle, &bufMaxSize);
+        uv_send_buffer_size((uv_handle_t *)tcpHandle, &bufMaxSize);
     }
 
     void ReallocBuf(uint8_t **origBuf, int *nOrigSize, const int indexUsedBuf, int sizeWanted)
@@ -194,14 +246,14 @@ namespace Base {
     bool TryCloseLoop(uv_loop_t *ptrLoop, const char *callerName)
     {
         // UV_RUN_DEFAULT: Runs the event loop until the reference count drops to zero. Always returns zero.
-        // UV_RUN_ONCE: Poll for new events once. Note that this function blocks if there are no pending events. Returns
-        //              zero when done (no active handles or requests left), or non-zero if more events are expected
-        //              (meaning you should run the event loop again sometime in the future).
-        // UV_RUN_NOWAIT: Poll for new events once but don't block if there are no pending events.
+        // UV_RUN_ONCE:    Poll for new events once. Note that this function blocks if there are no pending events.
+        //                 Returns zero when done (no active handles or requests left), or non-zero if more events are
+        //                 expected meaning you should run the event loop again sometime in the future).
+        // UV_RUN_NOWAIT:  Poll for new events once but don't block if there are no pending events.
         uint8_t closeRetry = 0;
         bool ret = false;
         constexpr int maxRetry = 3;
-        for (closeRetry = 0; closeRetry < maxRetry; closeRetry++) {
+        for (closeRetry = 0; closeRetry < maxRetry; ++closeRetry) {
             if (uv_loop_close(ptrLoop) == UV_EBUSY) {
                 if (closeRetry > 2) {
                     WRITE_LOG(LOG_WARN, "%s close busy,try:%d", callerName, closeRetry);
@@ -260,8 +312,8 @@ namespace Base {
         return SendToStreamEx(handleStream, pDynBuf, bufLen, nullptr, (void *)SendCallback, (void *)pDynBuf);
     }
 
-    // handleSend is used for pipe thread sending, set nullptr for tcp, and dynamically allocated by malloc when buf is
-    // required
+    // handleSend is used for pipe thread sending, set nullptr for tcp, and dynamically allocated by malloc when buf
+    // is required
     int SendToStreamEx(uv_stream_t *handleStream, const uint8_t *buf, const int bufLen, uv_stream_t *handleSend,
                        const void *finishCallback, const void *pWriteReqData)
     {
@@ -404,7 +456,7 @@ namespace Base {
                     isQuoted = false;
                 } else {
                     temp[j] = a;
-                    j++;
+                    ++j;
                 }
             } else {
                 switch (a) {
@@ -413,7 +465,7 @@ namespace Base {
                         isText = true;
                         if (isSpace) {
                             argv[argc] = temp + j;
-                            argc++;
+                            ++argc;
                         }
                         isSpace = false;
                         break;
@@ -423,7 +475,7 @@ namespace Base {
                     case '\r':
                         if (isText) {
                             temp[j] = '\0';
-                            j++;
+                            ++j;
                         }
                         isText = false;
                         isSpace = true;
@@ -432,15 +484,15 @@ namespace Base {
                         isText = true;
                         if (isSpace) {
                             argv[argc] = temp + j;
-                            argc++;
+                            ++argc;
                         }
                         temp[j] = a;
-                        j++;
+                        ++j;
                         isSpace = false;
                         break;
                 }
             }
-            i++;
+            ++i;
         }
         temp[j] = '\0';
         argv[argc] = nullptr;
@@ -708,7 +760,7 @@ namespace Base {
     }
 
     string GetFullFilePath(const string &s)
-    {
+    {  // cannot use s.rfind(std::filesystem::path::preferred_separator
 #ifdef _WIN32
         const char sep = '\\';
 #else
@@ -850,7 +902,6 @@ namespace Base {
         if (!len) {
             return 0;
         }
-
         int padding = 0;
         if (b64input[len - 1] == '=' && b64input[len - 2] == '=') {
             // last two chars are =
@@ -859,7 +910,6 @@ namespace Base {
             // last char is =
             padding = 1;
         }
-
         return static_cast<int>(len * 0.75 - padding);
     }
 
@@ -949,7 +999,7 @@ namespace Base {
         return true;
     }
 
-    bool TimerUvTask(uv_loop_t *loop, void *data, uv_timer_cb cb)
+    bool TimerUvTask(uv_loop_t *loop, void *data, uv_timer_cb cb, int repeatTimeout)
     {
         uv_timer_t *timer = new uv_timer_t();
         if (timer == nullptr) {
@@ -957,9 +1007,42 @@ namespace Base {
         }
         timer->data = data;
         uv_timer_init(loop, timer);
-        constexpr int repeatTimeout = 250;  // ms
+        // default 250ms
         uv_timer_start(timer, cb, 0, repeatTimeout);
         // delete by callback
+        return true;
+    }
+
+    // callback, uint8_t flag, string msg, const void * data
+    bool DelayDo(uv_loop_t *loop, const int delayMs, const uint8_t flag, string msg, void *data,
+                 std::function<void(const uint8_t, string &, const void *)> cb)
+    {
+        struct DelayDoParam {
+            uv_timer_t handle;
+            uint8_t flag;
+            string msg;
+            void *data;
+            std::function<void(const uint8_t, string &, const void *)> cb;
+        };
+        auto funcDelayDo = [](uv_timer_t *handle) -> void {
+            DelayDoParam *st = (DelayDoParam *)handle->data;
+            st->cb(st->flag, st->msg, st->data);
+            uv_close((uv_handle_t *)handle, [](uv_handle_t *handle) {
+                DelayDoParam *st = (DelayDoParam *)handle->data;
+                delete st;
+            });
+        };
+        DelayDoParam *st = new DelayDoParam();
+        if (st == nullptr) {
+            return false;
+        }
+        st->cb = cb;
+        st->flag = flag;
+        st->msg = msg;
+        st->data = data;
+        st->handle.data = st;
+        uv_timer_init(loop, &st->handle);
+        uv_timer_start(&st->handle, funcDelayDo, delayMs, 0);
         return true;
     }
 
@@ -989,6 +1072,45 @@ namespace Base {
 #endif
         string res(resolvedPath);
         return res;
+    }
+
+    uint8_t CalcCheckSum(const uint8_t *data, int len)
+    {
+        uint8_t ret = 0;
+        for (int i = 0; i < len; ++i) {
+            ret += data[i];
+        }
+        return ret;
+    }
+
+    int open_osfhandle(uv_os_fd_t os_fd)
+    {
+        // equal libuv's uv_open_osfhandle, libuv 1.23 added. old libuv not impl...
+#ifdef _WIN32
+        return _open_osfhandle((intptr_t)os_fd, 0);
+#else
+        return os_fd;
+#endif
+    }
+
+    uv_os_sock_t DuplicateUvSocket(uv_tcp_t *tcp)
+    {
+        uv_os_sock_t dupFd = -1;
+#ifdef _WIN32
+        WSAPROTOCOL_INFO info;
+        memset(&info, 0, sizeof(info));
+        if (WSADuplicateSocketA(tcp->socket, GetCurrentProcessId(), &info) < 0) {
+            return dupFd;
+        }
+        dupFd = WSASocketA(0, 0, 0, &info, 0, 0);
+#else
+        uv_os_fd_t fdOs;
+        if (uv_fileno((const uv_handle_t *)tcp, &fdOs) < 0) {
+            return ERR_API_FAIL;
+        }
+        dupFd = dup(open_osfhandle(fdOs));
+#endif
+        return dupFd;
     }
 }
 }  // namespace Hdc

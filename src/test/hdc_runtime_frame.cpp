@@ -52,7 +52,7 @@ bool FrameRuntime::Initial(bool bConnectToDaemon)
     constexpr int loopTime = 20;
     constexpr int sleepTime = 300;
     bool bRunCheckOK = false;
-    for (size_t i = 0; i < loopTime; i++) {
+    for (size_t i = 0; i < loopTime; ++i) {
         if (serverRunning && daemonRunning) {
             bRunCheckOK = true;
             break;

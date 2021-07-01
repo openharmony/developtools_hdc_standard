@@ -82,7 +82,7 @@ int BackgroundRun()
     } else if (!pc) {
         int i;
         const int MAX_NUM = 64;
-        for (i = 0; i < MAX_NUM; i++) {
+        for (i = 0; i < MAX_NUM; ++i) {
             close(i);
         }
         RestartDaemon(true);

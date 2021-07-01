@@ -116,7 +116,7 @@ bool HdcServer::CheckToPullUptrServer(const char *listenString)
     } else if (!pc) {
         int i;
         const int maxFD = 1024;
-        for (i = 0; i < maxFD; i++) {
+        for (i = 0; i < maxFD; ++i) {
             // close file pipe
             close(i);
         }
@@ -137,7 +137,7 @@ void HdcServer::ClearMapDaemonInfo()
         string sKey = iter->first;
         HDaemonInfo hDi = iter->second;
         delete hDi;
-        iter++;
+        ++iter;
     }
     uv_rwlock_rdunlock(&daemonAdmin);
     uv_rwlock_wrlock(&daemonAdmin);
@@ -198,7 +198,7 @@ string HdcServer::GetDaemonMapList(uint8_t opType)
     uv_rwlock_rdlock(&daemonAdmin);
     map<string, HDaemonInfo>::iterator iter;
     string echoLine;
-    for (iter = mapDaemon.begin(); iter != mapDaemon.end(); iter++) {
+    for (iter = mapDaemon.begin(); iter != mapDaemon.end(); ++iter) {
         HDaemonInfo di = iter->second;
         if (!di) {
             continue;
@@ -240,8 +240,7 @@ string HdcServer::AdminDaemonMap(uint8_t opType, const string &connectKey, HDaem
         }
         case OP_REMOVE: {
             uv_rwlock_wrlock(&daemonAdmin);
-            HDaemonInfo hdi = mapDaemon[connectKey];
-            if (hdi) {
+            if (mapDaemon.count(connectKey)) {
                 mapDaemon.erase(connectKey);
             }
             uv_rwlock_wrunlock(&daemonAdmin);
@@ -250,7 +249,7 @@ string HdcServer::AdminDaemonMap(uint8_t opType, const string &connectKey, HDaem
         case OP_GET_ANY: {
             uv_rwlock_rdlock(&daemonAdmin);
             map<string, HDaemonInfo>::iterator iter;
-            for (iter = mapDaemon.begin(); iter != mapDaemon.end(); iter++) {
+            for (iter = mapDaemon.begin(); iter != mapDaemon.end(); ++iter) {
                 HDaemonInfo di = iter->second;
                 // usb will be auto connected
                 if (di->connStatus == STATUS_READY || di->connStatus == STATUS_CONNECTED) {
@@ -263,8 +262,19 @@ string HdcServer::AdminDaemonMap(uint8_t opType, const string &connectKey, HDaem
         }
         case OP_GET_ONLY: {
             uv_rwlock_rdlock(&daemonAdmin);
-            if (mapDaemon.size() == 1) {
-                hDaemonInfoInOut = mapDaemon.begin()->second;
+            string key;
+            for (auto &i : mapDaemon) {
+                if (i.second->connStatus == STATUS_CONNECTED) {
+                    if (key == STRING_EMPTY) {
+                        key = i.first;
+                    } else {
+                        key = STRING_EMPTY;
+                        break;
+                    }
+                }
+            }
+            if (key.size() > 0) {
+                hDaemonInfoInOut = mapDaemon[key];
             }
             uv_rwlock_rdunlock(&daemonAdmin);
             break;
@@ -284,17 +294,31 @@ string HdcServer::AdminDaemonMap(uint8_t opType, const string &connectKey, HDaem
     return sRet;
 }
 
-void HdcServer::NotifyInstanceSessionFree(HSession hSession)
+void HdcServer::NotifyInstanceSessionFree(HSession hSession, bool freeOrClear)
 {
     HDaemonInfo hdiOld = nullptr;
     AdminDaemonMap(OP_QUERY, hSession->connectKey, hdiOld);
-    if (hdiOld) {
-        HdcDaemonInformation diNew;
-        diNew = *hdiOld;
+    if (hdiOld == nullptr) {
+        return;
+    }
+    if (!freeOrClear) {  // step1
         // update
+        HdcDaemonInformation diNew = *hdiOld;
         diNew.connStatus = STATUS_OFFLINE;
         HDaemonInfo hdiNew = &diNew;
         AdminDaemonMap(OP_UPDATE, hSession->connectKey, hdiNew);
+    } else {  // step2
+        string usbMountPoint = hdiOld->usbMountPoint;
+        constexpr int waitDaemonReconnect = 250;  // can be call directory, not delay?
+        auto funcDelayUsbNotify = [this, usbMountPoint](const uint8_t flag, string &msg, const void *) -> void {
+            string s = usbMountPoint;
+            clsUSBClt->RemoveIgnoreDevice(s);
+        };
+        if (usbMountPoint.size() > 0) {
+            // wait time for daemon reconnect
+            // If removed from maplist, the USB module will be reconnected, so it needs to wait for a while
+            Base::DelayDoSimple(&loopMain, waitDaemonReconnect, funcDelayUsbNotify);
+        }
     }
 }
 
@@ -395,6 +419,11 @@ bool HdcServer::FetchCommand(HSession hSession, const uint32_t channelId, const 
         return ret;
     }
     if (!hChannel) {
+        if (command == CMD_KERNEL_CHANNEL_CLOSE) {
+            // Saturated release. Daemon close channel and want to notify server close channel also, but it may has been
+            // closed by herself
+            return true;
+        }
         return false;
     }
     switch (command) {
@@ -412,15 +441,16 @@ bool HdcServer::FetchCommand(HSession hSession, const uint32_t channelId, const 
         case CMD_KERNEL_CHANNEL_CLOSE: {
             WRITE_LOG(LOG_DEBUG, "CMD_KERNEL_CHANNEL_CLOSE channelid:%d", channelId);
             ClearOwnTasks(hSession, channelId);
-            pSfc->FreeChannel(channelId);
+            auto funcChannleClose = [](uv_handle_t *handle) -> void {
+                HChannel hChannel = (HChannel)handle->data;
+                HdcServerForClient *sfc = static_cast<HdcServerForClient *>(hChannel->clsChannel);
+                sfc->FreeChannel(hChannel->channelId);
+            };
+            Base::TryCloseHandle((uv_handle_t *)&hChannel->hChildWorkTCP, funcChannleClose);
             if (*payload) {
-                (*payload)--;
+                --(*payload);
                 Send(hSession->sessionId, channelId, CMD_KERNEL_CHANNEL_CLOSE, payload, 1);
             }
-            break;
-        }
-        case CMD_KERNEL_CHANNEL_DETCH: {
-            Base::TryCloseHandle((uv_handle_t *)&hChannel->hChildWorkTCP);
             break;
         }
         case CMD_FORWARD_SUCCESS: {
@@ -436,7 +466,11 @@ bool HdcServer::FetchCommand(HSession hSession, const uint32_t channelId, const 
             break;
         }
         default: {
-            ret = DispatchTaskData(hChannel->targetSession, hChannel->channelId, command, payload, payloadSize);
+            HSession hSession = AdminSession(OP_QUERY, hChannel->targetSessionId, nullptr);
+            if (!hSession) {
+                return false;
+            }
+            ret = DispatchTaskData(hSession, hChannel->channelId, command, payload, payloadSize);
             break;
         }
     }
@@ -473,7 +507,7 @@ string HdcServer::AdminForwardMap(uint8_t opType, const string &taskString, HFor
         case OP_GET_STRLIST_FULL: {
             uv_rwlock_rdlock(&forwardAdmin);
             map<string, HForwardInfo>::iterator iter;
-            for (iter = mapForward.begin(); iter != mapForward.end(); iter++) {
+            for (iter = mapForward.begin(); iter != mapForward.end(); ++iter) {
                 HForwardInfo di = iter->second;
                 if (!di) {
                     continue;
@@ -493,8 +527,7 @@ string HdcServer::AdminForwardMap(uint8_t opType, const string &taskString, HFor
         }
         case OP_REMOVE: {
             uv_rwlock_wrlock(&forwardAdmin);
-            HForwardInfo hdi = mapForward[taskString];
-            if (hdi) {
+            if (mapForward.count(taskString)) {
                 mapForward.erase(taskString);
             }
             uv_rwlock_wrunlock(&forwardAdmin);
@@ -511,9 +544,10 @@ void HdcServer::UsbPreConnect(uv_timer_t *handle)
     HSession hSession = (HSession)handle->data;
     bool stopLoop = false;
     HdcServer *hdcServer = (HdcServer *)hSession->classInstance;
-    const int usbConnectRetryMax = 600;
+    const int usbConnectRetryMax = 100;
     while (true) {
-        if (hSession->hUSB->retryCount++ > usbConnectRetryMax) {  // max 6s
+        WRITE_LOG(LOG_DEBUG, "HdcServer::UsbPreConnect");
+        if (++hSession->hUSB->retryCount > usbConnectRetryMax) {  // max 10s
             hdcServer->FreeSession(hSession->sessionId);
             stopLoop = true;
             break;
@@ -541,8 +575,7 @@ void HdcServer::UsbPreConnect(uv_timer_t *handle)
 int HdcServer::CreateConnect(const string &connectKey)
 {
     uint8_t connType = 0;
-    if (connectKey.find(":") != std::string::npos) {
-        // TCP
+    if (connectKey.find(":") != std::string::npos) {  // TCP
         connType = CONN_TCP;
     } else {  // USB
         connType = CONN_USB;
@@ -590,27 +623,20 @@ int HdcServer::CreateConnect(const string &connectKey)
     return ERR_SUCCESS;
 }
 
-void HdcServer::RegisterChannel(HSession hSession, const uint32_t channelId)
+void HdcServer::AttachChannel(HSession hSession, const uint32_t channelId)
 {
     HdcServerForClient *hSfc = static_cast<HdcServerForClient *>(clsServerForClient);
     HChannel hChannel = hSfc->AdminChannel(OP_QUERY, channelId, nullptr);
+    int ret = 0;
     if (!hChannel) {
         return;
     }
     uv_tcp_init(&hSession->childLoop, &hChannel->hChildWorkTCP);
     hChannel->hChildWorkTCP.data = hChannel;
-    hChannel->targetSession = hSession;
-}
-
-void HdcServer::AttachChannel(HSession hSession, const uint32_t channelId)
-{
-    HdcServerForClient *hSfc = static_cast<HdcServerForClient *>(clsServerForClient);
-    HChannel hChannel = hSfc->AdminChannel(OP_QUERY, channelId, nullptr);
-    if (!hChannel) {
-        return;
-    }
-    if (uv_tcp_open((uv_tcp_t *)&hChannel->hChildWorkTCP, (uv_os_sock_t)hChannel->fdChildWorkTCP) < 0) {
-        WRITE_LOG(LOG_DEBUG, "Hdcserver AttachChannel uv_tcp_open failed");
+    hChannel->targetSessionId = hSession->sessionId;
+    if ((ret = uv_tcp_open((uv_tcp_t *)&hChannel->hChildWorkTCP, hChannel->fdChildWorkTCP)) < 0) {
+        WRITE_LOG(LOG_DEBUG, "Hdcserver AttachChannel uv_tcp_open failed %s, channelid:%d fdChildWorkTCP:%d",
+                  uv_err_name(ret), hChannel->channelId, hChannel->fdChildWorkTCP);
         return;
     }
     Base::SetTcpOptions((uv_tcp_t *)&hChannel->hChildWorkTCP);
@@ -624,8 +650,16 @@ void HdcServer::DeatchChannel(const uint32_t channelId)
     if (!hChannel) {
         return;
     }
-    Base::TryCloseHandle((uv_handle_t *)&hChannel->hChildWorkTCP);
-    hChannel->childCleared = true;
+    if (uv_is_closing((const uv_handle_t *)&hChannel->hChildWorkTCP)) {
+        hChannel->childCleared = true;
+        WRITE_LOG(LOG_DEBUG, "Childchannel free direct, cid:%d", channelId);
+    } else {
+        Base::TryCloseHandle((uv_handle_t *)&hChannel->hChildWorkTCP, [](uv_handle_t *handle) -> void {
+            HChannel hChannel = (HChannel)handle->data;
+            hChannel->childCleared = true;
+            WRITE_LOG(LOG_DEBUG, "Childchannel free callback, cid:%d", hChannel->channelId);
+        });
+    }
 };
 
 bool HdcServer::ServerCommand(const uint32_t sessionId, const uint32_t channelId, const uint16_t command,
@@ -633,10 +667,11 @@ bool HdcServer::ServerCommand(const uint32_t sessionId, const uint32_t channelId
 {
     HdcServerForClient *hSfc = static_cast<HdcServerForClient *>(clsServerForClient);
     HChannel hChannel = hSfc->AdminChannel(OP_QUERY, channelId, nullptr);
-    if (!hChannel) {
+    HSession hSession = AdminSession(OP_QUERY, sessionId, nullptr);
+    if (!hChannel || !hSession) {
         return false;
     }
-    return FetchCommand(hChannel->targetSession, channelId, command, bufPtr, size);
+    return FetchCommand(hSession, channelId, command, bufPtr, size);
 }
 
 // clang-format off
@@ -705,4 +740,5 @@ bool HdcServer::RemoveInstanceTask(const uint8_t op, HTaskInfo hTask)
     }
     return ret;
 }
+
 }  // namespace Hdc

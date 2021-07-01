@@ -88,7 +88,7 @@ bool HdcSessionBase::BeginRemoveTask(HTaskInfo hTask)
         HSession hSession = thisClass->AdminSession(OP_QUERY, hTask->sessionId, nullptr);
         thisClass->AdminTask(OP_REMOVE, hSession, hTask->channelId, nullptr);
         WRITE_LOG(LOG_DEBUG, "TaskDelay task remove finish, channelId:%d", hTask->channelId);
-        delete hTask;  // delete
+        delete hTask;
         uv_close((uv_handle_t *)handle, Base::CloseIdleCallback);
     };
     Base::IdleUvTask(hTask->runLoop, hTask, taskClassDeleteRetry);
@@ -113,7 +113,7 @@ void HdcSessionBase::ClearOwnTasks(HSession hSession, const uint32_t channelIDIn
         HTaskInfo hTask = iter->second;
         if (channelIDInput != 0) {  // single
             if (channelIDInput != channelId) {
-                iter++;
+                ++iter;
                 continue;
             }
             BeginRemoveTask(hTask);
@@ -123,7 +123,7 @@ void HdcSessionBase::ClearOwnTasks(HSession hSession, const uint32_t channelIDIn
         }
         // multi
         BeginRemoveTask(hTask);
-        iter++;
+        ++iter;
     }
 }
 
@@ -133,7 +133,7 @@ void HdcSessionBase::ClearSessions()
     // broadcast free singal
     for (auto v : mapSession) {
         HSession hSession = (HSession)v.second;
-        if (!hSession->mainCleared) {
+        if (!hSession->isDead) {
             FreeSession(hSession->sessionId);
         }
     }
@@ -166,7 +166,7 @@ void HdcSessionBase::EnumUSBDeviceRegister(void (*pCallBack)(HSession hSession))
     }
     uv_rwlock_rdlock(&lockMapSession);
     map<uint32_t, HSession>::iterator i;
-    for (i = mapSession.begin(); i != mapSession.end(); i++) {
+    for (i = mapSession.begin(); i != mapSession.end(); ++i) {
         HSession hs = i->second;
         if (hs->connType != CONN_USB) {
             continue;
@@ -203,7 +203,7 @@ HSession HdcSessionBase::QueryUSBDeviceRegister(void *pDev, int busIDIn, int dev
     }
     uv_rwlock_rdlock(&lockMapSession);
     map<uint32_t, HSession>::iterator i;
-    for (i = mapSession.begin(); i != mapSession.end(); i++) {
+    for (i = mapSession.begin(); i != mapSession.end(); ++i) {
         HSession hs = i->second;
         if (hs->connType == CONN_USB) {
             continue;
@@ -273,7 +273,7 @@ void HdcSessionBase::PushAsyncMessage(const uint32_t sessionId, const uint8_t me
     param->method = method;
     if (dataSize > 0) {
         param->dataSize = dataSize;
-        param->data = new uint8_t[param->dataSize];
+        param->data = new uint8_t[param->dataSize]();
         if (!param->data) {
             delete param;
             return;
@@ -304,7 +304,7 @@ int HdcSessionBase::MallocSessionByConnectType(HSession hSession)
     switch (hSession->connType) {
         case CONN_TCP: {
             uv_tcp_init(&loopMain, &hSession->hWorkTCP);
-            hSession->uvRef++;
+            ++hSession->uvRef;
             hSession->hWorkTCP.data = hSession;
             break;
         }
@@ -343,7 +343,7 @@ HSession HdcSessionBase::MallocSession(bool serverOrDaemon, const ConnType connT
         return nullptr;
     }
     int ret = 0;
-    sessionRef++;
+    ++sessionRef;
     memset_s(hSession->ctrlFd, sizeof(hSession->ctrlFd), 0, sizeof(hSession->ctrlFd));
     hSession->classInstance = this;
     hSession->connType = connType;
@@ -351,7 +351,6 @@ HSession HdcSessionBase::MallocSession(bool serverOrDaemon, const ConnType connT
     hSession->isDead = false;
     hSession->sessionId = ((sessionId == 0) ? static_cast<uint32_t>(Base::GetRuntimeMSec()) : sessionId);
     hSession->serverOrDaemon = serverOrDaemon;
-    uv_mutex_init(&hSession->sendMutex);
     hSession->hWorkThread = uv_thread_self();
     hSession->mapTask = new map<uint32_t, HTaskInfo>();
     hSession->listKey = new list<void *>;
@@ -360,7 +359,7 @@ HSession HdcSessionBase::MallocSession(bool serverOrDaemon, const ConnType connT
     WRITE_LOG(LOG_DEBUG, "HdcSessionBase NewSession, sessionId:%d", hSession->sessionId);
 
     uv_tcp_init(&loopMain, &hSession->ctrlPipe[STREAM_MAIN]);
-    hSession->uvRef++;
+    ++hSession->uvRef;
     Base::CreateSocketPair(hSession->ctrlFd);
     uv_tcp_open(&hSession->ctrlPipe[STREAM_MAIN], hSession->ctrlFd[STREAM_MAIN]);
     uv_read_start((uv_stream_t *)&hSession->ctrlPipe[STREAM_MAIN], Base::AllocBufferCallback, ReadCtrlFromSession);
@@ -368,7 +367,7 @@ HSession HdcSessionBase::MallocSession(bool serverOrDaemon, const ConnType connT
     hSession->ctrlPipe[STREAM_WORK].data = hSession;
     // Activate USB DAEMON's data channel, may not for use
     uv_tcp_init(&loopMain, &hSession->dataPipe[STREAM_MAIN]);
-    hSession->uvRef++;
+    ++hSession->uvRef;
     Base::CreateSocketPair(hSession->dataFd);
     uv_tcp_open(&hSession->dataPipe[STREAM_MAIN], hSession->dataFd[STREAM_MAIN]);
     hSession->dataPipe[STREAM_MAIN].data = hSession;
@@ -417,10 +416,6 @@ void HdcSessionBase::FreeSessionByConnectType(HSession hSession)
             close(hUSB->bulkOut);
             hUSB->bulkOut = 0;
         }
-        if (hUSB->control > 0) {
-            close(hUSB->control);
-            hUSB->control = 0;
-        }
 #endif
         delete hSession->hUSB;
         hSession->hUSB = nullptr;
@@ -435,14 +430,15 @@ void HdcSessionBase::FreeSessionFinally(uv_idle_t *handle)
     if (hSession->uvRef > 0) {
         return;
     }
+    // Notify Server or Daemon, just UI or display commandline
+    thisClass->NotifyInstanceSessionFree(hSession, true);
     // all hsession uv handle has been clear
     thisClass->AdminSession(OP_REMOVE, hSession->sessionId, nullptr);
-    hSession->mainCleared = true;
-    WRITE_LOG(LOG_DEBUG, "FreeSessionFinally sessionId:%d finish", hSession->sessionId);
+    WRITE_LOG(LOG_DEBUG, "!!!FreeSessionFinally sessionId:%d finish", hSession->sessionId);
     delete hSession;
     hSession = nullptr;  // fix CodeMars SetNullAfterFree issue
     Base::TryCloseHandle((const uv_handle_t *)handle, Base::CloseIdleCallback);
-    thisClass->sessionRef--;
+    --thisClass->sessionRef;
 }
 
 // work when child-work thread finish
@@ -450,7 +446,7 @@ void HdcSessionBase::FreeSessionContinue(HSession hSession)
 {
     auto closeSessionTCPHandle = [](uv_handle_t *handle) -> void {
         HSession hSession = (HSession)handle->data;
-        hSession->uvRef--;
+        --hSession->uvRef;
         Base::TryCloseHandle((uv_handle_t *)handle);
     };
     if (CONN_TCP == hSession->connType) {
@@ -462,7 +458,6 @@ void HdcSessionBase::FreeSessionContinue(HSession hSession)
         delete[] hSession->ioBuf;
         hSession->ioBuf = nullptr;
     }
-    uv_mutex_destroy(&hSession->sendMutex);
     Base::TryCloseHandle((uv_handle_t *)&hSession->ctrlPipe[STREAM_MAIN], closeSessionTCPHandle);
     Base::CloseSocketPair(hSession->ctrlFd);
     Base::TryCloseHandle((uv_handle_t *)&hSession->dataPipe[STREAM_MAIN], closeSessionTCPHandle);
@@ -475,31 +470,18 @@ void HdcSessionBase::FreeSessionContinue(HSession hSession)
     Base::IdleUvTask(&loopMain, hSession, FreeSessionFinally);
 }
 
-void HdcSessionBase::FreeSession(const uint32_t sessionId)
+void HdcSessionBase::FreeSessionOpeate(uv_timer_t *handle)
 {
-    bool bNotTodo = true;
-    HSession hSession = AdminSession(OP_QUERY, sessionId, nullptr);
-    if (!hSession) {
+    HSession hSession = (HSession)handle->data;
+    HdcSessionBase *thisClass = (HdcSessionBase *)hSession->classInstance;
+    if (hSession->sendRef > 0) {
         return;
     }
-    // Unified Send to the main thread
-    if (hSession->hWorkThread != uv_thread_self()) {
-        PushAsyncMessage(hSession->sessionId, ASYNC_FREE_SESSION, nullptr, 0);
+#ifdef HDC_HOST
+    if (hSession->hUSB != nullptr && hSession->hUSB->transferRecv != nullptr) {
         return;
     }
-    WRITE_LOG(LOG_DEBUG, "FreeSession sessionid:%d sendref:%u", hSession->sessionId, uint16_t(hSession->sendRef));
-    while (true) {
-        if (hSession->sendRef || hSession->isDead) {
-            break;
-        }
-        bNotTodo = false;
-        break;
-    }
-    if (bNotTodo) {
-        return;
-    }
-    hSession->isDead = true;
-    NotifyInstanceSessionFree(hSession);  // Notify Server or Daemon, just UI or display commandline
+#endif
     // wait workthread to free
     if (hSession->ctrlPipe[STREAM_WORK].loop) {
         auto ctrl = BuildCtrlString(SP_STOP_SESSION, 0, nullptr, 0);
@@ -514,13 +496,30 @@ void HdcSessionBase::FreeSession(const uint32_t sessionId)
             Base::TryCloseHandle((uv_handle_t *)handle, Base::CloseTimerCallback);
             thisClass->FreeSessionContinue(hSession);
         };
-        uv_timer_t *ut = new uv_timer_t;
-        ut->data = hSession;
-        uv_timer_init(&loopMain, ut);
-        uv_timer_start(ut, callbackCheckFreeSessionContinue, 500, 3000);
+        Base::TimerUvTask(&thisClass->loopMain, hSession, callbackCheckFreeSessionContinue);
     } else {
-        FreeSessionContinue(hSession);
+        thisClass->FreeSessionContinue(hSession);
     }
+    Base::TryCloseHandle((uv_handle_t *)handle, Base::CloseTimerCallback);
+}
+
+void HdcSessionBase::FreeSession(const uint32_t sessionId)
+{
+    HSession hSession = AdminSession(OP_QUERY, sessionId, nullptr);
+    if (!hSession) {
+        return;
+    }
+    if (hSession->hWorkThread != uv_thread_self()) {
+        PushAsyncMessage(hSession->sessionId, ASYNC_FREE_SESSION, nullptr, 0);
+        return;
+    }
+    if (hSession->isDead) {
+        return;
+    }
+    hSession->isDead = true;
+    Base::TimerUvTask(&loopMain, hSession, FreeSessionOpeate);
+    NotifyInstanceSessionFree(hSession, false);
+    WRITE_LOG(LOG_DEBUG, "FreeSession sessionid:%d sendref:%u", hSession->sessionId, uint16_t(hSession->sendRef));
 }
 
 HSession HdcSessionBase::AdminSession(const uint8_t op, const uint32_t sessionId, HSession hInput)
@@ -586,8 +585,7 @@ int HdcSessionBase::SendByProtocol(HSession hSession, uint8_t *bufPtr, const int
         return ERR_SESSION_NOFOUND;
     }
     int ret = 0;
-    uv_mutex_lock(&hSession->sendMutex);
-    hSession->sendRef++;
+    ++hSession->sendRef;
     switch (hSession->connType) {
         case CONN_TCP: {
             if (hSession->hWorkThread == uv_thread_self()) {
@@ -611,97 +609,102 @@ int HdcSessionBase::SendByProtocol(HSession hSession, uint8_t *bufPtr, const int
         default:
             break;
     }
-    uv_mutex_unlock(&hSession->sendMutex);
     return ret;
 }
 
 int HdcSessionBase::Send(const uint32_t sessionId, const uint32_t channelId, const uint16_t commandFlag,
-                         uint8_t *bufPtr, int bufLen)
+                         const uint8_t *data, const int dataSize)
 {
     HSession hSession = AdminSession(OP_QUERY, sessionId, nullptr);
     if (!hSession) {
-        WRITE_LOG(LOG_DEBUG, "Send to offline device, drop it,:%d", sessionId);
+        WRITE_LOG(LOG_DEBUG, "Send to offline device, drop it, sessionid:%d", sessionId);
         return ERR_SESSION_NOFOUND;
     }
-    // PayloadHead+Enc(channelId(4)+flag(2)+reserve(4)+buflen(4)+buf)
-    int sizeSendBuf = sizeof(PayloadHead) + 14 + bufLen;
-    uint8_t *sendBuf = new uint8_t[sizeSendBuf]();
-    if (sendBuf == nullptr) {
+    PayloadProtect protectBuf;  // noneed convert to big-endian
+    protectBuf.channelId = channelId;
+    protectBuf.commandFlag = commandFlag;
+    protectBuf.checkSum = (ENABLE_IO_CHECKSUM && dataSize > 0) ? Base::CalcCheckSum(data, dataSize) : 0;
+    protectBuf.vCode = payloadProtectStaticVcode;
+    string s = SerialStruct::SerializeToString(protectBuf);
+    // reserve for encrypt here
+    // xx-encrypt
+
+    PayloadHead payloadHead;  // need convert to big-endian
+    Base::ZeroStruct(payloadHead);
+    payloadHead.flag[0] = PACKET_FLAG.at(0);
+    payloadHead.flag[1] = PACKET_FLAG.at(1);
+    payloadHead.protocolVer = VER_PROTOCOL;
+    payloadHead.headSize = htons(s.size());
+    payloadHead.dataSize = htonl(dataSize);
+    int finalBufSize = sizeof(PayloadHead) + s.size() + dataSize;
+    uint8_t *finayBuf = new uint8_t[finalBufSize]();
+    if (finayBuf == nullptr) {
         return ERR_BUF_ALLOC;
     }
-    uint8_t *dataBuf = sendBuf + sizeof(PayloadHead);
-    PayloadHead *payloadHead = reinterpret_cast<PayloadHead *>(sendBuf);
-    int ret = ERR_BUF_COPY;
-    while (true) {
-        *(uint32_t *)dataBuf = htonl(channelId);
-        *(uint16_t *)(dataBuf + 4) = htons(commandFlag);
-        if (memcpy_s(dataBuf + 10, 4, &bufLen, 4)) {
+    bool bufRet = false;
+    do {
+        if (memcpy_s(finayBuf, sizeof(PayloadHead), reinterpret_cast<uint8_t *>(&payloadHead), sizeof(PayloadHead))) {
             break;
         }
-        // clang-format off
-        if (bufLen > 0 && bufPtr != nullptr &&
-            memcpy_s(dataBuf + 14, sizeSendBuf - sizeof(PayloadHead) - 14, bufPtr, bufLen)) {
-            break;  // memcpy_s failed
-        }
-        // clang-format on
-        int rc4BufLen = bufLen + 14;
-        // we can encrypt here
-        if (memcpy_s(payloadHead->flag, sizeof(payloadHead->flag), PACKET_FLAG.c_str(), 2)) {
+        if (memcpy_s(finayBuf + sizeof(PayloadHead), s.size(),
+                     reinterpret_cast<uint8_t *>(const_cast<char *>(s.c_str())), s.size())) {
             break;
         }
-        payloadHead->protocolVer = VER_PROTOCOL;
-        payloadHead->dataSize = htonl(rc4BufLen);
-        ret = SendByProtocol(hSession, sendBuf, sizeSendBuf);
-        break;
+        if (dataSize > 0 && memcpy_s(finayBuf + sizeof(PayloadHead) + s.size(), dataSize, data, dataSize)) {
+            break;
+        }
+        bufRet = true;
+    } while (false);
+    if (!bufRet) {
+        delete[] finayBuf;
+        return ERR_BUF_COPY;
     }
-    // sendBuf free by SendByProtocol
-    return ret;
+    return SendByProtocol(hSession, finayBuf, finalBufSize);
 }
 
-int HdcSessionBase::DecryptPayload(HSession hSession, uint8_t *pEncryptBuf, const int bufLen)
+int HdcSessionBase::DecryptPayload(HSession hSession, PayloadHead *payloadHeadBe, uint8_t *encBuf)
 {
-    // we can decrypt here
-    uint32_t channelId = ntohl(*(uint32_t *)pEncryptBuf);
-    uint16_t flag = ntohs(*(uint16_t *)(pEncryptBuf + 4));
-    int payloadSize = *(int *)(pEncryptBuf + 10);
-    if (payloadSize < 0 || (uint32_t)payloadSize > HDC_BUF_MAX_BYTES) {
-        WRITE_LOG(LOG_WARN, "DecryptPayload failed");
-        return -1;
+    PayloadProtect protectBuf;
+    Base::ZeroStruct(protectBuf);
+    uint16_t headSize = ntohs(payloadHeadBe->headSize);
+    int dataSize = ntohl(payloadHeadBe->dataSize);
+    string encString(reinterpret_cast<char *>(encBuf), headSize);
+    SerialStruct::ParseFromString(protectBuf, encString);
+    if (protectBuf.vCode != payloadProtectStaticVcode) {
+        WRITE_LOG(LOG_FATAL, "Session recv static vcode failed");
+        return ERR_BUF_CHECK;
     }
-    uint8_t *payload = nullptr;
-    if (payloadSize) {
-        payload = pEncryptBuf + 14;
+    uint8_t *data = encBuf + headSize;
+    if (protectBuf.checkSum != 0 && (protectBuf.checkSum != Base::CalcCheckSum(data, dataSize))) {
+        WRITE_LOG(LOG_FATAL, "Session recv CalcCheckSum failed");
+        return ERR_BUF_CHECK;
     }
-    if (!FetchCommand(hSession, channelId, flag, payload, payloadSize)) {
+    if (!FetchCommand(hSession, protectBuf.channelId, protectBuf.commandFlag, data, dataSize)) {
         WRITE_LOG(LOG_WARN, "FetchCommand failed");
-        return -2;
+        return ERR_GENERIC;
     }
-    return 0;
+    return ERR_SUCCESS;
 }
 
 int HdcSessionBase::OnRead(HSession hSession, uint8_t *bufPtr, const int bufLen)
 {
-    int ret = -3;
-    if (bufLen == 0) {
-        return 0;  // buf end
-    }
+    int ret = ERR_GENERIC;
     if (memcmp(bufPtr, PACKET_FLAG.c_str(), 2)) {
-        return -1;
+        return ERR_BUF_CHECK;
     }
     struct PayloadHead *payloadHead = (struct PayloadHead *)bufPtr;
-    int tobeReadLen = ntohl(payloadHead->dataSize);
+    int tobeReadLen = ntohl(payloadHead->dataSize) + ntohs(payloadHead->headSize);
     int packetHeadSize = sizeof(struct PayloadHead);
     if (tobeReadLen <= 0 || (uint32_t)tobeReadLen > HDC_BUF_MAX_BYTES) {
         // max 1G
-        return -2;
+        return ERR_BUF_CHECK;
     }
     if (bufLen - packetHeadSize < tobeReadLen) {
         return 0;
     }
-    if (DecryptPayload(hSession, bufPtr + packetHeadSize, tobeReadLen)) {
-        return -3;
+    if (DecryptPayload(hSession, payloadHead, bufPtr + packetHeadSize)) {
+        return ERR_BUF_CHECK;
     }
-
     ret = packetHeadSize + tobeReadLen;
     return ret;
 }
@@ -752,14 +755,14 @@ void HdcSessionBase::AllocCallback(uv_handle_t *handle, size_t sizeWanted, uv_bu
 void HdcSessionBase::FinishWriteSessionTCP(uv_write_t *req, int status)
 {
     HSession hSession = (HSession)req->handle->data;
-    hSession->sendRef--;
+    --hSession->sendRef;
     HdcSessionBase *thisClass = (HdcSessionBase *)hSession->classInstance;
     if (status < 0) {
         Base::TryCloseHandle((uv_handle_t *)req->handle);
-    }
-    if (hSession->isDead && !hSession->sendRef) {
-        WRITE_LOG(LOG_DEBUG, "FinishWriteSessionTCP willfreesn :%p", hSession);
-        thisClass->FreeSession(hSession->sessionId);
+        if (!hSession->isDead && !hSession->sendRef) {
+            WRITE_LOG(LOG_DEBUG, "FinishWriteSessionTCP freesession :%p", hSession);
+            thisClass->FreeSession(hSession->sessionId);
+        }
     }
     delete[]((uint8_t *)req->data);
     delete req;
@@ -816,7 +819,7 @@ bool HdcSessionBase::WorkThreadStartSession(HSession hSession)
             WRITE_LOG(LOG_DEBUG, "HdcSessionBase SessionCtrl failed 1");
             return false;
         }
-        if ((childRet = uv_tcp_open(&hSession->hChildWorkTCP, (uv_os_sock_t)hSession->fdChildWorkTCP)) < 0) {
+        if ((childRet = uv_tcp_open(&hSession->hChildWorkTCP, hSession->fdChildWorkTCP)) < 0) {
             WRITE_LOG(LOG_DEBUG, "SessionCtrl failed 2,fd:%d,str:%s", hSession->fdChildWorkTCP, uv_strerror(childRet));
             return false;
         }
@@ -841,8 +844,8 @@ bool HdcSessionBase::WorkThreadStartSession(HSession hSession)
     return true;
 }
 
-vector<uint8_t> HdcSessionBase::BuildCtrlString(InnerCtrlCommand command, uint32_t channelId,
-                                                const uint8_t *data, int dataSize)
+vector<uint8_t> HdcSessionBase::BuildCtrlString(InnerCtrlCommand command, uint32_t channelId, uint8_t *data,
+                                                int dataSize)
 {
     vector<uint8_t> ret;
     while (true) {
@@ -880,13 +883,6 @@ bool HdcSessionBase::DispatchMainThreadCommand(HSession hSession, const CtrlStru
             Base::TryCloseHandle((uv_handle_t *)&hSession->ctrlPipe[STREAM_WORK]);
             Base::TryCloseHandle((uv_handle_t *)&hSession->dataPipe[STREAM_WORK]);
             uv_stop(&hSession->childLoop);
-            break;
-        }
-        case SP_REGISTER_CHANNEL: {
-            if (!serverOrDaemon) {
-                break;  // Only Server has this feature
-            }
-            RegisterChannel(hSession, channelId);
             break;
         }
         case SP_ATTACH_CHANNEL: {

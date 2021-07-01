@@ -55,6 +55,9 @@ namespace Debug {
         if (fp == nullptr) {
             if (snprintf_s(pathName, sizeof(pathName), sizeof(pathName) - 1, "/tmp/%s", fileName) < 0
                 || (fp = fopen(pathName, "r")) == nullptr) {
+                if (fp != nullptr) {
+                    fclose(fp);
+                }
                 WRITE_LOG(LOG_DEBUG, "Write hex to %s failed!", pathName);
                 return ERR_FILE_WRITE;
             }
@@ -66,7 +69,6 @@ namespace Debug {
             fclose(fp);
             return ERR_BUF_SIZE;
         }
-
         int ret = fread(buf, 1, size, fp);
         fflush(fp);
         fclose(fp);
@@ -90,7 +92,7 @@ namespace Debug {
     int PrintfHexBuf(const uint8_t *buf, int bufLen)
     {
         int i = 0;
-        for (i = 0; i < bufLen; i++) {
+        for (i = 0; i < bufLen; ++i) {
             printf("0x%02x, ", buf[i]);
             fflush(stdout);
         }

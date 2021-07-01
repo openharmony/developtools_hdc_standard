@@ -36,9 +36,15 @@ public:
         uint8_t dataSize;
         uint8_t data[BUF_SIZE_MICRO];
     };
+    struct PayloadProtect {  // reserve for encrypt and decrypt
+        uint32_t channelId;
+        uint32_t commandFlag;
+        uint8_t checkSum;  // enable it will be lose about 20% speed
+        uint8_t vCode;
+    };
+
     HdcSessionBase(bool serverOrDaemonIn);
     virtual ~HdcSessionBase();
-    virtual void RegisterChannel(HSession hSession, const uint32_t channelId) {};
     virtual void AttachChannel(HSession hSession, const uint32_t channelId) {};
     virtual void DeatchChannel(const uint32_t channelId) {};
     virtual bool RedirectToTask(HTaskInfo hTaskInfo, HSession hSession, const uint32_t channelId,
@@ -46,7 +52,7 @@ public:
     {
         return true;
     }
-    virtual void NotifyInstanceSessionFree(HSession hSession)
+    virtual void NotifyInstanceSessionFree(HSession hSession, bool freeOrClear)
     {
     }
     void ReMainLoopForInstanceClear();
@@ -63,8 +69,8 @@ public:
     void FreeSession(const uint32_t sessionId);
     void WorkerPendding();
     int OnRead(HSession hSession, uint8_t *bufPtr, const int bufLen);
-    int Send(const uint32_t sessionId, const uint32_t channelId, const uint16_t commandFlag, uint8_t *bufPtr,
-             const int bufLen);
+    int Send(const uint32_t sessionId, const uint32_t channelId, const uint16_t commandFlag, const uint8_t *data,
+             const int dataSize);
     int SendByProtocol(HSession hSession, uint8_t *bufPtr, const int bufLen);
     HSession AdminSession(const uint8_t op, const uint32_t sessionId, HSession hInput);
     int FetchIOBuf(HSession hSession, uint8_t *ioBuf, int read);
@@ -92,8 +98,7 @@ public:
     {
         return wantRestart;
     }
-    static vector<uint8_t> BuildCtrlString(InnerCtrlCommand command, uint32_t channelId,
-        const uint8_t *data, int dataSize);
+    static vector<uint8_t> BuildCtrlString(InnerCtrlCommand command, uint32_t channelId, uint8_t *data, int dataSize);
     uv_loop_t loopMain;
     bool serverOrDaemon;
     uv_async_t asyncMainLoop;
@@ -104,11 +109,11 @@ public:
 protected:
     struct PayloadHead {
         uint8_t flag[2];
-        uint8_t reserve[2];
+        uint8_t reserve[2];  // encrypt'flag or others options
         uint8_t protocolVer;
+        uint16_t headSize;
         uint32_t dataSize;
     } __attribute__((packed));
-
     void ClearSessions();
     virtual void JdwpNewFileDescriptor(const uint8_t *buf, const int bytesIO)
     {
@@ -150,7 +155,7 @@ private:
     virtual void ClearInstanceResource()
     {
     }
-    int DecryptPayload(HSession hSession, uint8_t *pEncryptBuf, const int bufLen);
+    int DecryptPayload(HSession hSession, PayloadHead *payloadHeadBe, uint8_t *encBuf);
     bool DispatchMainThreadCommand(HSession hSession, const CtrlStruct *ctrl);
     bool DispatchSessionThreadCommand(uv_stream_t *uvpipe, HSession hSession, const uint8_t *baseBuf,
                                       const int bytesIO);
@@ -160,6 +165,7 @@ private:
     void FreeSessionContinue(HSession hSession);
     static void FreeSessionFinally(uv_idle_t *handle);
     static void AsyncMainLoopTask(uv_idle_t *handle);
+    static void FreeSessionOpeate(uv_timer_t *handle);
     int MallocSessionByConnectType(HSession hSession);
     void FreeSessionByConnectType(HSession hSession);
     bool WorkThreadStartSession(HSession hSession);
@@ -167,6 +173,7 @@ private:
     map<uint32_t, HSession> mapSession;
     uv_rwlock_t lockMapSession;
     std::atomic<uint32_t> sessionRef = 0;
+    const uint8_t payloadProtectStaticVcode = 0x09;
 };
 }  // namespace Hdc
 #endif
