@@ -211,6 +211,26 @@ string HdcServer::GetDaemonMapList(uint8_t opType)
     return ret;
 }
 
+void HdcServer::GetDaemonMapOnlyOne(HDaemonInfo &hDaemonInfoInOut)
+{
+    uv_rwlock_rdlock(&daemonAdmin);
+    string key;
+    for (auto &i : mapDaemon) {
+        if (i.second->connStatus == STATUS_CONNECTED) {
+            if (key == STRING_EMPTY) {
+                key = i.first;
+            } else {
+                key = STRING_EMPTY;
+                break;
+            }
+        }
+    }
+    if (key.size() > 0) {
+        hDaemonInfoInOut = mapDaemon[key];
+    }
+    uv_rwlock_rdunlock(&daemonAdmin);
+}
+
 string HdcServer::AdminDaemonMap(uint8_t opType, const string &connectKey, HDaemonInfo &hDaemonInfoInOut)
 {
     string sRet;
@@ -261,22 +281,7 @@ string HdcServer::AdminDaemonMap(uint8_t opType, const string &connectKey, HDaem
             break;
         }
         case OP_GET_ONLY: {
-            uv_rwlock_rdlock(&daemonAdmin);
-            string key;
-            for (auto &i : mapDaemon) {
-                if (i.second->connStatus == STATUS_CONNECTED) {
-                    if (key == STRING_EMPTY) {
-                        key = i.first;
-                    } else {
-                        key = STRING_EMPTY;
-                        break;
-                    }
-                }
-            }
-            if (key.size() > 0) {
-                hDaemonInfoInOut = mapDaemon[key];
-            }
-            uv_rwlock_rdunlock(&daemonAdmin);
+            GetDaemonMapOnlyOne(hDaemonInfoInOut);
             break;
         }
         case OP_UPDATE: {  // Cannot update the Object HDi lower key value by direct value

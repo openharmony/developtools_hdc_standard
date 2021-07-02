@@ -164,13 +164,14 @@ namespace Base {
         va_end(ap);
     }
 
+    // if can linkwith -lstdc++fs, use std::filesystem::path(path).filename();
     string GetFileNameAny(string &path)
     {
-        // if can linkwith -lstdc++fs, use std::filesystem::path(path).filename();
         string tmpString = path;
-        size_t tmpNum = 0;
-        if ((tmpNum = tmpString.rfind('/')) == std::string::npos) {
-            if ((tmpNum = tmpString.rfind('\\')) == std::string::npos) {
+        size_t tmpNum = tmpString.rfind('/');
+        if (tmpNum == std::string::npos) {
+            tmpNum = tmpString.rfind('\\');
+            if (tmpNum == std::string::npos) {
                 return tmpString;
             }
         }
@@ -1098,7 +1099,7 @@ namespace Base {
         uv_os_sock_t dupFd = -1;
 #ifdef _WIN32
         WSAPROTOCOL_INFO info;
-        memset(&info, 0, sizeof(info));
+        ZeroStruct(info);
         if (WSADuplicateSocketA(tcp->socket, GetCurrentProcessId(), &info) < 0) {
             return dupFd;
         }
