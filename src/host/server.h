@@ -52,6 +52,7 @@ private:
     bool HandServerAuth(HSession hSession, SessionHandShake &handshake);
     string GetDaemonMapList(uint8_t opType);
     bool ServerSessionHandshake(HSession hSession, uint8_t *payload, int payloadSize);
+    void GetDaemonMapOnlyOne(HDaemonInfo &hDaemonInfoInOut);
 
     uv_rwlock_t daemonAdmin;
     map<string, HDaemonInfo> mapDaemon;
