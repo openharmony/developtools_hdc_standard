@@ -37,33 +37,33 @@ constexpr auto HDC_USBTF_STR = 0x03;
 constexpr auto HDC_USBTF_ITF = 0x04;
 constexpr auto HDC_USBTF_EPS = 0x05;
 
-#define CPU_TO_LE16(x) htole16(x)
-#define CPU_TO_LE32(x) htole32(x)
+#define SHORT_LE(x) htole16(x)
+#define LONG_LE(x) htole32(x)
 #define HDC_INTERFACE_NAME "HDC Interface"
 
 struct UsbFunctionDesc {
-    struct usb_interface_descriptor intf;
-    struct usb_endpoint_descriptor_no_audio source;
-    struct usb_endpoint_descriptor_no_audio sink;
+    struct usb_interface_descriptor ifDesc;
+    struct usb_endpoint_descriptor_no_audio from;
+    struct usb_endpoint_descriptor_no_audio to;
 } __attribute__((packed));
 
 static const struct {
-    struct usb_functionfs_strings_head header;
+    struct usb_functionfs_strings_head head;
     struct {
         __le16 code;
-        const char str1[sizeof(HDC_INTERFACE_NAME)];
-    } __attribute__((packed)) lang0;
+        const char name[sizeof(HDC_INTERFACE_NAME)];
+    } __attribute__((packed)) firstItem;
 } __attribute__((packed)) USB_FFS_VALUE = {
-    .header =
+    .head =
         {
-            .magic = CPU_TO_LE32(FUNCTIONFS_STRINGS_MAGIC),
-            .length = CPU_TO_LE32(sizeof(USB_FFS_VALUE)),
-            .str_count = CPU_TO_LE32(1),
-            .lang_count = CPU_TO_LE32(1),
+            .magic = LONG_LE(FUNCTIONFS_STRINGS_MAGIC),
+            .length = LONG_LE(sizeof(USB_FFS_VALUE)),
+            .str_count = LONG_LE(1),
+            .lang_count = LONG_LE(1),
         },
-    .lang0 =
+    .firstItem =
         {
-            CPU_TO_LE16(0x0409),
+            SHORT_LE(0x0409),
             HDC_INTERFACE_NAME,
         },
 };
@@ -71,75 +71,75 @@ static const struct {
 struct UsbFunctionfsDescsHeadOld {
     __le32 magic;
     __le32 length;
-    __le32 fs_count;
-    __le32 hs_count;
+    __le32 config1Count;
+    __le32 config2Count;
 } __attribute__((packed));
 
-struct ss_func_desc {
-    struct usb_interface_descriptor intf;
-    struct usb_endpoint_descriptor_no_audio source;
-    struct usb_ss_ep_comp_descriptor source_comp;
-    struct usb_endpoint_descriptor_no_audio sink;
-    struct usb_ss_ep_comp_descriptor sink_comp;
+struct UsbFuncConfig {
+    struct usb_interface_descriptor ifDesc;
+    struct usb_endpoint_descriptor_no_audio from;
+    struct usb_ss_ep_comp_descriptor pairFrom;
+    struct usb_endpoint_descriptor_no_audio to;
+    struct usb_ss_ep_comp_descriptor pairTo;
 } __attribute__((packed));
 
-static struct ss_func_desc ss_descriptors = {
-    .intf = {
-        .bLength = sizeof(ss_descriptors.intf),
+static struct UsbFuncConfig config3 = {
+    .ifDesc = {
+        .bLength = sizeof(config3.ifDesc),
         .bDescriptorType = USB_DT_INTERFACE,
         .bInterfaceNumber = 0,
         .bNumEndpoints = 2,
         .bInterfaceClass = HDC_CLASS,
         .bInterfaceSubClass = HDC_SUBCLASS,
         .bInterfaceProtocol = VER_PROTOCOL,
-        .iInterface = 1, /* first string from the provided table */
+        .iInterface = 1
     },
-    .source = {
-        .bLength = sizeof(ss_descriptors.source),
+    .from = {
+        .bLength = sizeof(config3.from),
         .bDescriptorType = USB_DT_ENDPOINT,
         .bEndpointAddress = 1 | USB_DIR_OUT,
         .bmAttributes = USB_ENDPOINT_XFER_BULK,
         .wMaxPacketSize = HDC_FSPKT_SIZE_MAX,
     },
-    .source_comp = {
-        .bLength = sizeof(ss_descriptors.source_comp),
+    .pairFrom = {
+        .bLength = sizeof(config3.pairFrom),
         .bDescriptorType = USB_DT_SS_ENDPOINT_COMP,
         .bMaxBurst = 4,
     },
-    .sink = {
-        .bLength = sizeof(ss_descriptors.sink),
+    .to = {
+        .bLength = sizeof(config3.to),
         .bDescriptorType = USB_DT_ENDPOINT,
         .bEndpointAddress = 2 | USB_DIR_IN,
         .bmAttributes = USB_ENDPOINT_XFER_BULK,
         .wMaxPacketSize = HDC_FSPKT_SIZE_MAX,
     },
-    .sink_comp = {
-        .bLength = sizeof(ss_descriptors.sink_comp),
+    .pairTo = {
+        .bLength = sizeof(config3.pairTo),
         .bDescriptorType = USB_DT_SS_ENDPOINT_COMP,
         .bMaxBurst = 4,
     },
 };
 
-static struct UsbFunctionDesc fs_descriptors = {
-    .intf = {
-        .bLength = sizeof(fs_descriptors.intf),
+static struct UsbFunctionDesc config1 = {
+    .ifDesc = {
+        .bLength = sizeof(config1.ifDesc),
         .bDescriptorType = USB_DT_INTERFACE,
         .bInterfaceNumber = 0,
         .bNumEndpoints = 2,
         .bInterfaceClass = HDC_CLASS,
         .bInterfaceSubClass = HDC_SUBCLASS,
         .bInterfaceProtocol = VER_PROTOCOL,
-        .iInterface = 1, /* first string from the provided table */
+        .iInterface = 1
     },
-    .source = {
-        .bLength = sizeof(fs_descriptors.source),
+    .from = {
+        .bLength = sizeof(config1.from),
         .bDescriptorType = USB_DT_ENDPOINT,
         .bEndpointAddress = 1 | USB_DIR_OUT,
         .bmAttributes = USB_ENDPOINT_XFER_BULK,
         .wMaxPacketSize = HDC_FSPKT_SIZE_MAX,
     },
-    .sink = {
-        .bLength = sizeof(fs_descriptors.sink),
+    .to = {
+        .bLength = sizeof(config1.to),
         .bDescriptorType = USB_DT_ENDPOINT,
         .bEndpointAddress = 2 | USB_DIR_IN,
         .bmAttributes = USB_ENDPOINT_XFER_BULK,
@@ -147,26 +147,26 @@ static struct UsbFunctionDesc fs_descriptors = {
     },
 };
 
-static struct UsbFunctionDesc hs_descriptors = {
-    .intf = {
-        .bLength = sizeof(hs_descriptors.intf),
+static struct UsbFunctionDesc config2 = {
+    .ifDesc = {
+        .bLength = sizeof(config2.ifDesc),
         .bDescriptorType = USB_DT_INTERFACE,
         .bInterfaceNumber = 0,
         .bNumEndpoints = 2,
         .bInterfaceClass = HDC_CLASS,
         .bInterfaceSubClass = HDC_SUBCLASS,
         .bInterfaceProtocol = VER_PROTOCOL,
-        .iInterface = 1, /* first string from the provided table */
+        .iInterface = 1
     },
-    .source = {
-        .bLength = sizeof(hs_descriptors.source),
+    .from = {
+        .bLength = sizeof(config2.from),
         .bDescriptorType = USB_DT_ENDPOINT,
         .bEndpointAddress = 1 | USB_DIR_OUT,
         .bmAttributes = USB_ENDPOINT_XFER_BULK,
         .wMaxPacketSize = HDC_HSPKT_SIZE_MAX,
     },
-    .sink = {
-        .bLength = sizeof(hs_descriptors.sink),
+    .to = {
+        .bLength = sizeof(config2.to),
         .bDescriptorType = USB_DT_ENDPOINT,
         .bEndpointAddress = 2 | USB_DIR_IN,
         .bmAttributes = USB_ENDPOINT_XFER_BULK,
@@ -175,40 +175,39 @@ static struct UsbFunctionDesc hs_descriptors = {
 };
 
 static const struct {
-    struct usb_functionfs_descs_head_v2 header;
-    // The rest of the structure depends on the flags in the header.
-    __le32 fs_count;
-    __le32 hs_count;
-    __le32 ss_count;
-    __le32 os_count;
-    struct UsbFunctionDesc fs_descs, hs_descs;
-    struct ss_func_desc ss_descs;
-    struct usb_os_desc_header os_header;
-    struct usb_ext_compat_desc os_desc;
+    struct usb_functionfs_descs_head_v2 head;
+    __le32 config1Count;
+    __le32 config2Count;
+    __le32 config3Count;
+    __le32 configWosCount;
+    struct UsbFunctionDesc config1Desc, config2Desc;
+    struct UsbFuncConfig config3Desc;
+    struct usb_os_desc_header wosHead;
+    struct usb_ext_compat_desc wosDesc;
 } __attribute__((packed)) USB_FFS_DESC = {
-    .header =
+    .head =
     {
-        .magic = CPU_TO_LE32(FUNCTIONFS_DESCRIPTORS_MAGIC_V2),
-        .length = CPU_TO_LE32(sizeof(USB_FFS_DESC)),
+        .magic = LONG_LE(FUNCTIONFS_DESCRIPTORS_MAGIC_V2),
+        .length = LONG_LE(sizeof(USB_FFS_DESC)),
         .flags = FUNCTIONFS_HAS_FS_DESC | FUNCTIONFS_HAS_HS_DESC |
                                  FUNCTIONFS_HAS_SS_DESC | FUNCTIONFS_HAS_MS_OS_DESC
     },
-    .fs_count = 3,
-    .hs_count = 3,
-    .ss_count = 5,
-    .os_count = 1,
-    .fs_descs = fs_descriptors,
-    .hs_descs = hs_descriptors,
-    .ss_descs = ss_descriptors,
-    .os_header = {
-            .interface = 0,
-            .dwLength = CPU_TO_LE32(sizeof(USB_FFS_DESC.os_header) + sizeof(USB_FFS_DESC.os_desc)),
-            .bcdVersion = CPU_TO_LE16(1),
-            .wIndex = CPU_TO_LE16(4),
+    .config1Count = 3,
+    .config2Count = 3,
+    .config3Count = 5,
+    .configWosCount = 1,
+    .config1Desc = config1,
+    .config2Desc = config2,
+    .config3Desc = config3,
+    .wosHead = {
+            .interface = 1,
+            .dwLength = LONG_LE(sizeof(USB_FFS_DESC.wosHead) + sizeof(USB_FFS_DESC.wosDesc)),
+            .bcdVersion = SHORT_LE(1),
+            .wIndex = SHORT_LE(4),
             .bCount = 1,
             .Reserved = 0,
         },
-    .os_desc = {
+    .wosDesc = {
             .bFirstInterfaceNumber = 0,
             .Reserved1 = 1,
             .CompatibleID = { 'W', 'I', 'N', 'U', 'S', 'B', '\0', '\0'},
