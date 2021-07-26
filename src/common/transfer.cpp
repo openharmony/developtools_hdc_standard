@@ -232,6 +232,7 @@ void HdcTransferBase::OnFileOpen(uv_fs_t *req)
     CtxFile *context = (CtxFile *)req->data;
     HdcTransferBase *thisClass = (HdcTransferBase *)context->thisClass;
     uv_fs_req_cleanup(req);
+    WRITE_LOG(LOG_DEBUG, "Filemod openfile:%s", context->localPath.c_str());
     --thisClass->refCount;
     if (req->result < 0) {
         thisClass->LogMsg(MSG_FAIL, "Error opening file: %s, path:%s", uv_strerror((int)req->result),

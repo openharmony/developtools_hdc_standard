@@ -19,9 +19,7 @@ namespace Hdc {
 HdcDaemonUnity::HdcDaemonUnity(HTaskInfo hTaskInfo)
     : HdcTaskBase(hTaskInfo)
 {
-    Base::ZeroStruct(opContext);
-    opContext.thisClass = this;
-    opContext.dataCommand = CMD_KERNEL_ECHO_RAW;  // Default output to shelldata
+    currentDataCommand = CMD_KERNEL_ECHO_RAW;  // Default output to shelldata
 }
 
 HdcDaemonUnity::~HdcDaemonUnity()
@@ -31,118 +29,57 @@ HdcDaemonUnity::~HdcDaemonUnity()
 
 void HdcDaemonUnity::StopTask()
 {
-    singalStop = true;
-    ClearContext(&opContext);
+    asyncCommand.DoRelease();
 };
 
-void HdcDaemonUnity::ClearContext(ContextUnity *ctx)
+bool HdcDaemonUnity::ReadyForRelease()
 {
-    if (ctx->hasCleared) {
-        return;
+    if (!HdcTaskBase::ReadyForRelease() || !asyncCommand.ReadyForRelease()) {
+        return false;
     }
-    switch (ctx->typeUnity) {
-        case UNITY_SHELL_EXECUTE: {
-            if (ctx->fpOpen) {
-                pclose(ctx->fpOpen);
-                ctx->fpOpen = nullptr;
-            }
-            break;
-        }
-        default:
-            break;
-    }
-    ctx->hasCleared = true;
+    return true;
 }
 
-void HdcDaemonUnity::OnFdRead(uv_fs_t *req)
+void HdcDaemonUnity::AsyncCmdOut(bool finish, int64_t exitStatus, const string result)
 {
-    CtxUnityIO *ctxIO = static_cast<CtxUnityIO *>(req->data);
-    ContextUnity *ctx = static_cast<ContextUnity *>(ctxIO->context);
-    HdcDaemonUnity *thisClass = ctx->thisClass;
-    --thisClass->refCount;
-    uint8_t *buf = ctxIO->bufIO;
-    bool readContinue = false;
-    while (true) {
-        if (thisClass->singalStop || req->result <= 0) {
+#ifdef UNIT_TEST
+    Base::WriteBinFile((UT_TMP_PATH + "/execute.result").c_str(), (uint8_t *)result.c_str(), result.size(),
+                       countUt++ == 0);
+#endif
+    bool wantFinish = false;
+    do {
+        if (finish) {
+            wantFinish = true;
+            --refCount;
             break;
         }
-        if (!thisClass->SendToAnother(thisClass->opContext.dataCommand, (uint8_t *)buf, req->result)) {
+        if (!SendToAnother(currentDataCommand, (uint8_t *)result.c_str(), result.size())) {
+            asyncCommand.DoRelease();  // will callback self, set wantFinish =true
             break;
         }
-        if (thisClass->LoopFdRead(&thisClass->opContext) < 0) {
-            break;
-        }
-        readContinue = true;
-        break;
+    } while (false);
+    if (wantFinish) {
+        TaskFinish();
     }
-    delete[] buf;
-    uv_fs_req_cleanup(req);
-    delete req;
-    delete ctxIO;
-    if (!readContinue) {
-        thisClass->ClearContext(ctx);
-        thisClass->TaskFinish();
-    }
-}
-
-// Consider merage file_descriptor class
-int HdcDaemonUnity::LoopFdRead(ContextUnity *ctx)
-{
-    uv_buf_t iov;
-    int readMax = Base::GetMaxBufSize();
-    CtxUnityIO *contextIO = new CtxUnityIO();
-    uint8_t *buf = new uint8_t[readMax]();
-    uv_fs_t *req = new uv_fs_t();
-    if (!contextIO || !buf || !req) {
-        if (contextIO) {
-            delete contextIO;
-        }
-        if (buf) {
-            delete[] buf;
-        }
-        if (req) {
-            delete req;
-        }
-        WRITE_LOG(LOG_WARN, "Memory alloc failed");
-        return -1;
-    }
-    contextIO->bufIO = buf;
-    contextIO->context = ctx;
-    req->data = contextIO;
-    ++refCount;
-
-    iov = uv_buf_init((char *)buf, readMax);
-    uv_fs_read(loopTask, req, ctx->fd, &iov, 1, -1, OnFdRead);
-    return 0;
 }
 
 int HdcDaemonUnity::ExecuteShell(const char *shellCommand)
 {
-    string sUTPath;
-    if ((opContext.fpOpen = popen(shellCommand, "r")) == nullptr) {
-        goto FAILED;
-    }
-    opContext.fd = fileno(opContext.fpOpen);
-    opContext.typeUnity = UNITY_SHELL_EXECUTE;
-    while (true) {
-#ifdef UNIT_TEST  // UV_FS_READ can not respond to read file content in time when the unit test
-        uint8_t readBuf[BUF_SIZE_DEFAULT] = "";
-        int bytesIO = 0;
-        bytesIO = fread(readBuf, 1, BUF_SIZE_DEFAULT, opContext.fpOpen);
-        if (bytesIO <= 0 || !SendToAnother(opContext.dataCommand, readBuf, bytesIO)) {
+    do {
+        AsyncCmd::CmdResultCallback funcResultOutput;
+        funcResultOutput = std::bind(&HdcDaemonUnity::AsyncCmdOut, this, std::placeholders::_1, std::placeholders::_2,
+                                     std::placeholders::_3);
+        if (!asyncCommand.Initial(loopTask, funcResultOutput,
+                                  asyncCommand.GetDefaultOption() | asyncCommand.OPTION_READBACK_OUT)) {
             break;
         }
-        Base::WriteBinFile((UT_TMP_PATH + "/execute.result").c_str(), readBuf, bytesIO, false);
-#else
-        if (LoopFdRead(&opContext) < 0) {
-            break;
-        }
-        return 0;
-#endif
-    }
-FAILED:
+        asyncCommand.ExecuteCommand(shellCommand);
+        ++refCount;
+        return ERR_SUCCESS;
+    } while (false);
+
     TaskFinish();
-    WRITE_LOG(LOG_DEBUG, "Shell finish");
+    WRITE_LOG(LOG_DEBUG, "Shell failed finish");
     return -1;
 }
 
@@ -258,7 +195,7 @@ bool HdcDaemonUnity::SetDeviceRunMode(void *daemonIn, const char *cmd)
         return false;
     }
     // shutdown
-    daemon->StopDaemon(true);
+    daemon->PostStopInstanceMessage(true);
     LogMsg(MSG_OK, "Set device run mode successful.");
     return true;
 }
@@ -317,19 +254,20 @@ bool HdcDaemonUnity::CommandDispatch(const uint16_t command, uint8_t *payload, c
         }
         case CMD_UNITY_ROOTRUN: {
             ret = false;
-            if (payload && !strcmp((char *)payload, "r")) {
+            if (payloadSize != 0 && !strcmp((char *)payload, "r")) {
                 Base::SetHdcProperty("persist.hdc.root", "0");
+            } else {
+                Base::SetHdcProperty("persist.hdc.root", "1");
             }
-            Base::SetHdcProperty("persist.hdc.root", "1");
-            daemon->StopDaemon(true);
+            daemon->PostStopInstanceMessage(true);
             break;
         }
         case CMD_UNITY_TERMINATE: {
-            daemon->StopDaemon(!strcmp((char *)payload, "1"));
+            daemon->PostStopInstanceMessage(!strcmp((char *)payload, "1"));
             break;
         }
         case CMD_UNITY_BUGREPORT_INIT: {
-            opContext.dataCommand = CMD_UNITY_BUGREPORT_DATA;
+            currentDataCommand = CMD_UNITY_BUGREPORT_DATA;
             ExecuteShell((char *)CMDSTR_BUGREPORT.c_str());
             break;
         }

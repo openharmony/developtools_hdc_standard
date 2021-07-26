@@ -78,7 +78,7 @@ int HdcDaemonUSB::ConnectEPPoint(HUSB hUSB)
                 break;
             }
             if (write(controlEp, &USB_FFS_DESC, sizeof(USB_FFS_DESC)) < 0) {
-                WRITE_LOG(LOG_WARN, "%s: write ffs_descriptors failed: errno=%d", USB_FFS_HDC_EP0, errno);
+                WRITE_LOG(LOG_WARN, "%s: write ffs configs failed: errno=%d", USB_FFS_HDC_EP0, errno);
                 break;
             }
             if (write(controlEp, &USB_FFS_VALUE, sizeof(USB_FFS_VALUE)) < 0) {
@@ -148,7 +148,7 @@ bool HdcDaemonUSB::AvailablePacket(uint8_t *ioBuf, uint32_t *sessionId)
         if ((usbPayloadHeader->option & USB_OPTION_RESET)) {
             HdcDaemon *daemon = reinterpret_cast<HdcDaemon *>(clsMainBase);
             // The Host end program is restarted, but the USB cable is still connected
-            WRITE_LOG(LOG_WARN, "Hostside want restart daemon, restart old sessionid:%d", usbPayloadHeader->sessionId);
+            WRITE_LOG(LOG_WARN, "Hostside want restart daemon, restart old sessionId:%u", usbPayloadHeader->sessionId);
             daemon->PushAsyncMessage(usbPayloadHeader->sessionId, ASYNC_FREE_SESSION, nullptr, 0);
             break;
         }
@@ -271,7 +271,7 @@ HSession HdcDaemonUSB::PrepareNewSession(uint32_t sessionId, uint8_t *pRecvBuf, 
     if (currentSessionId != 0) {
         // reset old session
         // The Host side is restarted, but the USB cable is still connected
-        WRITE_LOG(LOG_WARN, "New session coming, restart old sessionid:%d", currentSessionId);
+        WRITE_LOG(LOG_WARN, "New session coming, restart old sessionId:%u", currentSessionId);
         daemon->PushAsyncMessage(currentSessionId, ASYNC_FREE_SESSION, nullptr, 0);
     }
     Base::StartWorkThread(&daemon->loopMain, daemon->SessionWorkThread, Base::FinishWorkThread, hChildSession);

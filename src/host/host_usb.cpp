@@ -406,6 +406,7 @@ void LIBUSB_CALL HdcHostUSB::WriteUSBBulkCallback(struct libusb_transfer *transf
         --hSession->sendRef;
     }
     uv_sem_post(&thisClass->semUsbSend);
+
     if (LIBUSB_TRANSFER_COMPLETED != transfer->status || (hSession->isDead && 0 == hSession->sendRef)) {
         WRITE_LOG(LOG_FATAL, "SendUSBRaw status:%d", transfer->status);
         if (hSession->hUSB->transferRecv != nullptr) {
@@ -417,7 +418,27 @@ void LIBUSB_CALL HdcHostUSB::WriteUSBBulkCallback(struct libusb_transfer *transf
     libusb_free_transfer(transfer);
 }
 
+bool HdcHostUSB::WaitMaxOverlap(HSession hSession)
+{
+    int result = 0;
+    bool ret = false;
+    while (true) {
+        result = uv_sem_trywait(&semUsbSend);
+        if (result == 0) {
+            ret = true;
+            break;
+        } else if (result == UV_EAGAIN && !hSession->isDead) {
+            uv_sleep(3);  // at least sleep 3ms to Hand over CPU for IO
+            continue;
+        } else {
+            break;
+        }
+    }
+    return ret;
+}
+
 // libusb can send directly across threads?!!!
+// Just call from child work thread, it will be block when overlap full
 int HdcHostUSB::SendUSBRaw(HSession hSession, uint8_t *data, const int length)
 {
     int ret = ERR_GENERIC;
@@ -437,7 +458,10 @@ int HdcHostUSB::SendUSBRaw(HSession hSession, uint8_t *data, const int length)
         }
         libusb_fill_bulk_transfer(transferUsb, hUSB->devHandle, hUSB->epHost, sendBuf, length, WriteUSBBulkCallback,
                                   hSession, retryTimeout);
-        uv_sem_wait(&semUsbSend);
+        if (!WaitMaxOverlap(hSession)) {
+            ret = ERR_THREAD_MUTEX_FAIL;
+            break;
+        }
         if (libusb_submit_transfer(transferUsb) < 0) {
             uv_sem_post(&semUsbSend);
             ret = ERR_IO_FAIL;

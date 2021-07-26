@@ -19,7 +19,13 @@
 #include <openssl/bio.h>
 #include <openssl/buffer.h>
 #include <openssl/evp.h>
+#include <openssl/md5.h>
 #include <random>
+#ifdef __MUSL__
+extern "C" {
+#include "parameter.h"
+}
+#endif
 using namespace std::chrono;
 
 namespace Hdc {
@@ -40,7 +46,7 @@ namespace Base {
 #ifdef _WIN32
         currentThreadId = GetCurrentThreadId();
 #else
-        currentThreadId = uv_thread_self();  // 64 just use 32bit
+        currentThreadId = uv_thread_self();  // 64bit OS, just dispaly 32bit ptr
 #endif
         debugInfo = StringFormat("%s:%d", tmpString.c_str(), line);
         if (g_logLevel < LOG_FULL) {
@@ -261,7 +267,7 @@ namespace Base {
                 }
 
                 if (ptrLoop->active_handles >= 2) {
-                    WRITE_LOG(LOG_WARN, "TryCloseLoop issue");
+                    WRITE_LOG(LOG_DEBUG, "TryCloseLoop issue");
                 }
                 auto clearLoopTask = [](uv_handle_t *handle, void *arg) -> void { TryCloseHandle(handle); };
                 uv_walk(ptrLoop, clearLoopTask, nullptr);
@@ -285,15 +291,23 @@ namespace Base {
     // Some handles may not be initialized or activated yet or have been closed, skip the closing process
     void TryCloseHandle(const uv_handle_t *handle)
     {
-        if (handle->loop && !uv_is_closing(handle)) {
-            uv_close((uv_handle_t *)handle, nullptr);
-        }
+        TryCloseHandle(handle, nullptr);
     }
 
     void TryCloseHandle(const uv_handle_t *handle, uv_close_cb closeCallBack)
     {
+        TryCloseHandle(handle, false, closeCallBack);
+    }
+
+    void TryCloseHandle(const uv_handle_t *handle, bool alwaysCallback, uv_close_cb closeCallBack)
+    {
+        bool hasCallClose = false;
         if (handle->loop && !uv_is_closing(handle)) {
             uv_close((uv_handle_t *)handle, closeCallBack);
+            hasCallClose = true;
+        }
+        if (!hasCallClose && alwaysCallback) {
+            closeCallBack((uv_handle_t *)handle);
         }
     }
 
@@ -528,6 +542,7 @@ namespace Base {
 
     bool SetHdcProperty(const char *key, const char *value)
     {
+#ifndef __MUSL__
 #ifdef HDC_PCDEBUG
         WRITE_LOG(LOG_DEBUG, "Setproperty, key:%s value:%s", key, value);
 #else
@@ -535,6 +550,9 @@ namespace Base {
         string sValue = value;
         string sBuf = "setprop " + sKey + " " + value;
         system(sBuf.c_str());
+#endif
+#else
+        SetParameter(key, value);
 #endif
         return true;
     }
@@ -555,10 +573,6 @@ namespace Base {
     // bufLen == 0: alloc buffer in heap, need free it later
     // >0: read max nBuffLen bytes to *buff
     // ret value: <0 or bytes read
-
-    // bufLen == 0: alloc buffer in heap, need free it later
-    // >0: read max nBuffLen bytes to *buff
-    // ret value: <0 or bytes read
     int ReadBinFile(const char *pathName, void **buf, const int bufLen)
     {
         uint8_t *pDst = nullptr;
@@ -574,7 +588,7 @@ namespace Base {
         ret = -3;
         if (bufLen == 0) {
             dynamicBuf = 1;
-            pDst = new uint8_t[nFileSize];
+            pDst = new uint8_t[nFileSize + 1]();  // tail \0
             if (!pDst) {
                 return -1;
             }
@@ -583,7 +597,6 @@ namespace Base {
             if (nFileSize > bufLen) {
                 return -2;
             }
-
             readMax = nFileSize;
             pDst = reinterpret_cast<uint8_t *>(buf);  // The first address of the static array is the array address
         }
@@ -616,16 +629,21 @@ namespace Base {
 
     int WriteBinFile(const char *pathName, const uint8_t *buf, const int bufLen, bool newFile)
     {
-        char mode[BUF_SIZE_TINY] = "";
-        if (newFile) {
-            strcpy_s(mode, sizeof(mode), "wb+");
-        } else {
-            strcpy_s(mode, sizeof(mode), "a+");
-        }
-
+        string mode;
+        string resolvedPath;
         string srcPath(pathName);
-        string resolvedPath = CanonicalizeSpecPath(srcPath);
-        FILE *fp = fopen(resolvedPath.c_str(), mode);
+        if (newFile) {
+            mode = "wb+";
+            // no std::fs supoort, else std::filesystem::canonical,-lstdc++fs
+            if (srcPath.find("..") != string::npos) {
+                return ERR_FILE_PATH_CHECK;
+            }
+            resolvedPath = srcPath.c_str();
+        } else {
+            mode = "a+";
+            resolvedPath = CanonicalizeSpecPath(srcPath);
+        }
+        FILE *fp = fopen(resolvedPath.c_str(), mode.c_str());
         if (fp == nullptr) {
             WRITE_LOG(LOG_DEBUG, "Write to %s failed!", pathName);
             return ERR_FILE_OPEN;
@@ -667,9 +685,8 @@ namespace Base {
         if (snprintf_s(pidBuf, sizeof(pidBuf), sizeof(pidBuf) - 1, "%d", pid) < 0) {
             return ERR_BUF_OVERFLOW;
         }
-        string srcPath(bufPath);
-        string resolvedPath = CanonicalizeSpecPath(srcPath);
-        int fd = open(resolvedPath.c_str(), O_RDWR | O_CREAT, (S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH));
+        // no need to CanonicalizeSpecPath, else not work
+        int fd = open(bufPath, O_RDWR | O_CREAT, (S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH));
         if (fd < 0) {
             WRITE_LOG(LOG_FATAL, "Open mutex file \"%s\" failed!!!\n", buf);
             return ERR_FILE_OPEN;
@@ -1113,5 +1130,16 @@ namespace Base {
 #endif
         return dupFd;
     }
+
+    vector<uint8_t> Md5Sum(uint8_t *buf, int size)
+    {
+        vector<uint8_t> ret;
+        uint8_t md5Hash[MD5_DIGEST_LENGTH] = { 0 };
+        if (EVP_Digest(buf, size, md5Hash, NULL, EVP_md5(), NULL)) {
+            ret.insert(ret.begin(), md5Hash, md5Hash + sizeof(md5Hash));
+        }
+        return ret;
+    }
+
 }
 }  // namespace Hdc

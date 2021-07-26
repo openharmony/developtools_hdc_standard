@@ -79,8 +79,7 @@ void HdcDaemonTCP::AcceptClient(uv_stream_t *server, int status)
     if ((hSession->fdChildWorkTCP = Base::DuplicateUvSocket(&hSession->hWorkTCP)) < 0) {
         goto Finish;
     };
-    uv_read_stop((uv_stream_t *)&hSession->hWorkTCP);
-    Base::SetTcpOptions(&hSession->hWorkTCP);
+    Base::TryCloseHandle((uv_handle_t *)&hSession->hWorkTCP);
     Base::StartWorkThread(ptrLoop, ptrConnect->SessionWorkThread, Base::FinishWorkThread, hSession);
     // wait for thread up
     while (hSession->childLoop.active_handles == 0) {
