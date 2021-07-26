@@ -126,7 +126,6 @@ int HdcShell::CreateSubProcessPTY(const char *cmd, const char *arg0, const char 
         close(ptm);
         return -3;
     }
-
     *pid = fork();
     if (*pid < 0) {
         WRITE_LOG(LOG_DEBUG, "Fork shell failed:%s", strerror(errno));
@@ -159,11 +158,6 @@ bool HdcShell::ChildReadCallback(const void *context, uint8_t *buf, const int si
     if (!thisClass->SendToAnother(CMD_KERNEL_ECHO_RAW, (uint8_t *)buf, size)) {
         thisClass->TaskFinish();
     }
-#ifdef UNIT_TEST
-    // just read little data
-    Base::WriteBinFile((UT_TMP_PATH + "/shell.result").c_str(), (uint8_t *)buf, size, false);
-    thisClass->TaskFinish();
-#endif
     return true;
 };
 

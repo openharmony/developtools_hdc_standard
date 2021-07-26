@@ -28,6 +28,7 @@ constexpr auto HDC_CLASS = 0xff;
 constexpr auto HDC_SUBCLASS = 0x50;
 constexpr auto HDC_FSPKT_SIZE_MAX = 64;
 constexpr auto HDC_HSPKT_SIZE_MAX = 512;
+constexpr uint16_t HDC_SSPKT_SIZE_MAX = 1024;
 constexpr auto USB_FFS_HDC_EP0 = "/dev/usb-ffs/hdc/ep0";
 constexpr auto USB_FFS_HDC_OUT = "/dev/usb-ffs/hdc/ep1";
 constexpr auto USB_FFS_HDC_IN = "/dev/usb-ffs/hdc/ep2";
@@ -99,7 +100,7 @@ static struct UsbFuncConfig config3 = {
         .bDescriptorType = USB_DT_ENDPOINT,
         .bEndpointAddress = 1 | USB_DIR_OUT,
         .bmAttributes = USB_ENDPOINT_XFER_BULK,
-        .wMaxPacketSize = HDC_FSPKT_SIZE_MAX,
+        .wMaxPacketSize = HDC_SSPKT_SIZE_MAX,
     },
     .pairFrom = {
         .bLength = sizeof(config3.pairFrom),
@@ -111,7 +112,7 @@ static struct UsbFuncConfig config3 = {
         .bDescriptorType = USB_DT_ENDPOINT,
         .bEndpointAddress = 2 | USB_DIR_IN,
         .bmAttributes = USB_ENDPOINT_XFER_BULK,
-        .wMaxPacketSize = HDC_FSPKT_SIZE_MAX,
+        .wMaxPacketSize = HDC_SSPKT_SIZE_MAX,
     },
     .pairTo = {
         .bLength = sizeof(config3.pairTo),

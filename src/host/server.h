@@ -29,7 +29,6 @@ public:
     bool Initial(const char *listenString);
     void AttachChannel(HSession hSession, const uint32_t channelId);
     void DeatchChannel(const uint32_t channelId);
-    void StopInstance();
     static bool CheckToPullUptrServer(const char *listenString);
     static void UsbPreConnect(uv_timer_t *handle);
     void NotifyInstanceSessionFree(HSession hSession, bool freeOrClear);
@@ -53,6 +52,7 @@ private:
     string GetDaemonMapList(uint8_t opType);
     bool ServerSessionHandshake(HSession hSession, uint8_t *payload, int payloadSize);
     void GetDaemonMapOnlyOne(HDaemonInfo &hDaemonInfoInOut);
+    void TryStopInstance();
 
     uv_rwlock_t daemonAdmin;
     map<string, HDaemonInfo> mapDaemon;

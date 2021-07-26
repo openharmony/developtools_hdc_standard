@@ -17,8 +17,8 @@ using namespace Hdc;
 
 static bool g_enableUsb = false;
 static bool g_enableTcp = false;
+static bool g_rootRun = false;
 static bool g_backgroundRun = false;
-static bool g_root = false;
 namespace Hdc {
 bool RestartDaemon(bool forkchild)
 {
@@ -31,15 +31,11 @@ bool RestartDaemon(bool forkchild)
 
 bool ForkChildCheck(int argc, const char *argv[])
 {
-    // set servicelog
-    Base::SetLogLevel(4);  // debug log print
     // hdcd        #service start forground
     // hdcd -b     #service start backgroundRun
     // hdcd -fork  #fork
     char modeSet[BUF_SIZE_TINY] = "";
-    char droprootSet[BUF_SIZE_TINY] = "";
     Base::GetHdcProperty("persist.hdc.mode", modeSet, BUF_SIZE_TINY);
-    Base::GetHdcProperty("persist.hdc.root", droprootSet, BUF_SIZE_TINY);
     Base::PrintMessage("Background mode, persist.hdc.mode:%s", modeSet);
     if (!strcmp(modeSet, "tcp")) {
         WRITE_LOG(LOG_DEBUG, "Property enable TCP");
@@ -54,15 +50,6 @@ bool ForkChildCheck(int argc, const char *argv[])
     } else {
         WRITE_LOG(LOG_DEBUG, "Default USB mode");
         g_enableUsb = true;
-    }
-    droprootSet[sizeof(droprootSet) - 1] = '\0';
-    if (!strcmp(droprootSet, "1")) {
-        g_root = true;
-        WRITE_LOG(LOG_DEBUG, "Root run");
-    } else if (!strcmp(droprootSet, "0")) {
-        // Interface for pm am, harmony system has not been implemented, not to achieve
-        // Running is reduced by ROOT permission to run
-        // setgid(USER_GID) setuid(USER_UID)
     }
     if (argc == 2) {
         if (!strcmp(argv[1], "-forkchild")) {
@@ -143,6 +130,21 @@ bool GetDaemonCommandlineOptions(int argc, const char *argv[])
     }
     return true;
 }
+
+void NeedDropPriv()
+{
+    char droprootSet[BUF_SIZE_TINY] = "";
+    Base::GetHdcProperty("persist.hdc.root", droprootSet, BUF_SIZE_TINY);
+    droprootSet[sizeof(droprootSet) - 1] = '\0';
+    if (!strcmp(droprootSet, "1")) {
+        setuid(0);
+        g_rootRun = true;
+        WRITE_LOG(LOG_DEBUG, "Root run");
+    } else if (!strcmp(droprootSet, "0")) {
+        setuid(AID_SHELL);
+        // if need, will be more priv. operate
+    }
+}
 }  // namespace Hdc
 
 #ifndef UNIT_TEST
@@ -172,6 +174,7 @@ int main(int argc, const char *argv[])
     if (g_backgroundRun) {
         return BackgroundRun();
     }
+    NeedDropPriv();
     WRITE_LOG(LOG_DEBUG, "HdcDaemon main run");
     HdcDaemon daemon(false);
     daemon.InitMod(g_enableTcp, g_enableUsb);
@@ -179,8 +182,9 @@ int main(int argc, const char *argv[])
     bool wantRestart = daemon.WantRestart();
     WRITE_LOG(LOG_DEBUG, "Daemon finish");
     // There is no daemon, we can only restart myself.
-    if (g_root || wantRestart) {
-        daemon.StopInstance();
+    if (g_rootRun && wantRestart) {
+        // just root can self restart, low privilege will be exit and start by service(root)
+        WRITE_LOG(LOG_INFO, "Daemon restart");
         RestartDaemon(false);
     }
     return 0;

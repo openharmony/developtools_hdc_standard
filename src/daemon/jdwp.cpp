@@ -14,12 +14,12 @@
  */
 #include "jdwp.h"
 
-// https://blog.csdn.net/cigogo/article/details/87453793
 namespace Hdc {
 HdcJdwp::HdcJdwp(uv_loop_t *loopIn)
 {
-    loop = loopIn;
+    Base::ZeroStruct(listenPipe);
     listenPipe.data = this;
+    loop = loopIn;
     refCount = 0;
     uv_rwlock_init(&lockMapContext);
 }
@@ -303,7 +303,9 @@ string HdcJdwp::GetProcessList()
 // jdb -connect com.sun.jdi.SocketAttach:hostname=localhost,port=8000
 int HdcJdwp::Initial()
 {
-    JdwpListen();
-    return 0;
+    if (!JdwpListen()) {
+        return ERR_MODULE_JDWP_FAILED;
+    }
+    return ERR_SUCCESS;
 }
 }

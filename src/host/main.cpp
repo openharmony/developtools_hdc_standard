@@ -16,7 +16,7 @@
 #include "server_for_client.h"
 
 #ifndef HARMONY_PROJECT
-#include "../test/hdc_runtime_command.h"
+#include "../test/ut_command.h"
 using namespace HdcTest;
 #endif
 

@@ -172,7 +172,8 @@ void HdcServerForClient::OrderFindTargets(HChannel hChannel)
     EchoClient(hChannel, MSG_INFO, "Broadcast find daemon, total:%d", count);
 #ifdef UNIT_TEST
     string bufString = std::to_string(count);
-    Base::WriteBinFile((UT_TMP_PATH + "/base.result").c_str(), (uint8_t *)bufString.c_str(), bufString.size(), false);
+    Base::WriteBinFile((UT_TMP_PATH + "/base-discover.result").c_str(), (uint8_t *)bufString.c_str(), bufString.size(),
+                       true);
 #endif
 }
 
@@ -287,7 +288,8 @@ void HdcServerForClient::GetTargetList(HChannel hChannel, void *formatCommandInp
     }
     EchoClient(hChannel, MSG_OK, (char *)sRet.c_str());
 #ifdef UNIT_TEST
-    Base::WriteBinFile((UT_TMP_PATH + "/base.result").c_str(), (uint8_t *)sRet.c_str(), sRet.size(), false);
+    Base::WriteBinFile((UT_TMP_PATH + "/base-list.result").c_str(), (uint8_t *)MESSAGE_SUCCESS.c_str(),
+                       MESSAGE_SUCCESS.size(), true);
 #endif
 }
 
@@ -304,7 +306,8 @@ bool HdcServerForClient::GetAnyTarget(HChannel hChannel)
     string connectKey = hdi->connectKey;
     bool ret = NewConnectTry(ptrServer, hChannel, connectKey);
 #ifdef UNIT_TEST
-    Base::WriteBinFile((UT_TMP_PATH + "/base.result").c_str(), (uint8_t *)"OK", 3, false);
+    Base::WriteBinFile((UT_TMP_PATH + "/base-any.result").c_str(), (uint8_t *)MESSAGE_SUCCESS.c_str(),
+                       MESSAGE_SUCCESS.size(), true);
 #endif
     return ret;
 }

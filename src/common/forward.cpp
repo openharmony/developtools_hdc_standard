@@ -23,7 +23,6 @@ HdcForwardBase::HdcForwardBase(HTaskInfo hTaskInfo)
 
 HdcForwardBase::~HdcForwardBase()
 {
-    runningProtect = false;
     WRITE_LOG(LOG_DEBUG, "~HdcForwardBase");
 };
 
@@ -44,7 +43,6 @@ void HdcForwardBase::StopTask()
     }
     // FREECONTEXT in the STOP is triggered by the other party sector, no longer notifying each other.
     mapCtxPoint.clear();
-    runningProtect = false;
 };
 
 void HdcForwardBase::OnAccept(uv_stream_t *server, HCtxForward ctxClient, uv_stream_t *client)
@@ -94,12 +92,10 @@ void HdcForwardBase::ListenCallback(uv_stream_t *server, const int status)
     if (FORWARD_TCP == ctxListen->type) {
         uv_tcp_init(ctxClient->thisClass->loopTask, &ctxClient->tcp);
         client = (uv_stream_t *)&ctxClient->tcp;
-        ctxClient->tcp.data = ctxClient;
     } else {
         // FORWARD_ABSTRACT, FORWARD_RESERVED, FORWARD_FILESYSTEM,
         uv_pipe_init(ctxClient->thisClass->loopTask, &ctxClient->pipe, 0);
         client = (uv_stream_t *)&ctxClient->pipe;
-        ctxClient->pipe.data = ctxClient;
     }
     thisClass->OnAccept(server, ctxClient, client);
 }
@@ -114,6 +110,8 @@ void *HdcForwardBase::MallocContext(bool masterSlave)
     ctx->masterSlave = masterSlave;
     ctx->thisClass = this;
     ctx->fdClass = nullptr;
+    ctx->tcp.data = ctx;
+    ctx->pipe.data = ctx;
     AdminContext(OP_ADD, ctx->id, ctx);
     refCount++;
     return ctx;
@@ -122,7 +120,10 @@ void *HdcForwardBase::MallocContext(bool masterSlave)
 void HdcForwardBase::FreeContextCallBack(HCtxForward ctx)
 {
     AdminContext(OP_REMOVE, ctx->id, nullptr);
-    delete ctx;
+    Base::DoNextLoop(loopTask, ctx, [](const uint8_t flag, string &msg, const void *data) {
+        HCtxForward ctx = (HCtxForward)data;
+        delete ctx;
+    });
     --refCount;
 }
 
@@ -176,12 +177,12 @@ void HdcForwardBase::FreeContext(HCtxForward ctxIn, const uint32_t id, bool bNot
     switch (ctx->type) {
         case FORWARD_TCP:
         case FORWARD_JDWP:
-            Base::TryCloseHandle((uv_handle_t *)&ctx->tcp, funcHandleClose);
+            Base::TryCloseHandle((uv_handle_t *)&ctx->tcp, true, funcHandleClose);
             break;
         case FORWARD_ABSTRACT:
         case FORWARD_RESERVED:
         case FORWARD_FILESYSTEM:
-            Base::TryCloseHandle((uv_handle_t *)&ctx->pipe, funcHandleClose);
+            Base::TryCloseHandle((uv_handle_t *)&ctx->pipe, true, funcHandleClose);
             break;
         case FORWARD_DEVICE: {
             FreeJDWP(ctx);
@@ -249,6 +250,9 @@ void HdcForwardBase::ConnectTarget(uv_connect_t *connection, int status)
     HCtxForward ctx = (HCtxForward)connection->data;
     HdcForwardBase *thisClass = ctx->thisClass;
     delete connection;
+    if (status < 0) {
+        WRITE_LOG(LOG_WARN, "Forward connect result:%d error:%s", status, uv_err_name(status));
+    }
     thisClass->SetupPointContinue(ctx, status);
 }
 
@@ -520,11 +524,15 @@ bool HdcForwardBase::SlaveConnect(uint8_t *bufCmd, bool bCheckPoint, string &sEr
     if (!CheckNodeInfo(content, ctxPoint->localArgs)) {
         return false;
     }
-    if (!SetupPoint(ctxPoint)) {
-        WRITE_LOG(LOG_FATAL, "SetupPoint failed");
-        goto Finish;
+    if ((ctxPoint->checkPoint && slaveCheckWhenBegin) || !ctxPoint->checkPoint) {
+        if (!SetupPoint(ctxPoint)) {
+            WRITE_LOG(LOG_FATAL, "SetupPoint failed");
+            goto Finish;
+        }
+        sError = ctxPoint->lastError;
+    } else {
+        SetupPointContinue(ctxPoint, 0);
     }
-    sError = ctxPoint->lastError;
     ret = true;
 Finish:
     if (!ret) {
@@ -702,7 +710,6 @@ bool HdcForwardBase::CommandDispatch(const uint16_t command, uint8_t *payload, c
     string sError;
     // prepare
     if (CMD_FORWARD_INIT == command) {
-        runningProtect = true;
         if (!BeginForward((char *)(payload), sError)) {
             ret = false;
             goto Finish;
@@ -710,7 +717,6 @@ bool HdcForwardBase::CommandDispatch(const uint16_t command, uint8_t *payload, c
         return true;
     } else if (CMD_FORWARD_CHECK == command) {
         // Detect remote if it's reachable
-        runningProtect = true;
         if (!SlaveConnect(payload, true, sError)) {
             ret = false;
             goto Finish;

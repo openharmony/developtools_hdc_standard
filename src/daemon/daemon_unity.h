@@ -23,27 +23,11 @@ public:
     virtual ~HdcDaemonUnity();
     bool CommandDispatch(const uint16_t command, uint8_t *payload, const int payloadSize);
     void StopTask();
+    bool ReadyForRelease();
 
 private:
-    enum UNITY_TYPE {
-        UNITY_SHELL_EXECUTE = 1,
-    };
-    struct ContextUnity {
-        bool hasCleared;
-        uint16_t dataCommand;
-        HdcDaemonUnity *thisClass;
-        uint8_t typeUnity;
-        FILE *fpOpen;
-        int fd;
-    };
-    struct CtxUnityIO {
-        uint8_t *bufIO;
-        ContextUnity *context;
-    };
     static void OnFdRead(uv_fs_t *req);
     int ExecuteShell(const char *shellCommand);
-    int LoopFdRead(ContextUnity *ctx);
-    void ClearContext(ContextUnity *ctx);
     bool FindMountDeviceByPath(const char *toQuery, char *dev);
     bool RemountPartition(const char *dir);
     bool RemountDevice();
@@ -51,9 +35,14 @@ private:
     bool SetDeviceRunMode(void *daemonIn, const char *cmd);
     bool GetHiLog(const char *cmd);
     bool ListJdwpProcess(void *daemonIn);
+    void AsyncCmdOut(bool finish, int64_t exitStatus, const string result);
 
-    ContextUnity opContext;
     const string rebootProperty = "sys.powerctl";
+    AsyncCmd asyncCommand;
+    uint16_t currentDataCommand;
+#ifdef UNIT_TEST
+    int countUt = 0;
+#endif
 };
 }  // namespace Hdc
 #endif  // HDC_DAEMON_UNITY_H

@@ -66,9 +66,6 @@ protected:
     bool SetupPointContinue(HCtxForward ctx, int status);
 
 private:
-    const uint8_t FORWARD_PARAMENTER_BUFSIZE = 8;
-    const string FILESYSTEM_SOCKET_PREFIX = "/tmp/";
-    const string HARMONY_RESERVED_SOCKET_PREFIX = "/dev/socket/";
     static void ListenCallback(uv_stream_t *server, const int status);
     static void ConnectTarget(uv_connect_t *connection, int status);
     static void ReadForwardBuf(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf);
@@ -99,6 +96,11 @@ private:
 
     map<uint32_t, HCtxForward> mapCtxPoint;
     string taskCommand;
+    const uint8_t FORWARD_PARAMENTER_BUFSIZE = 8;
+    const string FILESYSTEM_SOCKET_PREFIX = "/tmp/";
+    const string HARMONY_RESERVED_SOCKET_PREFIX = "/dev/socket/";
+    // set true to enable slave check when forward create
+    const bool slaveCheckWhenBegin = false;
 };
 }  // namespace Hdc
 #endif

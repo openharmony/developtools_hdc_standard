@@ -45,9 +45,9 @@ protected:                                                                      
     void *clsSession;
     // Task has stopped running. When Task is officially running, set True as soon as possible, set FALSE after the last
     // step, when the value is false, the Task class will be destructured as soon as possible
-    bool runningProtect;
-    bool childReady;  // Subcompulents have been prepared
-    bool singalStop;  // Request stop signal
+    bool runningProtect;  // [deprecated]will be remove, please use refCount
+    bool childReady;      // Subcompulents have been prepared
+    bool singalStop;      // Request stop signal
     HTaskInfo taskInfo;
     uint32_t refCount;
 

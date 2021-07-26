@@ -55,6 +55,8 @@ public:
     virtual void NotifyInstanceSessionFree(HSession hSession, bool freeOrClear)
     {
     }
+    // Thread security interface for global stop programs
+    void PostStopInstanceMessage(bool restart = false);
     void ReMainLoopForInstanceClear();
     // server, Two parameters in front of call can be empty
     void LogMsg(const uint32_t sessionId, const uint32_t channelId, MessageLevel level, const char *msg, ...);
@@ -169,6 +171,7 @@ private:
     int MallocSessionByConnectType(HSession hSession);
     void FreeSessionByConnectType(HSession hSession);
     bool WorkThreadStartSession(HSession hSession);
+    uint32_t GetSessionPseudoUid();
 
     map<uint32_t, HSession> mapSession;
     uv_rwlock_t lockMapSession;

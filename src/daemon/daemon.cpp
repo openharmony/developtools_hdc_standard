@@ -24,7 +24,6 @@ HdcDaemon::HdcDaemon(bool serverOrDaemonIn)
     clsUSBServ = nullptr;
     clsJdwp = nullptr;
     enableSecure = false;
-    isStopped = false;
 }
 
 HdcDaemon::~HdcDaemon()
@@ -34,7 +33,7 @@ HdcDaemon::~HdcDaemon()
 
 void HdcDaemon::ClearInstanceResource()
 {
-    StopInstance();
+    TryStopInstance();
     Base::TryCloseLoop(&loopMain, "HdcDaemon::~HdcDaemon");
     if (clsTCPServ) {
         delete (HdcDaemonTCP *)clsTCPServ;
@@ -51,11 +50,8 @@ void HdcDaemon::ClearInstanceResource()
     WRITE_LOG(LOG_DEBUG, "~HdcDaemon finish");
 }
 
-void HdcDaemon::StopInstance()
+void HdcDaemon::TryStopInstance()
 {
-    if (isStopped) {
-        return;
-    }
     ClearSessions();
     if (clsTCPServ) {
         WRITE_LOG(LOG_DEBUG, "Stop TCP");
@@ -67,7 +63,7 @@ void HdcDaemon::StopInstance()
     }
     ((HdcJdwp *)clsJdwp)->Stop();
     // workaround temply remove MainLoop instance clear
-    isStopped = true;
+    ReMainLoopForInstanceClear();
     WRITE_LOG(LOG_DEBUG, "Stop loopmain");
 }
 
@@ -305,13 +301,6 @@ bool HdcDaemon::RemoveInstanceTask(const uint8_t op, HTaskInfo hTask)
             break;
     }
     return ret;
-}
-
-void HdcDaemon::StopDaemon(bool restart)
-{
-    PushAsyncMessage(0, ASYNC_STOP_MAINLOOP, nullptr, 0);
-    WRITE_LOG(LOG_DEBUG, "StopDaemon has sended");
-    wantRestart = restart;
 }
 
 bool HdcDaemon::ServerCommand(const uint32_t sessionId, const uint32_t channelId, const uint16_t command,
