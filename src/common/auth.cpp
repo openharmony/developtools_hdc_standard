@@ -165,7 +165,7 @@ int WritePublicKeyfile(RSA *private_key, const char *private_key_path)
     GetUserInfo(info, sizeof(info));
     vec.insert(vec.end(), (uint8_t *)info, (uint8_t *)info + strlen(info));
     ret = Base::WriteBinFile(path.c_str(), vec.data(), vec.size(), true);
-    return ret > 0 ? ret : 0;
+    return ret >= 0 ? 1 : 0;
 }
 
 bool GenerateKey(const char *file)

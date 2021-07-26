@@ -12,12 +12,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#ifndef HDC_RUNTIME_COMMAND_H
-#define HDC_RUNTIME_COMMAND_H
+#ifndef HDC_UT_COMMAND_H
+#define HDC_UT_COMMAND_H
 #include "ut_common.h"
 
 namespace HdcTest {
-enum UTType {
+enum UtType {
     UT_HELP,
     UT_DISCOVER,
     UT_LIST_TARGETS,
@@ -35,7 +35,6 @@ enum UTType {
     UT_FORWARD_TCP2DEV,
     UT_FORWARD_TCP2JDWP,
     UT_APP_INSTALL,
-
     UT_TEST_TMP,
 };
 

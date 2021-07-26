@@ -12,24 +12,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#ifndef HDC_UT_COMMON_H
-#define HDC_UT_COMMON_H
-#include "../daemon/daemon_common.h"
-#include "../host/host_common.h"
-#include "../host/server.h"
+#ifndef HDC_UT_MOD_H
+#define HDC_UT_MOD_H
+#include "ut_common.h"
 
-using Hdc::HdcClient;
-using Hdc::HdcServer;
+namespace HdcTest {
+bool TestBaseCommand(void *runtimePtr);
+bool TestShellExecute(void *runtimePtr);
+bool TestFileCommand(void *runtimePtr);
+bool TestForwardCommand(void *runtimePtr);
+bool TestAppCommand(void *runtimePtr);
 
-#ifndef _WIN32
-#include <gtest/gtest.h>
-#endif
-#include <openssl/md5.h>
-#include <stdio.h>
-#include <uv.h>
-
-#include "ut_command.h"
-#include "ut_mod.h"
-#include "ut_runtime.h"
-
-#endif  // end HDC_UT_COMMON_H
+}  // namespace HdcTest
+#endif  // HDC_FUNC_TEST_H

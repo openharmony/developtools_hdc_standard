@@ -24,6 +24,7 @@
 #include <variant>
 #include <vector>
 
+// static file define. No need not modify. by zako
 namespace Hdc {
 // clang-format off
 namespace SerialStruct {

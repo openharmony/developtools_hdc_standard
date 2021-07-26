@@ -26,9 +26,6 @@ public:
                       const int payloadSize);
     bool ServerCommand(const uint32_t sessionId, const uint32_t channelId, const uint16_t command, uint8_t *bufPtr,
                        const int size);
-    void StopInstance();
-    void StopDaemon(bool restart);  // Thread security interface for global stop programs
-
     void *clsTCPServ;
     void *clsUSBServ;
     void *clsJdwp;
@@ -42,9 +39,9 @@ private:
     void ClearInstanceResource();
     bool DaemonSessionHandshake(HSession hSession, const uint32_t channelId, uint8_t *payload, int payloadSize);
     bool CheckVersionMatch(string version);
+    void TryStopInstance();
 
     bool enableSecure;
-    bool isStopped;
 };
 }  // namespace Hdc
 #endif

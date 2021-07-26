@@ -49,6 +49,7 @@ namespace Base {
     bool TryCloseLoop(uv_loop_t *ptrLoop, const char *callerName);
     void TryCloseHandle(const uv_handle_t *handle);
     void TryCloseHandle(const uv_handle_t *handle, uv_close_cb closeCallBack);
+    void TryCloseHandle(const uv_handle_t *handle, bool alwaysCallback, uv_close_cb closeCallBack);
     char **SplitCommandToArgs(const char *cmdStringLine, int *slotIndex);
     bool SetHdcProperty(const char *key, const char *value);
     // value needs to save results which can't be const
@@ -56,7 +57,7 @@ namespace Base {
     bool RunPipeComand(const char *cmdString, char *outBuf, uint16_t sizeOutBuf, bool ignoreTailLF);
     // results need to save in buf which can't be const
     int ReadBinFile(const char *pathName, void **buf, const int bufLen);
-    int WriteBinFile(const char *pathName, const uint8_t *buf, const int bufLen, bool newFile);
+    int WriteBinFile(const char *pathName, const uint8_t *buf, const int bufLen, bool newFile = false);
     void CloseIdleCallback(uv_handle_t *handle);
     void CloseTimerCallback(uv_handle_t *handle);
     int ProgramMutex(const char *procname, bool checkOrNew);
@@ -105,10 +106,15 @@ namespace Base {
     {
         return DelayDo(loop, delayMs, 0, "", nullptr, cb);
     }
+    inline bool DoNextLoop(uv_loop_t *loop, void *data, std::function<void(const uint8_t, string &, const void *)> cb)
+    {
+        return DelayDo(loop, 0, 0, "", data, cb);
+    }
     string ReplaceAll(string str, const string from, const string to);
     uint8_t CalcCheckSum(const uint8_t *data, int len);
     string GetFileNameAny(string &path);
     uv_os_sock_t DuplicateUvSocket(uv_tcp_t *tcp);
+    vector<uint8_t> Md5Sum(uint8_t *buf, int size);
 }  // namespace base
 }  // namespace Hdc
 

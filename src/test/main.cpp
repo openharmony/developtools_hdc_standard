@@ -12,20 +12,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "hdc_runtime_command.h"
-#include "hdc_runtime_frame.h"
 #include "ut_common.h"
 using namespace Hdc;
 
 namespace HdcTest {
-// Base module test
+
 TEST(HdcBaseFunction, HandleNoneZeroInput)
 {
     char bufString[256] = "";
     uint16_t num;
     int argc = 0;
-    char **argv = nullptr;
-
     GTEST_ASSERT_LE(1, Base::GetRuntimeMSec());
     GTEST_ASSERT_LE(10, Base::GetRandomNum(10, 12));
     GTEST_ASSERT_EQ(0, Base::ConnectKey2IPPort("127.0.0.1:8080", bufString, &num));
@@ -34,60 +30,59 @@ TEST(HdcBaseFunction, HandleNoneZeroInput)
     GTEST_ASSERT_EQ(4, argc);
 }
 
-// Task-shell
-TEST(HdcShellMod, HandleNoneZeroInput)
-{
-    FrameRuntime *ftest = new FrameRuntime();
-    GTEST_ASSERT_EQ(true, ftest->Initial(true));
-    GTEST_ASSERT_EQ(true, ftest->CheckEntry(ftest->UT_MOD_SHELL));
-    delete ftest;
-
-    // Add interactive shell cases if ready
-}
-
-// Basic support command test
 TEST(HdcBaseCommand, HandleNoneZeroInput)
 {
-    FrameRuntime *ftest = new FrameRuntime();
+    Runtime *ftest = new Runtime();
     GTEST_ASSERT_EQ(true, ftest->Initial(false));
     GTEST_ASSERT_EQ(true, ftest->CheckEntry(ftest->UT_MOD_BASE));
     delete ftest;
 }
 
-// File Transfer Command Test
+TEST(HdcShellMod, HandleNoneZeroInput)
+{
+    Runtime *ftest = new Runtime();
+    GTEST_ASSERT_EQ(true, ftest->Initial(true));
+    GTEST_ASSERT_EQ(true, ftest->CheckEntry(ftest->UT_MOD_SHELL));
+    delete ftest;
+}
+
 TEST(HdcFileCommand, HandleNoneZeroInput)
 {
-    FrameRuntime *ftest = new FrameRuntime();
+    Runtime *ftest = new Runtime();
     GTEST_ASSERT_EQ(true, ftest->Initial(true));
     GTEST_ASSERT_EQ(true, ftest->CheckEntry(ftest->UT_MOD_FILE));
     delete ftest;
 }
 
-// Task-shellFunction point test
-TEST(HdcShellMod_Test, HandleNoneZeroInput)
+TEST(HdcForwardCommand, HandleNoneZeroInput)
 {
-    WRITE_LOG(LOG_INFO, "Begincheck Shell execute");
-    FrameRuntime *ftest = new FrameRuntime();
+    Runtime *ftest = new Runtime();
     GTEST_ASSERT_EQ(true, ftest->Initial(true));
-    GTEST_ASSERT_EQ(true, ftest->CheckEntry(ftest->UT_MOD_SHELL));
+    GTEST_ASSERT_EQ(true, ftest->CheckEntry(ftest->UT_MOD_FORWARD));
     delete ftest;
 }
+
+TEST(AppCommand, HandleNoneZeroInput)
+{
+    Runtime *ftest = new Runtime();
+    GTEST_ASSERT_EQ(true, ftest->Initial(true));
+    GTEST_ASSERT_EQ(true, ftest->CheckEntry(ftest->UT_MOD_APP));
+    delete ftest;
+}
+
 }  // namespace HdcTest
 
 int main(int argc, const char *argv[])
 {
-#ifdef DEBUG_PROTOCOL
-    HdcTest::DdmCallCommandEntry(argc, argv);
-    return 0;
-#endif
     int ret = 0;
     // many feature under Win32 UT is not supported, so we cannot support it when unit test
 #ifdef _WIN32
-    printf("Not support platform\r\n");
+    printf("Unit test not support win32 platform\r\n");
     return 0;
-#endif
+#else
     testing::InitGoogleTest(&argc, (char **)argv);
     ret = RUN_ALL_TESTS();
     WRITE_LOG(LOG_INFO, "Test all finish");
+#endif
     return ret;
 }

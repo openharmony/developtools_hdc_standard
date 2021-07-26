@@ -34,7 +34,7 @@ HdcServer::~HdcServer()
 
 void HdcServer::ClearInstanceResource()
 {
-    StopInstance();
+    TryStopInstance();
     Base::TryCloseLoop(&loopMain, "HdcServer::~HdcServer");
     if (clsTCPClt) {
         delete clsTCPClt;
@@ -47,7 +47,7 @@ void HdcServer::ClearInstanceResource()
     }
 }
 
-void HdcServer::StopInstance()
+void HdcServer::TryStopInstance()
 {
     ClearSessions();
     if (clsTCPClt) {
@@ -56,7 +56,9 @@ void HdcServer::StopInstance()
     if (clsUSBClt) {
         clsUSBClt->Stop();
     }
-    ((HdcServerForClient *)clsServerForClient)->Stop();
+    if (clsServerForClient) {
+        ((HdcServerForClient *)clsServerForClient)->Stop();
+    }
     ReMainLoopForInstanceClear();
     ClearMapDaemonInfo();
 }

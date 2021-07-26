@@ -39,43 +39,57 @@ bool AsyncCmd::ReadyForRelease() const
     return !running;
 }
 
+// manual stop will not trigger ExitCallback, we call it
 void AsyncCmd::DoRelease()
 {
-    if (!running) {
+    if (hasStop || !running) {
         return;
     }
-    stdinPipe.data = this;
-    stdoutPipe.data = this;
-    stderrPipe.data = this;
-    Base::TryCloseHandle((uv_handle_t *)&stdinPipe);
-    Base::TryCloseHandle((uv_handle_t *)&stdoutPipe);
-    Base::TryCloseHandle((uv_handle_t *)&stderrPipe);
-    uv_process_kill(&proc, 0);
+    hasStop = true;  // must set here to deny repeate release
+    ExitCallback(&proc, 0, 0);
     WRITE_LOG(LOG_DEBUG, "AsyncCmd::DoRelease finish");
 }
 
 void AsyncCmd::ChildReadCallback(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 {
     AsyncCmd *thisClass = (AsyncCmd *)stream->data;
-    if (nread <= 0) {
-        WRITE_LOG(LOG_DEBUG, "Read ShellChildProcess failed:%s", uv_err_name(nread));
+    if (nread <= 0) {  // stdout and stderr
+        WRITE_LOG(LOG_DEBUG, "Read ShellChildProcess failed %s", uv_err_name(nread));
     } else {
-        thisClass->cmdResult += buf->base;
+        if (thisClass->options & OPTION_READBACK_OUT) {
+            thisClass->cmdResult = buf->base;
+            thisClass->resultCallback(false, 0, thisClass->cmdResult);
+            thisClass->cmdResult = STRING_EMPTY;
+        } else {  // output all when finish
+            thisClass->cmdResult += buf->base;
+        }
     }
     delete[] buf->base;
 }
 
 void AsyncCmd::ExitCallback(uv_process_t *req, int64_t exitStatus, int tersignal)
 {
+    auto funcReqClose = [](uv_handle_t *handle) -> void {
+        AsyncCmd *thisClass = (AsyncCmd *)handle->data;
+        if (--thisClass->uvRef == 0) {
+            thisClass->running = false;
+        }
+    };
     AsyncCmd *thisClass = (AsyncCmd *)req->data;
-    thisClass->resultCallback(exitStatus == 0, thisClass->cmdResult);
-    thisClass->running = false;
+    thisClass->hasStop = true;  // callback maybe call dorelease, so deny repeate ExitCallback
+
+    thisClass->resultCallback(true, exitStatus, thisClass->cmdResult);
     WRITE_LOG(LOG_DEBUG, "AsyncCmd::ExitCallback");
-    Base::TryCloseHandle((uv_handle_t *)req);
+    thisClass->uvRef = 4;
+    Base::TryCloseHandle((uv_handle_t *)&thisClass->stdinPipe, true, funcReqClose);
+    Base::TryCloseHandle((uv_handle_t *)&thisClass->stdoutPipe, true, funcReqClose);
+    Base::TryCloseHandle((uv_handle_t *)&thisClass->stderrPipe, true, funcReqClose);
+    Base::TryCloseHandle((uv_handle_t *)req, true, funcReqClose);
+    uv_process_kill(req, SIGKILL);
     thisClass->cmdResult = STRING_EMPTY;
 }
 
-bool AsyncCmd::Initial(uv_loop_t *loopIn, const CmdResultCallback callback)
+bool AsyncCmd::Initial(uv_loop_t *loopIn, const CmdResultCallback callback, uint32_t optionsIn)
 {
     if (running) {
         return false;
@@ -85,14 +99,17 @@ bool AsyncCmd::Initial(uv_loop_t *loopIn, const CmdResultCallback callback)
     if (StartProcess() < 0) {
         return false;
     }
+    options = optionsIn;
     return true;
 }
 
-bool AsyncCmd::ExecuteCommand(const string &command, bool once) const
+bool AsyncCmd::ExecuteCommand(const string &command) const
 {
     string cmd = command;
-    cmd += "\n";
-    if (once) {
+    if (options & OPTION_APPEND_NEWLINE) {
+        cmd += "\n";
+    }
+    if (options & OPTION_COMMAND_ONETIME) {
         cmd += "exit\n";
     }
     Base::SendToStream((uv_stream_t *)&stdinPipe, (uint8_t *)cmd.c_str(), cmd.size() + 1);
@@ -109,6 +126,7 @@ int AsyncCmd::StartProcess()
         uv_pipe_init(loop, &stdinPipe, 1);
         uv_pipe_init(loop, &stdoutPipe, 1);
         uv_pipe_init(loop, &stderrPipe, 1);
+        stdinPipe.data = this;
         stdoutPipe.data = this;
         stderrPipe.data = this;
         procOptions.stdio = stdioShellProc;
@@ -141,7 +159,7 @@ int AsyncCmd::StartProcess()
     }
     if (!running) {
         // failed
-        resultCallback(false, "Start process failed");
+        resultCallback(true, -1, "Start process failed");
         return -1;
     } else {
         return 0;

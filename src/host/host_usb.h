@@ -52,6 +52,7 @@ private:
     bool DetectMyNeed(libusb_device *device, string &sn);
     void SendUsbReset(HUSB hUSB, uint32_t sessionId);
     void RestoreHdcProtocol(HUSB hUsb, const uint8_t *buf, int bufSize);
+    bool WaitMaxOverlap(HSession hSession);
 
     uv_idle_t usbWork;
     libusb_context *ctxUSB;
