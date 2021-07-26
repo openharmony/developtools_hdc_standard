@@ -45,6 +45,7 @@ bool HdcFile::BeginTransfer(CtxFile *context, const char *command)
     const string CMD_OPTION_TSTMP = "-a";
     const string CMD_OPTION_SYNC = "-sync";
     const string CMD_OPTION_ZIP = "-z";
+
     char **argv = Base::SplitCommandToArgs(command, &argc);
     if (argc < CMD_ARG1_COUNT) {
         goto Finish;
@@ -69,14 +70,16 @@ bool HdcFile::BeginTransfer(CtxFile *context, const char *command)
     } else {
         context->localPath = argv[0];
     }
+
     if (!Base::CheckDirectoryOrPath(context->localPath.c_str(), true, true)) {
         goto Finish;
     }
     context->localName = Base::GetFullFilePath(context->localPath);
     ++refCount;
-    uv_fs_open(loopTask, &context->fsOpenReq, context->localPath.c_str(), O_RDONLY, 0, OnFileOpen);
+    uv_fs_open(loopTask, &context->fsOpenReq, context->localPath.c_str(), O_RDONLY, S_IWUSR | S_IRUSR, OnFileOpen);
     context->master = true;
     ret = true;
+
 Finish:
     if (!ret) {
         LogMsg(MSG_FAIL, "Transfer master path failed");

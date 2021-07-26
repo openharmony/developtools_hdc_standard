@@ -12,9 +12,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "hdc_runtime_command.h"
+#include "ut_command.h"
 using namespace Hdc;
-using Hdc::Base::RunPipeComand;
 
 namespace HdcTest {
 void *TestBackgroundServerForClient(void *param)
@@ -46,7 +45,6 @@ void PreConnectDaemon(const string &debugServerPort, const string &debugConnectK
 
 int TestRuntimeCommandSimple(bool bTCPorUSB, int method, bool bNeedConnectDaemon)
 {
-    unlink("/mnt/hgfs/vtmp/my.txt");
     // These two parameters are tested, not much change, manually modify by myself
     string debugServerPort;
     string debugConnectKey;
@@ -67,6 +65,7 @@ int TestRuntimeCommandSimple(bool bTCPorUSB, int method, bool bNeedConnectDaemon
 int TestTaskCommand(int method, const string &debugServerPort, const string &debugConnectKey)
 {
     WRITE_LOG(LOG_DEBUG, "------------Operate command------------");
+    string bufString;
     switch (method) {
         case UT_SHELL_BASIC:  // Basic order test
             TestRunClient(debugServerPort, debugConnectKey, "shell id");
@@ -81,17 +80,12 @@ int TestTaskCommand(int method, const string &debugServerPort, const string &deb
             TestRunClient(debugServerPort, debugConnectKey, CMDSTR_SHELL.c_str());
             break;
         case UT_FILE_SEND: {  // send files
-#ifdef UNIT_TEST
-            string bufString
-                = Base::StringFormat("file send %s/file.send %s/file.recv", UT_TMP_PATH.c_str(), UT_TMP_PATH.c_str());
+            bufString = Base::StringFormat("file send %s/file.local %s/file.remote", UT_TMP_PATH.c_str(),
+                                           UT_TMP_PATH.c_str());
             TestRunClient(debugServerPort, debugConnectKey, bufString);
-#else
-            TestRunClient(debugServerPort, debugConnectKey,
-                          "file send /mnt/hgfs/vtmp/f.txt /mnt/hgfs/vtmp/f2.txt -z 1");
-#endif
             break;
         }
-        case UT_FILE_RECV:  // send files
+        case UT_FILE_RECV:  // recv files
             TestRunClient(debugServerPort, debugConnectKey,
                           "file recv /mnt/hgfs/vtmp/f.txt /mnt/hgfs/vtmp/f2.txt -z 1");
             break;
@@ -108,8 +102,8 @@ int TestTaskCommand(int method, const string &debugServerPort, const string &deb
             TestRunClient(debugServerPort, debugConnectKey, "fport tcp:8081 jdwp:1234");
             break;
         case UT_APP_INSTALL:  // Single and multiple and multiple paths support
-            TestRunClient(debugServerPort, debugConnectKey,
-                          "install /d/a.hap /mnt/hgfs/vtmp/b.hap /mnt/hgfs/vtmp -lrtsdpg");  // hap
+            bufString = Base::StringFormat("install %s/app.hap", UT_TMP_PATH.c_str());
+            TestRunClient(debugServerPort, debugConnectKey, bufString);
             break;
         case UT_TEST_TMP:
             TestRunClient(debugServerPort, debugConnectKey, "shell pwd");
@@ -137,7 +131,7 @@ int TestTaskCommand(int method, const string &debugServerPort, const string &deb
         default:
             break;
     }
-    WRITE_LOG(LOG_DEBUG, "!!!!!!!!!Client finish");
+    WRITE_LOG(LOG_DEBUG, "!!!Client finish");
     return 0;
 }
 

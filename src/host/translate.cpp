@@ -66,8 +66,8 @@ namespace TranslateCommand {
               "                                         localabstract:<unix domain socket name>\n"
               "                                         dev:<device name>\n"
               "                                         jdwp:<pid> (remote only)\n"
-              " fport|rport ls                        - Dispaly forward/reverse tasks\n"
-              " fport|rport rm taskstr                - Remove forward/reverse task by taskstring\n"
+              " fport ls                              - Dispaly forward/reverse tasks\n"
+              " fport rm taskstr                      - Remove forward/reverse task by taskstring\n"
               "\n"
               "app commands:\n"
               " install [-rdg] src                 - Send package(s) to device and install them\n"
@@ -209,7 +209,6 @@ namespace TranslateCommand {
         } else if (!strncmp(input, (CMDSTR_SHELL + " ").c_str(), CMDSTR_SHELL.size() + 1)) {
             outCmd->cmdFlag = CMD_UNITY_EXECUTE;
             outCmd->paraments = input + CMDSTR_SHELL.size() + 1;
-            outCmd->paraments += " 2>&1";
         } else if (!strcmp(input, CMDSTR_SHELL.c_str())) {
             outCmd->cmdFlag = CMD_SHELL_INIT;
         } else if (!strncmp(input, CMDSTR_FILE_SEND.c_str(), CMDSTR_FILE_SEND.size())

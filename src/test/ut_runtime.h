@@ -12,57 +12,56 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#ifndef HDC_RUNTIME_FRAME_H
-#define HDC_RUNTIME_FRAME_H
+#ifndef HDC_UT_RUNTIME_H
+#define HDC_UT_RUNTIME_H
 #include "ut_common.h"
 
 namespace HdcTest {
-class FrameRuntime {
+class Runtime {
 public:
-    enum UT_MOD_TYPE {
+    enum UtModType {
         UT_MOD_BASE,
         UT_MOD_SHELL,
         UT_MOD_SHELL_INTERACTIVE,
         UT_MOD_FILE,
+        UT_MOD_FORWARD,
         UT_MOD_APP,
     };
-    FrameRuntime();
-    ~FrameRuntime();
-    bool Initial(bool bConnectToDaemon);
-    bool CheckEntry(UT_MOD_TYPE type);
+    Runtime();
+    ~Runtime();
+    bool Initial(bool bConnectToDaemonIn);
+    bool CheckEntry(UtModType type);
+
+    bool ResetUtTmpFolder();
+    bool ResetUtTmpFile(string file);
+    int InnerCall(int method);
+    uv_loop_t *GetRuntimeLoop()
+    {
+        return &loopMain;
+    };
 
 private:
-    static void DoCheck(uv_idle_t *handle);
-    static void StartServer(void *arg);
-    static void StartDaemon(void *arg);
+    static void DoCheck(uv_timer_t *handle);
+    static void StartServer(uv_work_t *arg);
+    static void StartDaemon(uv_work_t *arg);
     static void CheckStopServer(uv_idle_t *arg);
     static void CheckStopDaemon(uv_idle_t *arg);
-    static void FinishRemoveIdle(uv_handle_t *handle)
-    {
-        delete (uv_idle_t *)handle;
-    }
-
-    bool ResetTmpFolder();
     void WorkerPendding();
-    bool TestShellExecute();
-    bool TestShellInterActive();
-    bool TestBaseCommand();
-    bool TestFileCommand();
-    int InnerCall(int method);
+    int CheckServerDaemonReady();
 
     bool serverRunning;
     bool daemonRunning;
     bool bCheckResult;
     bool checkFinish;
     bool hashInitialize;
-    UT_MOD_TYPE checkType;
+    UtModType checkType;
     uv_loop_t loopMain;
     uv_idle_t checkServerStop;
     uv_idle_t checkDaemonStop;
     Hdc::HdcServer *server;
     Hdc::HdcDaemon *daemon;
-    uv_thread_t tdServer;
-    uv_thread_t tdDaemon;
+    uint8_t waitServerDaemonReadyCount = 0;
+    bool bConnectToDaemon = false;
 };
 }  // namespace HdcTest
 #endif  // HDC_FUNC_TEST_H
