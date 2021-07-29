@@ -619,13 +619,8 @@ int HdcServerForClient::ReadChannel(HChannel hChannel, uint8_t *bufPtr, const in
             return ret;
         }
     } else {
-        // HdcCommand ctrlCommand;
-        // if (bytesIO == 1 && SpecialSignal(bufPtr[0], ctrlCommand)) {
-        //     formatCommand.cmdFlag = (uint16_t)ctrlCommand;
-        // } else {
         formatCommand.paraments = string((char *)bufPtr, bytesIO);
         formatCommand.cmdFlag = CMD_SHELL_DATA;
-        //  }
     }
     if (!DoCommand(hChannel, &formatCommand)) {
         return -3;  // error or want close
