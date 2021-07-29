@@ -220,12 +220,11 @@ void HdcClient::ReadStd(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 {
     HChannel hChannel = (HChannel)stream->data;
     HdcClient *thisClass = (HdcClient *)hChannel->clsChannel;
-    char *pCmd = hChannel->bufStd;
+    char *command = hChannel->bufStd;
     if (nread <= 0) {
         return;  // error
     }
-    thisClass->Send(hChannel->channelId, (uint8_t *)pCmd, strlen(pCmd) + 1);
-    WRITE_LOG(LOG_DEBUG, "send:%s", pCmd);
+    thisClass->Send(hChannel->channelId, (uint8_t *)command, strlen(command));
     Base::ZeroArray(hChannel->bufStd);
 }
 

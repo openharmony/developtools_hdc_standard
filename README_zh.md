@@ -1,15 +1,21 @@
-# hdc组件<a name="ZH-CN_TOPIC_0000001149090043"></a>
+# HDC-鸿蒙设备连接器<a name="ZH-CN_TOPIC_0000001149090043"></a>
 
 -   [简介](#section662115419449)
 -   [架构](#section15908143623714)
 -   [目录](#section161941989596)
+    -   [下载说明](#section129654513263)
+        -    [1.通过git clone方式下载(建议)](#section161941989591)
+        -    [2.通过网页形式下载](#section161941989592)
+        -    [3.支持环境](#section161941989593)
+        -    [4.BUG上报](#section161941989594)
     -   [使用说明](#section129654513264)
 
 -   [相关仓](#section1371113476307)
+-   [FAQ](#section1371113476308)
 
 ## 简介<a name="section662115419449"></a>
 
-hdc（Harmony Device Connector） 是OpenHarmony为开发人员提供的用于调试的命令行工具，开发机器上使用设备连接器hdc client/server命令行工具，该工具需支持部署在Windows/Linux/Mac等系统上与鸿蒙设备（或模拟器）进行连接调试通信。PC端hdc工具需要针对以上开发机操作系统平台分别发布相应的版本，设备端hdc daemon需跟随设备镜像发布包括对模拟器进行支持。下文将介绍hdc的常用命令及使用举例。
+HDC（Harmony Device Connector） 是OpenHarmony为开发人员提供的用于调试的命令行工具，开发机器上使用设备连接器hdc client/server命令行工具，该工具需支持部署在Windows/Linux/Mac等系统上与鸿蒙设备（或模拟器）进行连接调试通信。PC端hdc工具需要针对以上开发机操作系统平台分别发布相应的版本，设备端hdc daemon需跟随设备镜像发布包括对模拟器进行支持。下文将介绍hdc的常用命令及使用举例。
 
 ## 架构<a name="section15908143623714"></a>
 
@@ -34,11 +40,37 @@ hdc主要有三部分组成：
 │   └── prebuilt      # 预编译目录，存放预编译的二进制文件
 ```
 
+### 下载说明<a name="section129654513263"></a>
+
+
+[1.通过git clone方式下载(建议)](#section161941989591)
+```
+外仓命令为:
+git clone git@gitee.com:openharmony/developtools_hdc_standard.git
+合作仓命令为:
+git clone git@gitee.com:OHOS_STD/developtools_hdc_standard.git
+```
+
+[2.通过网页形式下载](#section161941989592)
+通过网页形式下载prebuilt，请使用类似如下URL打开网页:
+``` https://gitee.com/openharmony/developtools_hdc_standard/blob/master/prebuilt/windows/hdc-std.exe```
+点击中间下载方式进行下载，windows版本文件大小在**5M左右**，linux版本在**2M左右**，不要使用右击另存为方式进行保存下载，这样下载不对，下载后检查文件大小(**说三遍**)。
+
+[3.支持环境](#section161941989593)
+支持运行环境 linux版本建议ubuntu20 CentOS8 64位，其他版本相近也应该可以，libc++.so引用错误请使用ldd/readelf等命令检查库引用 windows版本建议windows10 64位，windows8也应该可以，Windows7等EOF版本尚未测试，如果低版本windows winusb库缺失，请使用zadig更新库。
+
+[4.BUG上报](#section161941989594)
+近期hdc刚开发完成，适配和调整变动较多，如果遇到异常情况，建议按照如下步骤进行排查:
+1)首先核对server与daemon版本是否匹配，hdc-std -v, hdcd -v。
+2)更新工程最新的线上代码和预编译文件，是否在后续版本中已解决问题。
+3)规范的和详细的提出issue，我们将尽快跟进。
+
+
 ### 使用说明<a name="section129654513264"></a>
 
-hdc当前支持如下命令：
+hdc当前常用命令如下，未尽命令使用hdc -h或者hdc --help查看：
 
-**表 1**  hdc命令列表
+**表 1**  hdc常用命令列表
 
 <a name="table159297571254"></a>
 <table><thead align="left"><tr id="row149291357182511"><th class="cellrowborder" valign="top" width="50%" id="mcps1.2.3.1.1"><p id="p14423184344212"><a name="p14423184344212"></a><a name="p14423184344212"></a>Option</p>
@@ -199,3 +231,5 @@ hdc当前支持如下命令：
 
 
 **developtools\_hdc\_standard**
+
+## FAQ<a name="section1371113476308"></a>
