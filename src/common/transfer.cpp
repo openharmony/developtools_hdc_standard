@@ -60,7 +60,7 @@ int HdcTransferBase::SimpleFileIO(CtxFile *context, uint64_t index, uint8_t *sen
     CtxFileIO *ioContext = new CtxFileIO();
     bool ret = false;
     while (true) {
-        if (!buf || !ioContext || !bytes) {
+        if (!buf || !ioContext || bytes < 0) {
             break;
         }
         uv_fs_t *req = &ioContext->fs;
@@ -74,10 +74,7 @@ int HdcTransferBase::SimpleFileIO(CtxFile *context, uint64_t index, uint8_t *sen
         } else {
             // The US_FS_WRITE here must be brought into the actual file offset, which cannot be incorporated with local
             // accumulated index because UV_FS_WRITE will be executed multiple times and then trigger a callback.
-            if (!sendBuf || !bytes) {
-                break;
-            }
-            if (memcpy_s(ioContext->bufIO, bytes, sendBuf, bytes) != EOK) {
+            if (bytes > 0 && memcpy_s(ioContext->bufIO, bytes, sendBuf, bytes) != EOK) {
                 break;
             }
             uv_buf_t iov = uv_buf_init(reinterpret_cast<char *>(ioContext->bufIO), bytes);
@@ -143,23 +140,24 @@ bool HdcTransferBase::SendIOPayload(CtxFile *context, int index, uint8_t *data, 
     payloadHead.compressType = context->transferConfig.compressType;
     payloadHead.uncompressSize = dataSize;
     payloadHead.index = index;
-    switch (payloadHead.compressType) {
+    if (dataSize > 0) {
+        switch (payloadHead.compressType) {
 #ifdef HARMONY_PROJECT
-        case COMPRESS_LZ4: {
-            // clang-format off
-            compressSize = LZ4_compress_default((const char *)data, (char *)sendBuf + payloadPrefixReserve,
-                                                dataSize, dataSize);
-            // clang-format on
-            break;
-        }
-#endif
-        default: {  // COMPRESS_NONE
-            if (memcpy_s(sendBuf + payloadPrefixReserve, sendBufSize - payloadPrefixReserve, data, dataSize) != EOK) {
-                delete[] sendBuf;
-                return false;
+            case COMPRESS_LZ4: {
+                compressSize = LZ4_compress_default((const char *)data, (char *)sendBuf + payloadPrefixReserve,
+                                                    dataSize, dataSize);
+                break;
             }
-            compressSize = dataSize;
-            break;
+#endif
+            default: {  // COMPRESS_NONE
+                if (memcpy_s(sendBuf + payloadPrefixReserve, sendBufSize - payloadPrefixReserve, data, dataSize)
+                    != EOK) {
+                    delete[] sendBuf;
+                    return false;
+                }
+                compressSize = dataSize;
+                break;
+            }
         }
     }
     payloadHead.compressSize = compressSize;
@@ -188,12 +186,10 @@ void HdcTransferBase::OnFileIO(uv_fs_t *req)
     uv_fs_req_cleanup(req);
     --thisClass->refCount;
     while (true) {
-        if (req->result <= 0) {  // Read error or master read completion
+        if (req->result < 0) {
+            WRITE_LOG(LOG_DEBUG, "OnFileIO error: %s", uv_strerror((int)req->result));
+            context->closeNotify = true;
             tryFinishIO = true;
-            if (req->result < 0) {
-                WRITE_LOG(LOG_DEBUG, "OnFileIO error: %s", uv_strerror((int)req->result));
-                context->closeNotify = true;
-            }
             break;
         }
         context->indexIO += req->result;
@@ -202,9 +198,11 @@ void HdcTransferBase::OnFileIO(uv_fs_t *req)
                 tryFinishIO = true;
                 break;
             }
-            // read continue until result >0, let single file packet +packet header less than GetMaxBufSize()
-            constexpr auto maxBufFactor = 0.8;
-            thisClass->SimpleFileIO(context, context->indexIO, nullptr, Base::GetMaxBufSize() * maxBufFactor);
+            if (context->indexIO < context->fileSize) {
+                // read continue until result >0, let single file packet +packet header less than GetMaxBufSize()
+                constexpr auto maxBufFactor = 0.8;
+                thisClass->SimpleFileIO(context, context->indexIO, nullptr, Base::GetMaxBufSize() * maxBufFactor);
+            }
         } else if (req->fs_type == UV_FS_WRITE) {  // write
             if (context->indexIO >= context->fileSize) {
                 // The active end must first read it first, but you can't make Finish first, because Slave may not
@@ -246,15 +244,16 @@ void HdcTransferBase::OnFileOpen(uv_fs_t *req)
         uv_fs_t fs;
         Base::ZeroStruct(fs.statbuf);
         uv_fs_fstat(nullptr, &fs, context->fsOpenReq.result, nullptr);
-        uv_fs_req_cleanup(&fs);
-
         TransferConfig &st = context->transferConfig;
         st.fileSize = fs.statbuf.st_size;
         st.optionalName = context->localName;
         st.atime = fs.statbuf.st_atim.tv_sec;
         st.mtime = fs.statbuf.st_mtim.tv_sec;
         st.path = context->remotePath;
+        // update ctxNow=context child value
+        context->fileSize = st.fileSize;
 
+        uv_fs_req_cleanup(&fs);
         thisClass->CheckMaster(context);
     } else {  // write
         thisClass->SendToAnother(thisClass->commandBegin, nullptr, 0);
@@ -340,21 +339,23 @@ bool HdcTransferBase::RecvIOPayload(CtxFile *context, uint8_t *data, int dataSiz
         return false;
     }
     int clearSize = 0;
-    switch (pld.compressType) {
+    if (pld.compressSize > 0) {
+        switch (pld.compressType) {
 #ifdef HARMONY_PROJECT
-        case COMPRESS_LZ4: {
-            clearSize = LZ4_decompress_safe((const char *)data + payloadPrefixReserve, (char *)clearBuf,
-                                            pld.compressSize, pld.uncompressSize);
-            break;
-        }
-#endif
-        default: {  // COMPRESS_NONE
-            if (memcpy_s(clearBuf, pld.uncompressSize, data + payloadPrefixReserve, pld.compressSize) != EOK) {
-                delete[] clearBuf;
-                return false;
+            case COMPRESS_LZ4: {
+                clearSize = LZ4_decompress_safe((const char *)data + payloadPrefixReserve, (char *)clearBuf,
+                                                pld.compressSize, pld.uncompressSize);
+                break;
             }
-            clearSize = pld.compressSize;
-            break;
+#endif
+            default: {  // COMPRESS_NONE
+                if (memcpy_s(clearBuf, pld.uncompressSize, data + payloadPrefixReserve, pld.compressSize) != EOK) {
+                    delete[] clearBuf;
+                    return false;
+                }
+                clearSize = pld.compressSize;
+                break;
+            }
         }
     }
     while (true) {

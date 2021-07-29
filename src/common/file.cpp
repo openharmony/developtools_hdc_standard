@@ -37,57 +37,65 @@ void HdcFile::StopTask()
 // Send supported below styles
 // send|recv path/filename path/filename
 // send|recv filename  path
-bool HdcFile::BeginTransfer(CtxFile *context, const char *command)
+bool HdcFile::BeginTransfer(CtxFile *context, const string &command)
 {
     int argc = 0;
-    int srcOffset = 0;
     bool ret = false;
+    char **argv = Base::SplitCommandToArgs(command.c_str(), &argc);
+    if (argc < CMD_ARG1_COUNT || argv == nullptr) {
+        LogMsg(MSG_FAIL, "Transfer path split failed");
+        if (argv) {
+            delete[]((char *)argv);
+        }
+        return false;
+    }
+    if (!GetLocalRemotePath(context, command.c_str(), argc, argv)) {
+        delete[]((char *)argv);
+        return false;
+    }
+    do {
+        ++refCount;
+        uv_fs_open(loopTask, &context->fsOpenReq, context->localPath.c_str(), O_RDONLY, S_IWUSR | S_IRUSR, OnFileOpen);
+        context->master = true;
+        ret = true;
+    } while (false);
+    if (!ret) {
+        LogMsg(MSG_FAIL, "Transfer path failed, Master:%s Slave:%s", context->localPath.c_str(),
+               context->remotePath.c_str());
+    }
+    delete[]((char *)argv);
+    return ret;
+}
+
+bool HdcFile::GetLocalRemotePath(CtxFile *context, const char *command, int argc, char **argv)
+{
+    int srcArgvIndex = 0;
     const string CMD_OPTION_TSTMP = "-a";
     const string CMD_OPTION_SYNC = "-sync";
     const string CMD_OPTION_ZIP = "-z";
-
-    char **argv = Base::SplitCommandToArgs(command, &argc);
-    if (argc < CMD_ARG1_COUNT) {
-        goto Finish;
-    }
-    context->localPath = argv[argc - 2];
     for (int i = 0; i < argc - CMD_ARG1_COUNT; i++) {
         if (argv[i] == CMD_OPTION_ZIP) {
             context->transferConfig.compressType = COMPRESS_LZ4;
-            srcOffset += strlen(argv[i]) + 1;
+            ++srcArgvIndex;
         } else if (argv[i] == CMD_OPTION_SYNC) {
             context->transferConfig.updateIfNew = true;
-            srcOffset += strlen(argv[i]) + 1;
+            ++srcArgvIndex;
         } else if (argv[i] == CMD_OPTION_TSTMP) {
             context->transferConfig.holdTimestamp = true;
-            srcOffset += strlen(argv[i]) + 1;
+            ++srcArgvIndex;
+        } else if (argv[i][0] == '-') {
+            LogMsg(MSG_FAIL, "Unknow file option: %s", argv[i]);
+            return false;
         }
     }
     context->remotePath = argv[argc - 1];
-    if (argc > CMD_ARG1_COUNT) {
-        context->localPath
-            = std::string(command + srcOffset, strlen(command) - srcOffset - context->remotePath.size() - 1);
-    } else {
-        context->localPath = argv[0];
-    }
-
+    context->localPath = argv[argc - 2];
     if (!Base::CheckDirectoryOrPath(context->localPath.c_str(), true, true)) {
-        goto Finish;
+        LogMsg(MSG_FAIL, "Src not exist, path: %s", context->localPath.c_str());
+        return false;
     }
     context->localName = Base::GetFullFilePath(context->localPath);
-    ++refCount;
-    uv_fs_open(loopTask, &context->fsOpenReq, context->localPath.c_str(), O_RDONLY, S_IWUSR | S_IRUSR, OnFileOpen);
-    context->master = true;
-    ret = true;
-
-Finish:
-    if (!ret) {
-        LogMsg(MSG_FAIL, "Transfer master path failed");
-    }
-    if (argv) {
-        delete[]((char *)argv);
-    }
-    return ret;
+    return true;
 }
 
 void HdcFile::CheckMaster(CtxFile *context)
@@ -107,7 +115,7 @@ void HdcFile::TransferSummary(CtxFile *context)
 {
     uint64_t nMSec = Base::GetRuntimeMSec() - context->transferBegin;
     double fRate = static_cast<double>(context->indexIO) / nMSec;  // / /1000 * 1000 = 0
-    LogMsg(MSG_OK, "FileTransfer finish, Size:%lld time:%lldms rate:%lfkB/s", context->indexIO, nMSec, fRate);
+    LogMsg(MSG_OK, "FileTransfer finish, Size:%lld time:%lldms rate:%.2lfkB/s", context->indexIO, nMSec, fRate);
 }
 
 bool HdcFile::SlaveCheck(uint8_t *payload, const int payloadSize)
@@ -149,7 +157,8 @@ bool HdcFile::CommandDispatch(const uint16_t command, uint8_t *payload, const in
     bool ret = true;
     switch (command) {
         case CMD_FILE_INIT: {  // initial
-            ret = BeginTransfer(&ctxNow, (char *)payload);
+            string s = string((char *)payload, payloadSize);
+            ret = BeginTransfer(&ctxNow, s);
             ctxNow.transferBegin = Base::GetRuntimeMSec();
             break;
         }
