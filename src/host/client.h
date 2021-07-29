@@ -29,31 +29,30 @@ protected:
 private:
     static void DoCtrlServiceWork(uv_check_t *handle);
     static void Connect(uv_connect_t *connection, int status);
-    int ConnectServerForClient(const char *stringIP, uint16_t port);
-    void BindLocalStd();
-    int ReadChannel(HChannel hChannel, uint8_t *buf, const int bytesIO);
-    void BindLocalStd(HChannel hChannel);
     static void AllocStdbuf(uv_handle_t *handle, size_t sizeWanted, uv_buf_t *buf);
     static void ReadStd(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf);
     static void CommandWorker(uv_timer_t *handle);
+    int ConnectServerForClient(const char *stringIP, uint16_t port);
+    int ReadChannel(HChannel hChannel, uint8_t *buf, const int bytesIO);
+    int PreHandshake(HChannel hChannel, const uint8_t *buf);
     string AutoConnectKey(string &doCommand, const string &preConnectKey) const;
     uint32_t GetLastPID();
     bool StartKillServer(const char *cmd, bool startOrKill);
+    void BindLocalStd();
+    void BindLocalStd(HChannel hChannel);
     void ModifyTty(bool setOrRestore, uv_tty_t *tty);
-    int PreHandshake(HChannel hChannel, const uint8_t *buf);
     void NotifyInstanceChannelFree(HChannel hChannel);
 
 #ifndef _WIN32
     termios terminalState;
 #endif
-
-    HChannel channel;
     string connectKey;
+    string command;
     uint16_t debugRetryCount;
+    bool bShellInteractive = false;
     uv_timer_t waitTimeDoCmd;
     uv_check_t ctrlServerWork;
-    string command;
-    bool bShellInteractive = false;
+    HChannel channel;
 };
 }  // namespace Hdc
 #endif

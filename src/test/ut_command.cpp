@@ -106,7 +106,7 @@ int TestTaskCommand(int method, const string &debugServerPort, const string &deb
             TestRunClient(debugServerPort, debugConnectKey, bufString);
             break;
         case UT_TEST_TMP:
-            TestRunClient(debugServerPort, debugConnectKey, "shell pwd");
+            TestRunClient(debugServerPort, debugConnectKey, "shell");
 #ifdef DEF_NULL
             while (true) {
                 uv_sleep(50);
@@ -126,6 +126,8 @@ int TestTaskCommand(int method, const string &debugServerPort, const string &deb
             TestRunClient(debugServerPort, debugConnectKey, "file send /mnt/hgfs/vtmp/f.txt /tmp/f2.txt");
             TestRunClient(debugServerPort, debugConnectKey, "file recv /tmp/f2.txt /mnt/hgfs/vtmp/f2.txt");
             TestRunClient(debugServerPort, debugConnectKey, "shell find /proc");
+            TestRunClient(debugServerPort, debugConnectKey, "file send \"/d/a b/1.txt\" \"/d/a b/2.txt\"");
+            TestRunClient(debugServerPort, debugConnectKey, "file recv \"/d/a b/1.txt\" \"/d/a b/2.txt\"");
 #endif
             break;
         default:

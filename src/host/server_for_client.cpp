@@ -398,7 +398,7 @@ bool HdcServerForClient::TaskCommand(HChannel hChannel, void *formatCommandInput
 {
     TranslateCommand::FormatCommand *formatCommand = (TranslateCommand::FormatCommand *)formatCommandInput;
     HdcServer *ptrServer = (HdcServer *)clsServer;
-    int sizeSend = formatCommand->paraments.size() == 0 ? 0 : (formatCommand->paraments.size() + 1);
+    int sizeSend = formatCommand->paraments.size();
     string cmdFlag;
     uint8_t sizeCmdFlag = 0;
     if (CMD_FILE_INIT == formatCommand->cmdFlag) {
@@ -438,12 +438,12 @@ bool HdcServerForClient::DoCommandRemote(HChannel hChannel, void *formatCommandI
 {
     TranslateCommand::FormatCommand *formatCommand = (TranslateCommand::FormatCommand *)formatCommandInput;
     bool ret = false;
-    int sizeSend = formatCommand->paraments.size() == 0 ? 0 : (formatCommand->paraments.size() + 1);
+    int sizeSend = formatCommand->paraments.size();
     string cmdFlag;
     switch (formatCommand->cmdFlag) {
         // Some simple commands only need to forward the instruction, no need to start Task
         case CMD_SHELL_INIT:
-        case CMD_KERNEL_ECHO_RAW:
+        case CMD_SHELL_DATA:
         case CMD_UNITY_EXECUTE:
         case CMD_UNITY_TERMINATE:
         case CMD_UNITY_REMOUNT:
@@ -452,7 +452,6 @@ bool HdcServerForClient::DoCommandRemote(HChannel hChannel, void *formatCommandI
         case CMD_UNITY_HILOG:
         case CMD_UNITY_ROOTRUN:
         case CMD_UNITY_JPID: {
-            // strlen+1 Prevent DAEMON memory sticks from causing Strlen errors
             if (!SendToDaemon(hChannel, formatCommand->cmdFlag, (uint8_t *)formatCommand->paraments.c_str(),
                               sizeSend)) {
                 break;
@@ -604,8 +603,7 @@ int HdcServerForClient::ReadChannel(HChannel hChannel, uint8_t *bufPtr, const in
     if (!hChannel->handshakeOK) {
         return ChannelHandShake(hChannel, bufPtr, bytesIO);
     }
-    TranslateCommand::FormatCommand formatCommand;
-    Base::ZeroStruct(formatCommand);
+    struct TranslateCommand::FormatCommand formatCommand = { 0 };
     if (!hChannel->interactiveShellMode) {
         string retEcho = String2FormatCommand((char *)bufPtr, bytesIO, &formatCommand);
         if (retEcho.length()) {
@@ -621,8 +619,8 @@ int HdcServerForClient::ReadChannel(HChannel hChannel, uint8_t *bufPtr, const in
             return ret;
         }
     } else {
-        formatCommand.paraments = (char *)bufPtr;
-        formatCommand.cmdFlag = CMD_KERNEL_ECHO_RAW;
+        formatCommand.paraments = string((char *)bufPtr, bytesIO);
+        formatCommand.cmdFlag = CMD_SHELL_DATA;
     }
     if (!DoCommand(hChannel, &formatCommand)) {
         return -3;  // error or want close

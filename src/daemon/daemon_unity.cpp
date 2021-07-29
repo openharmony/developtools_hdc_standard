@@ -166,14 +166,14 @@ bool HdcDaemonUnity::RemountDevice()
     return true;
 }
 
-bool HdcDaemonUnity::RebootDevice(const uint8_t *cmd, const int cmdSize)
+bool HdcDaemonUnity::RebootDevice(const string &cmd)
 {
     sync();
     string propertyVal;
-    if (!cmdSize) {
+    if (!cmd.size()) {
         propertyVal = "reboot";
     } else {
-        propertyVal = Base::StringFormat("reboot,%s", cmd);
+        propertyVal = Base::StringFormat("reboot,%s", cmd.c_str());
     }
     return Base::SetHdcProperty(rebootProperty.c_str(), propertyVal.c_str());
 }
@@ -228,9 +228,10 @@ bool HdcDaemonUnity::CommandDispatch(const uint16_t command, uint8_t *payload, c
     bool ret = true;
     HdcDaemon *daemon = (HdcDaemon *)taskInfo->ownerSessionClass;
     // Both are not executed, do not need to be detected 'childReady'
+    string strPayload = string((char *)payload, payloadSize);
     switch (command) {
         case CMD_UNITY_EXECUTE: {
-            ExecuteShell((char *)payload);
+            ExecuteShell((char *)strPayload.c_str());
             break;
         }
         case CMD_UNITY_REMOUNT: {
@@ -240,21 +241,21 @@ bool HdcDaemonUnity::CommandDispatch(const uint16_t command, uint8_t *payload, c
         }
         case CMD_UNITY_REBOOT: {
             ret = false;
-            RebootDevice(payload, payloadSize);
+            RebootDevice(strPayload);
             break;
         }
         case CMD_UNITY_RUNMODE: {
             ret = false;
-            SetDeviceRunMode(daemon, (const char *)payload);
+            SetDeviceRunMode(daemon, strPayload.c_str());
             break;
         }
         case CMD_UNITY_HILOG: {
-            GetHiLog((const char *)payload);
+            GetHiLog(strPayload.c_str());
             break;
         }
         case CMD_UNITY_ROOTRUN: {
             ret = false;
-            if (payloadSize != 0 && !strcmp((char *)payload, "r")) {
+            if (payloadSize != 0 && !strcmp((char *)strPayload.c_str(), "r")) {
                 Base::SetHdcProperty("persist.hdc.root", "0");
             } else {
                 Base::SetHdcProperty("persist.hdc.root", "1");
@@ -263,7 +264,7 @@ bool HdcDaemonUnity::CommandDispatch(const uint16_t command, uint8_t *payload, c
             break;
         }
         case CMD_UNITY_TERMINATE: {
-            daemon->PostStopInstanceMessage(!strcmp((char *)payload, "1"));
+            daemon->PostStopInstanceMessage(!strcmp((char *)strPayload.c_str(), "1"));
             break;
         }
         case CMD_UNITY_BUGREPORT_INIT: {

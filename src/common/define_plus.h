@@ -122,6 +122,7 @@ enum HdcCommand {
     CMD_UNITY_JPID,
     // Shell commands types
     CMD_SHELL_INIT = 2000,
+    CMD_SHELL_DATA,
     // Forward commands types
     CMD_FORWARD_INIT = 2500,
     CMD_FORWARD_CHECK,

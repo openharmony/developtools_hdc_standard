@@ -57,6 +57,23 @@ void HdcShell::StopTask()
     runningProtect = false;
 };
 
+bool HdcShell::SpecialSignal(uint8_t ch)
+{
+    const uint8_t TXT_SIGNAL_ETX = 0x3;
+    bool ret = true;
+    switch (ch) {
+        case TXT_SIGNAL_ETX: {  // Ctrl+C
+            pid_t tpgid = tcgetpgrp(fdPTY);
+            kill(tpgid, SIGINT);
+            break;
+        }
+        default:
+            ret = false;
+            break;
+    }
+    return ret;
+}
+
 bool HdcShell::CommandDispatch(const uint16_t command, uint8_t *payload, const int payloadSize)
 {
     switch (command) {
@@ -67,13 +84,15 @@ bool HdcShell::CommandDispatch(const uint16_t command, uint8_t *payload, const i
             }
             break;
         }
-        case CMD_KERNEL_ECHO_RAW:
+        case CMD_SHELL_DATA:
             if (!childReady) {
                 WRITE_LOG(LOG_DEBUG, "Shell not running");
                 return false;
             }
-            // payloadSize tail with \0
-            childShell->Write(payload, payloadSize - 1);
+            if (payloadSize == 1 && SpecialSignal(payload[0])) {
+            } else {
+                childShell->Write(payload, payloadSize);
+            }
             break;
         default:
             break;
@@ -120,7 +139,7 @@ int HdcShell::CreateSubProcessPTY(const char *cmd, const char *arg0, const char 
         close(ptm);
         return -2;
     }
-
+    fcntl(ptm, F_SETFD, FD_CLOEXEC);
     if (ptsname_r(ptm, devname, sizeof(devname)) != 0) {
         WRITE_LOG(LOG_DEBUG, "Trouble with  ptmx, error:%s", strerror(errno));
         close(ptm);
@@ -151,10 +170,6 @@ bool HdcShell::FinishShellProc(const void *context, const bool result, const str
 bool HdcShell::ChildReadCallback(const void *context, uint8_t *buf, const int size)
 {
     HdcShell *thisClass = (HdcShell *)context;
-    if (size == CMD_ARG1_COUNT && *buf == 0x5e && *(buf + 1) == 0x43) {
-        WRITE_LOG(LOG_WARN, "sh.ChildReadCallback fstop");
-        thisClass->TaskFinish();
-    }
     if (!thisClass->SendToAnother(CMD_KERNEL_ECHO_RAW, (uint8_t *)buf, size)) {
         thisClass->TaskFinish();
     }
