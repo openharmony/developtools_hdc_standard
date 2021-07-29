@@ -83,6 +83,7 @@ int SplitOptionAndCommand(int argc, const char **argv, string &outOption, string
 {
     bool foundCommand = false;
     int resultChild = 0;
+    // we want to start from 1, ignore argv[0], but it has issue
     for (int i = 0; i < argc; ++i) {
         if (!foundCommand) {
             resultChild = IsRegisterCommand(outCommand, argv[i], (i == argc - 1) ? nullptr : argv[i + 1]);
@@ -96,7 +97,9 @@ int SplitOptionAndCommand(int argc, const char **argv, string &outOption, string
         }
         if (foundCommand) {
             outCommand += outCommand.size() ? " " : "";
-            outCommand += argv[i];
+            string rawCmd = argv[i];
+            string packageCmd = Base::StringFormat("\"%s\"", argv[i]);
+            outCommand += rawCmd.find(" ") == string::npos ? rawCmd : packageCmd;
         } else {
             outOption += outOption.size() ? " " : "";
             outOption += argv[i];
@@ -141,7 +144,7 @@ int RunClientMode(string &commands, string &serverListenString, string &connectK
     uv_loop_init(&loopMain);
     HdcClient client(false, DEFAULT_SERVER_ADDR, &loopMain);
     if (!commands.size()) {
-        Base::PrintMessage("Nothing to do...");
+        Base::PrintMessage("Unknow operation command...");
         TranslateCommand::Usage();
         return 0;
     }

@@ -31,7 +31,7 @@ private:
     bool FindMountDeviceByPath(const char *toQuery, char *dev);
     bool RemountPartition(const char *dir);
     bool RemountDevice();
-    bool RebootDevice(const uint8_t *cmd, const int cmdSize);
+    bool RebootDevice(const string &cmd);
     bool SetDeviceRunMode(void *daemonIn, const char *cmd);
     bool GetHiLog(const char *cmd);
     bool ListJdwpProcess(void *daemonIn);

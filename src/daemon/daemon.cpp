@@ -111,7 +111,7 @@ bool HdcDaemon::RedirectToTask(HTaskInfo hTaskInfo, HSession hSession, const uin
             ret = TaskCommandDispatch<HdcDaemonUnity>(hTaskInfo, TYPE_UNITY, command, payload, payloadSize);
             break;
         case CMD_SHELL_INIT:
-        case CMD_KERNEL_ECHO_RAW:
+        case CMD_SHELL_DATA:
             ret = TaskCommandDispatch<HdcShell>(hTaskInfo, TYPE_SHELL, command, payload, payloadSize);
             break;
         case CMD_FILE_CHECK:

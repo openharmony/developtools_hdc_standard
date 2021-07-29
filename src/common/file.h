@@ -30,9 +30,10 @@ private:
     bool SlaveCheck(uint8_t *payload, const int payloadSize);
     void CheckMaster(CtxFile *context);
     void WhenTransferFinish(CtxFile *context);
-    bool BeginTransfer(CtxFile *context, const char *command);
+    bool BeginTransfer(CtxFile *context, const string &command);
     void TransferSummary(CtxFile *context);
+    bool GetLocalRemotePath(CtxFile *context, const char *command, int argc, char **argv);
 };
-} // namespace Hdc
+}  // namespace Hdc
 
 #endif

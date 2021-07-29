@@ -48,14 +48,16 @@ constexpr uint16_t MAX_IP_PORT = 65535;
 constexpr uint8_t STREAM_MAIN = 0;            // work at main thread
 constexpr uint8_t STREAM_WORK = 1;            // work at work thread
 constexpr uint16_t MAX_CONNECTKEY_SIZE = 32;  // usb sn/tcp ipport
-constexpr uint8_t MAX_IO_OVERLAP = 255;       //
+constexpr uint8_t MAX_IO_OVERLAP = 32;        // test on windows 32 is OK
 constexpr auto TIME_BASE = 1000;              // time unit conversion base value
 constexpr uint16_t AID_SHELL = 2000;
+// double-word(hex)=[0]major[1][2]monor[3][4]version[5]fix(a-p)[6][7]reserve
+constexpr uint32_t HDC_VERSION_NUMBER = 0x10100f00;
 
 // general one argument command argc
 constexpr int CMD_ARG1_COUNT = 2;
 // The first child versions must match, otherwise server and daemon must be upgraded
-const string VERSION_NUMBER = "1.1.0p";       // same with openssl version, 1.1.2==VERNUMBER 0x10102000
+const string VERSION_NUMBER = "1.1.0q";       // same with openssl version, 1.1.2==VERNUMBER 0x10102000
 const string HANDSHAKE_MESSAGE = "OHOS HDC";  // sep not char '-', not more than 11 bytes
 const string PACKET_FLAG = "HW";              // must 2bytes
 const string EMPTY_ECHO = "[Empty]";
@@ -90,6 +92,6 @@ const string CMDSTR_FORWARD_RPORT = "rport";
 const string CMDSTR_APP_INSTALL = "install";
 const string CMDSTR_APP_UNINSTALL = "uninstall";
 const string CMDSTR_APP_SIDELOAD = "sideload";
-const string CMDSTR_LIST_JDWP = "list jpid";
+const string CMDSTR_LIST_JDWP = "jpid";
 }  // namespace Hdc
 #endif  // HDC_DEFINE_H
