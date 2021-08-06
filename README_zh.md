@@ -45,10 +45,8 @@ hdc主要有三部分组成：
 
 [1.通过git clone方式下载(建议)](#section161941989591)
 ```
-外仓命令为:
+命令为:
 git clone git@gitee.com:openharmony/developtools_hdc_standard.git
-合作仓命令为:
-git clone git@gitee.com:OHOS_STD/developtools_hdc_standard.git
 ```
 
 [2.通过网页形式下载](#section161941989592)
