@@ -49,16 +49,14 @@ ohos_executable("hdcd") {
   ]
   sources += hdc_common_sources
 
-  defines = [
-    "HARMONY_PROJECT",
-  ]
+  defines = [ "HARMONY_PROJECT" ]
 
   configs = [ ":hdc_config" ]
 
   deps = [
     "//third_party/libuv:uv_static",
     "//third_party/lz4:liblz4_static",
-    "//third_party/openssl:crypto_source",
+    "//third_party/openssl:libcrypto_static",
     "//utils/native/base:utils",
   ]
   if (use_musl) {
@@ -113,7 +111,7 @@ ohos_executable("hdc_std") {
     "//third_party/lz4:liblz4_static",
   ]
   deps += [
-    "//third_party/openssl:crypto_source",
+    "//third_party/openssl:libcrypto_static",
     "//utils/native/base:utilsecurec",
   ]
 
