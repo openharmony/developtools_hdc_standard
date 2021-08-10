@@ -40,6 +40,7 @@ private:
     int DispatchToWorkThread(const uint32_t sessionId, uint8_t *readBuf, int readBytes);
     bool AvailablePacket(uint8_t *ioBuf, uint32_t *sessionId);
     void CloseEndpoint(HUSB hUSB, bool closeCtrlEp = false);
+    string GetDevPath(const std::string& path);
     bool ReadyForWorkThread(HSession hSession);
     int LoopUSBRead(HUSB hUSB);
     HSession PrepareNewSession(uint32_t sessionId, uint8_t *pRecvBuf, int recvBytesIO);
@@ -48,6 +49,7 @@ private:
     int CloseBulkEp(bool bulkInOut, int bulkFd, uv_loop_t *loop);
 
     HdcUSB usbHandle;
+    string basePath;  // usb device's base path
     uint32_t currentSessionId = 0;  // USB mode,limit only one session
     std::atomic<uint32_t> ref = 0;
     uv_timer_t checkEP;  // server-use
