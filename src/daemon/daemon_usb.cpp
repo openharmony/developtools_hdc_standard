@@ -44,14 +44,42 @@ void HdcDaemonUSB::Stop()
     WRITE_LOG(LOG_DEBUG, "HdcDaemonUSB Stop free main session finish");
 }
 
+string HdcDaemonUSB::GetDevPath(const std::string& path) {
+    DIR *dir = ::opendir(path.c_str());
+    if (dir == nullptr) {
+        WRITE_LOG(LOG_WARN, "%s: cannot open devpath: errno: %d", path.c_str(), errno);
+        return "";
+    }
+
+    string res = USB_FFS_BASE;
+    string node;
+    int count = 0;
+    struct dirent *entry = nullptr;
+    while ((entry = ::readdir(dir))) {
+        if (*entry->d_name == '.') {
+            continue;
+        }
+        node = entry->d_name;
+        ++count;
+    }
+    if (count > 1) {
+        res += "hdc";
+    } else {
+        res += node;
+    }
+    ::closedir(dir);
+    return res;
+}
+
 int HdcDaemonUSB::Initial()
 {
     // 4.4   Kit Kat      |19, 20     |3.10
     // after Linux-3.8，kernel switch to the USB Function FS
     // Implement USB hdc function in user space
     WRITE_LOG(LOG_DEBUG, "HdcDaemonUSB init");
-    if (access(USB_FFS_HDC_EP0, F_OK) != 0) {
-        WRITE_LOG(LOG_DEBUG, "Just support usb-ffs, must kernel3.8+ and enable usb-ffs, usbmod disable");
+    basePath = GetDevPath(USB_FFS_BASE);
+    if (access((basePath + "/ep0").c_str(), F_OK) != 0) {
+        WRITE_LOG(LOG_DEBUG, "Only support usb-ffs, make sure kernel3.8+ and usb-ffs enabled, usbmode disabled");
         return -1;
     }
     const uint16_t usbFfsScanInterval = 1500;
@@ -73,29 +101,31 @@ int HdcDaemonUSB::ConnectEPPoint(HUSB hUSB)
             // which can be found for USB devices. Do not send initialization to the EP0 control port, the USB
             // device will not be initialized by Host
             WRITE_LOG(LOG_DEBUG, "Begin send to control(EP0) for usb descriptor init");
-            if ((controlEp = open(USB_FFS_HDC_EP0, O_RDWR)) < 0) {
-                WRITE_LOG(LOG_WARN, "%s: cannot open control endpoint: errno=%d", USB_FFS_HDC_EP0, errno);
+            string ep0Path = basePath + "/ep0";
+            if ((controlEp = open(ep0Path.c_str(), O_RDWR)) < 0) {
+                WRITE_LOG(LOG_WARN, "%s: cannot open control endpoint: errno=%d", ep0Path.c_str(), errno);
                 break;
             }
             if (write(controlEp, &USB_FFS_DESC, sizeof(USB_FFS_DESC)) < 0) {
-                WRITE_LOG(LOG_WARN, "%s: write ffs configs failed: errno=%d", USB_FFS_HDC_EP0, errno);
+                WRITE_LOG(LOG_WARN, "%s: write ffs configs failed: errno=%d", ep0Path.c_str(), errno);
                 break;
             }
             if (write(controlEp, &USB_FFS_VALUE, sizeof(USB_FFS_VALUE)) < 0) {
-                WRITE_LOG(LOG_WARN, "%s: write USB_FFS_VALUE failed: errno=%d", USB_FFS_HDC_EP0, errno);
+                WRITE_LOG(LOG_WARN, "%s: write USB_FFS_VALUE failed: errno=%d", ep0Path.c_str(), errno);
                 break;
             }
             // active usbrc，Send USB initialization singal
             Base::SetHdcProperty("sys.usb.ffs.ready", "1");
             WRITE_LOG(LOG_DEBUG, "ConnectEPPoint ctrl init finish, set usb-ffs ready");
         }
-
-        if ((hUSB->bulkOut = open(USB_FFS_HDC_OUT, O_RDWR)) < 0) {
-            WRITE_LOG(LOG_WARN, "%s: cannot open bulk-out ep: errno=%d", USB_FFS_HDC_OUT, errno);
+        string outPath = basePath + "/ep1";
+        if ((hUSB->bulkOut = open(outPath.c_str(), O_RDWR)) < 0) {
+            WRITE_LOG(LOG_WARN, "%s: cannot open bulk-out ep: errno=%d", outPath.c_str(), errno);
             break;
         }
-        if ((hUSB->bulkIn = open(USB_FFS_HDC_IN, O_RDWR)) < 0) {
-            WRITE_LOG(LOG_WARN, "%s: cannot open bulk-in ep: errno=%d", USB_FFS_HDC_IN, errno);
+        string inPath = basePath + "/ep2";
+        if ((hUSB->bulkIn = open(inPath.c_str(), O_RDWR)) < 0) {
+            WRITE_LOG(LOG_WARN, "%s: cannot open bulk-in ep: errno=%d", inPath.c_str(), errno);
             break;
         }
         // cannot open with O_CLOEXEC, must fcntl
