@@ -107,10 +107,9 @@ ohos_executable("hdc_std") {
   sources += hdc_common_sources
 
   deps = [
+    "//third_party/libusb:libusb",
     "//third_party/libuv:uv_static",
     "//third_party/lz4:liblz4_static",
-  ]
-  deps += [
     "//third_party/openssl:libcrypto_static",
     "//utils/native/base:utilsecurec",
   ]
