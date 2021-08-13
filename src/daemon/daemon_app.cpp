@@ -65,7 +65,7 @@ bool HdcDaemonApp::CommandDispatch(const uint16_t command, uint8_t *payload, con
             size_t size = 256;
             uv_os_tmpdir(tmpPath, &size);
             dstPath = tmpPath;
-            dstPath += std::filesystem::path::preferred_separator;
+            dstPath += PREF_SEPARATOR;
 #endif
             dstPath += ctxNow.transferConfig.optionalName;
             ctxNow.localPath = dstPath;
