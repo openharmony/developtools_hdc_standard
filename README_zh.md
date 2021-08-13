@@ -3,7 +3,8 @@
 -   [简介](#section662115419449)
 -   [架构](#section15908143623714)
 -   [目录](#section161941989596)
-    -   [下载说明](#section129654513263)
+    -   [pc端编译说明](#section129654513262)
+    -   [预制pc端下载说明](#section129654513263)
         -    [1.通过git clone方式下载(建议)](#section161941989591)
         -    [2.通过网页形式下载](#section161941989592)
         -    [3.支持环境](#section161941989593)
@@ -15,7 +16,7 @@
 
 ## 简介<a name="section662115419449"></a>
 
-HDC（Harmony Device Connector） 是OpenHarmony为开发人员提供的用于调试的命令行工具，开发机器上使用设备连接器hdc client/server命令行工具，该工具需支持部署在Windows/Linux/Mac等系统上与鸿蒙设备（或模拟器）进行连接调试通信。PC端hdc工具需要针对以上开发机操作系统平台分别发布相应的版本，设备端hdc daemon需跟随设备镜像发布包括对模拟器进行支持。下文将介绍hdc的常用命令及使用举例。
+HDC（Harmony Device Connector） 是OpenHarmony为开发人员提供的用于设备连接调试的命令行工具，pc端开发机使用命令行工具hdc_std(为方便起见，下文统称hdc)，该工具需支持部署在Windows/Linux/Mac等系统上与鸿蒙设备（或模拟器）进行连接调试通信。PC端hdc工具需要针对以上开发机操作系统平台分别发布相应的版本，设备端hdc daemon需跟随设备镜像发布包括对模拟器进行支持。下文将介绍hdc的常用命令及使用举例。
 
 ## 架构<a name="section15908143623714"></a>
 
@@ -40,26 +41,41 @@ hdc主要有三部分组成：
 │   └── prebuilt      # 预编译目录，存放预编译的二进制文件
 ```
 
-### 下载说明<a name="section129654513263"></a>
+### pc端编译说明<a name="section129654513262"></a>
+
+
+hdc pc端可执行文件编译步骤：
+
+1. 工程准备：更新下载整个工程，使得工程包含https://gitee.com/openharmony/build/pulls/89 等必要的提交。
+
+2. 编译命令：调试编译命令 在整个工程编译命令的基础上增加 "--build-target build_ohos_sdk --gn-args build_ohos_sdk=true" 参数即可。
+
+3. 编译：在目标开发机上运行上面调整好的sdk编译命令， 正常编译hdc_std会输出到sdk平台相关目录下； 注意： ubuntu环境下只能编译windows/linux版本工具，mac版需要在macos开发机上编译。
+
+
+### 预制pc端下载说明<a name="section129654513263"></a>
 
 
 [1.通过git clone方式下载(建议)](#section161941989591)
 ```
-命令为:
-git clone git@gitee.com:openharmony/developtools_hdc_standard.git
+下载命令格式:  git clone git@gitee.com:projectname/developtools_hdc_standard.git
+git clone https://gitee.com/projectname/developtools_hdc_standard.git
+其中 projectname为 本仓所在的开源社区项目英文名(譬如: openharmony)
+完整命令示意:  git clone git@gitee.com:openharmony/developtools_hdc_standard.git
+或     git clone https://gitee.com/openharmony/developtools_hdc_standard.git
 ```
 
 [2.通过网页形式下载](#section161941989592)
 通过网页形式下载prebuilt，请使用类似如下URL打开网页:
 ``` https://gitee.com/openharmony/developtools_hdc_standard/blob/master/prebuilt/windows/hdc-std.exe```
-点击中间下载方式进行下载，windows版本文件大小在**5M左右**，linux版本在**2M左右**，不要使用右击另存为方式进行保存下载，这样下载不对，下载后检查文件大小(**说三遍**)。
+点击中间下载方式进行下载，windows版本文件大小在**5M左右**，linux版本在**2M左右**，请勿使用右击另存为方式进行保存下载，下载后检查文件大小(**说三遍**)。
 
 [3.支持环境](#section161941989593)
-支持运行环境 linux版本建议ubuntu20 CentOS8 64位，其他版本相近也应该可以，libc++.so引用错误请使用ldd/readelf等命令检查库引用 windows版本建议windows10 64位，windows8也应该可以，Windows7等EOF版本尚未测试，如果低版本windows winusb库缺失，请使用zadig更新库。
+linux版本建议ubuntu 16.04以上 64位，其他相近版本也可；libc++.so引用错误请使用ldd/readelf等命令检查库引用 windows版本建议windows10 64位，如果低版本windows winusb库缺失，请使用zadig更新库。
 
 [4.BUG上报](#section161941989594)
 近期hdc刚开发完成，适配和调整变动较多，如果遇到异常情况，建议按照如下步骤进行排查:
-1)首先核对server与daemon版本是否匹配，hdc-std -v, hdcd -v。
+1)首先核对server与daemon版本是否匹配，hdc_std -v, hdcd -v。
 2)更新工程最新的线上代码和预编译文件，是否在后续版本中已解决问题。
 3)规范的和详细的提出issue，我们将尽快跟进。
 
