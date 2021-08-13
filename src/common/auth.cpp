@@ -248,7 +248,7 @@ int GetUserKeyPath(string &path)
     char buf[BUF_SIZE_DEFAULT];
     size_t len = BUF_SIZE_DEFAULT;
     char sep[2] = "";
-    sep[0] = std::filesystem::path::preferred_separator;
+    sep[0] = PREF_SEPARATOR;
     // $home
     if (uv_os_homedir(buf, &len) < 0)
         return false;

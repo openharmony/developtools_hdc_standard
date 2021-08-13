@@ -14,9 +14,7 @@
  */
 #include "transfer.h"
 #include "serial_struct.h"
-#include <filesystem>
 #include <sys/stat.h>
-namespace fs = std::filesystem;
 #ifdef HARMONY_PROJECT
 #include <lz4.h>
 #endif
@@ -322,7 +320,7 @@ bool HdcTransferBase::SmartSlavePath(string &localPath, const char *optName)
     int r = uv_fs_lstat(nullptr, &req, localPath.c_str(), nullptr);
     uv_fs_req_cleanup(&req);
     if (r == 0 && req.statbuf.st_mode & S_IFDIR) {  // is dir
-        localPath = Base::StringFormat("%s%c%s", localPath.c_str(), fs::path::preferred_separator, optName);
+        localPath = Base::StringFormat("%s%c%s", localPath.c_str(), PREF_SEPARATOR, optName);
     }
     return false;
 }
