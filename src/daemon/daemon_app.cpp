@@ -87,7 +87,7 @@ bool HdcDaemonApp::CommandDispatch(const uint16_t command, uint8_t *payload, con
     return ret;
 };
 
-void HdcDaemonApp::AsyncInstallFinish(bool finish, int64_t exitStatus, const string result)
+bool HdcDaemonApp::AsyncInstallFinish(bool finish, int64_t exitStatus, const string result)
 {
     if (mode == APPMOD_INSTALL) {
         unlink(ctxNow.localPath.c_str());
@@ -105,6 +105,7 @@ void HdcDaemonApp::AsyncInstallFinish(bool finish, int64_t exitStatus, const str
     Base::WriteBinFile((UT_TMP_PATH + "/appinstall.result").c_str(), (uint8_t *)MESSAGE_SUCCESS.c_str(),
                        MESSAGE_SUCCESS.size(), true);
 #endif
+    return true;
 }
 
 void HdcDaemonApp::PackageShell(bool installOrUninstall, const char *options, const char *package)

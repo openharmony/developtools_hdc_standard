@@ -87,9 +87,8 @@ void HdcDaemon::InitMod(bool bEnableTCP, bool bEnableUSB)
     // enable security
     char value[4] = "0";
     Base::GetHdcProperty("ro.hdc.secure", value, 4);
-    if (!strcmp("1", value)) {
-        enableSecure = true;
-    }
+    string secure = value;
+    enableSecure = (Base::Trim(secure) == "1");
 }
 
 // clang-format off
@@ -188,23 +187,6 @@ bool HdcDaemon::HandDaemonAuth(HSession hSession, const uint32_t channelId, Sess
     return ret;
 }
 
-bool HdcDaemon::CheckVersionMatch(string version)
-{
-    uint32_t nowMajor;
-    uint32_t nowMinor;
-    uint32_t inMajor;
-    uint32_t inMinor;
-    uint32_t ignore;
-    if (sscanf_s(VERSION_NUMBER.c_str(), "%d.%d.%d", &nowMajor, &nowMinor, &ignore) < 3
-        || sscanf_s(VERSION_NUMBER.c_str(), "%d.%d.%d", &inMajor, &inMinor, &ignore) < 3) {
-        return false;
-    }
-    if (nowMajor != inMajor || nowMinor != inMinor) {
-        return false;
-    }
-    return true;
-}
-
 bool HdcDaemon::DaemonSessionHandshake(HSession hSession, const uint32_t channelId, uint8_t *payload, int payloadSize)
 {
     // session handshake step2
@@ -219,7 +201,6 @@ bool HdcDaemon::DaemonSessionHandshake(HSession hSession, const uint32_t channel
         return false;
     }
     if (handshake.authType == AUTH_NONE) {
-        // checkVersionMatch
         // daemon handshake 1st packet
         uint32_t unOld = hSession->sessionId;
         hSession->sessionId = handshake.sessionId;

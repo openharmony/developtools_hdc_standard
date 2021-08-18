@@ -36,14 +36,16 @@ bool ForkChildCheck(int argc, const char *argv[])
     // hdcd -fork  #fork
     char modeSet[BUF_SIZE_TINY] = "";
     Base::GetHdcProperty("persist.hdc.mode", modeSet, BUF_SIZE_TINY);
-    Base::PrintMessage("Background mode, persist.hdc.mode:%s", modeSet);
-    if (!strcmp(modeSet, "tcp")) {
+    Base::PrintMessage("Background mode, persist.hdc.mode:[%s]", modeSet);
+    string workMode = modeSet;
+    workMode = Base::Trim(workMode);
+    if (workMode == CMDSTR_TMODE_TCP) {
         WRITE_LOG(LOG_DEBUG, "Property enable TCP");
         g_enableTcp = true;
-    } else if (!strcmp(modeSet, CMDSTR_TMODE_USB.c_str())) {
+    } else if (workMode == CMDSTR_TMODE_USB) {
         WRITE_LOG(LOG_DEBUG, "Property enable USB");
         g_enableUsb = true;
-    } else if (!strcmp(modeSet, "all")) {
+    } else if (workMode == "all") {
         WRITE_LOG(LOG_DEBUG, "Property enable USB and TCP");
         g_enableUsb = true;
         g_enableTcp = true;
@@ -81,17 +83,16 @@ int BackgroundRun()
 string DaemonUsage()
 {
     string ret;
-    ret = "\n                         Harmony device connector(HDC) daemon side...\n\n"
+    ret = "\n                         Harmony device connector daemon(HDCD) Usage: hdcd [options]...\n\n"
           "\n"
-          "service mode commands:\n"
-          " hdcd                          - Daemon server mode\n"
-          " -b                            - Daemon server backgroundRun/fork mode\n"
-          "\n"
-          "paramenter mode commands:\n"
+          "general options:\n"
           " -h                            - Print help\n"
           " -l 0-5                        - Print runtime log\n"
-          " -u                            - Enable USB mod\n"
-          " -t                            - Enable TCP mod\n";
+          "\n"
+          "daemon mode options:\n"
+          " -b                            - Daemon run in background/fork mode\n"
+          " -u                            - Enable USB mode\n"
+          " -t                            - Enable TCP mode\n";
     return ret;
 }
 
@@ -99,7 +100,7 @@ bool GetDaemonCommandlineOptions(int argc, const char *argv[])
 {
     int ch;
     // hdcd -l4 ...
-    WRITE_LOG(LOG_DEBUG, "Paraments mode");
+    WRITE_LOG(LOG_DEBUG, "Fgcli mode");
     // Both settings are running with parameters
     while ((ch = getopt(argc, (char *const *)argv, "utl:")) != -1) {
         switch (ch) {
@@ -112,18 +113,18 @@ bool GetDaemonCommandlineOptions(int argc, const char *argv[])
                 Base::SetLogLevel(logLevel);
                 break;
             }
-            case 'u': {  // enable usb
-                Base::PrintMessage("Parament Enable USB");
+            case 'u': {
+                Base::PrintMessage("Option USB enabled");
                 g_enableUsb = true;
                 break;
             }
-            case 't': {  // enable tcp
-                Base::PrintMessage("Parament Enable TCP");
+            case 't': {
+                Base::PrintMessage("Option TCP enabled");
                 g_enableTcp = true;
                 break;
             }
             default:
-                Base::PrintMessage("other option:%c\n", ch);
+                Base::PrintMessage("Option:%c non-supported!", ch);
                 exit(0);
                 break;
         }
@@ -136,13 +137,13 @@ void NeedDropPriv()
     char droprootSet[BUF_SIZE_TINY] = "";
     Base::GetHdcProperty("persist.hdc.root", droprootSet, BUF_SIZE_TINY);
     droprootSet[sizeof(droprootSet) - 1] = '\0';
-    if (!strcmp(droprootSet, "1")) {
+    string rootMode = droprootSet;
+    if (Base::Trim(rootMode) == "1") {
         setuid(0);
         g_rootRun = true;
         WRITE_LOG(LOG_DEBUG, "Root run");
-    } else if (!strcmp(droprootSet, "0")) {
+    } else if (Base::Trim(rootMode) == "0") {
         setuid(AID_SHELL);
-        // if need, will be more priv. operate
     }
 }
 }  // namespace Hdc

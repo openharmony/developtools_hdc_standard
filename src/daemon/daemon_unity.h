@@ -35,7 +35,7 @@ private:
     bool SetDeviceRunMode(void *daemonIn, const char *cmd);
     bool GetHiLog(const char *cmd);
     bool ListJdwpProcess(void *daemonIn);
-    void AsyncCmdOut(bool finish, int64_t exitStatus, const string result);
+    bool AsyncCmdOut(bool finish, int64_t exitStatus, const string result);
 
     const string rebootProperty = "sys.powerctl";
     AsyncCmd asyncCommand;

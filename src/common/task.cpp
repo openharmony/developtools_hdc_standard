@@ -23,7 +23,6 @@ HdcTaskBase::HdcTaskBase(HTaskInfo hTaskInfo)
     taskInfo = hTaskInfo;
     loopTask = hTaskInfo->runLoop;
     clsSession = hTaskInfo->ownerSessionClass;
-    runningProtect = false;
     childReady = false;
     singalStop = false;
     refCount = 0;
@@ -36,7 +35,7 @@ HdcTaskBase::~HdcTaskBase()
 
 bool HdcTaskBase::ReadyForRelease()
 {
-    return !runningProtect && refCount == 0;
+    return refCount == 0;
 }
 
 // Only the Task work thread call is allowed to use only when Workfortask returns FALSE.
@@ -49,6 +48,9 @@ void HdcTaskBase::TaskFinish()
 
 bool HdcTaskBase::SendToAnother(const uint16_t command, uint8_t *bufPtr, const int size)
 {
+    if (singalStop) {
+        return false;
+    }
     HdcSessionBase *sessionBase = reinterpret_cast<HdcSessionBase *>(taskInfo->ownerSessionClass);
     return sessionBase->Send(taskInfo->sessionId, taskInfo->channelId, command, bufPtr, size) > 0;
 }

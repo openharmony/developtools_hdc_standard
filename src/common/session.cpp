@@ -18,8 +18,7 @@
 namespace Hdc {
 HdcSessionBase::HdcSessionBase(bool serverOrDaemonIn)
 {
-    string threadNum = std::to_string(SIZE_THREAD_POOL);
-    uv_os_setenv("UV_THREADPOOL_SIZE", threadNum.c_str());
+    // server/daemon common initialize
     uv_loop_init(&loopMain);
     WRITE_LOG(LOG_DEBUG, "loopMain init");
     uv_rwlock_init(&mainAsync);
@@ -28,6 +27,17 @@ HdcSessionBase::HdcSessionBase(bool serverOrDaemonIn)
     serverOrDaemon = serverOrDaemonIn;
     ctxUSB = nullptr;
     wantRestart = false;
+
+    // server/daemon common set
+    string threadNum = std::to_string(SIZE_THREAD_POOL);
+    uv_os_setenv("UV_THREADPOOL_SIZE", threadNum.c_str());
+#ifndef _WIN32
+    // global signal detect
+    umask(0);
+    signal(SIGPIPE, SIG_IGN);  // SIG_DFL
+                               // prevent zoombie process, let 'init' process do process's clear
+    signal(SIGCHLD, SIG_IGN);
+#endif
 #ifdef HDC_HOST
     if (serverOrDaemon) {
         libusb_init((libusb_context **)&ctxUSB);
@@ -88,7 +98,7 @@ bool HdcSessionBase::BeginRemoveTask(HTaskInfo hTask)
         thisClass->AdminTask(OP_REMOVE, hSession, hTask->channelId, nullptr);
         WRITE_LOG(LOG_DEBUG, "TaskDelay task remove finish, channelId:%d", hTask->channelId);
         delete hTask;
-        uv_close((uv_handle_t *)handle, Base::CloseIdleCallback);
+        Base::TryCloseHandle((uv_handle_t *)handle, Base::CloseIdleCallback);
     };
     Base::IdleUvTask(hTask->runLoop, hTask, taskClassDeleteRetry);
 
@@ -238,7 +248,7 @@ void HdcSessionBase::AsyncMainLoopTask(uv_idle_t *handle)
     }
     delete param;
     param = nullptr;
-    uv_close((uv_handle_t *)handle, Base::CloseIdleCallback);
+    Base::TryCloseHandle((uv_handle_t *)handle, Base::CloseIdleCallback);
 }
 
 void HdcSessionBase::MainAsyncCallback(uv_async_t *handle)
@@ -378,7 +388,6 @@ HSession HdcSessionBase::MallocSession(bool serverOrDaemon, const ConnType connT
     hSession->dataPipe[STREAM_MAIN].data = hSession;
     hSession->dataPipe[STREAM_WORK].data = hSession;
     Base::SetTcpOptions(&hSession->dataPipe[STREAM_MAIN]);
-
     ret = MallocSessionByConnectType(hSession);
     if (ret) {
         delete hSession;
@@ -463,10 +472,8 @@ void HdcSessionBase::FreeSessionContinue(HSession hSession)
         delete[] hSession->ioBuf;
         hSession->ioBuf = nullptr;
     }
-    Base::TryCloseHandle((uv_handle_t *)&hSession->ctrlPipe[STREAM_MAIN], closeSessionTCPHandle);
-    Base::CloseSocketPair(hSession->ctrlFd);
-    Base::TryCloseHandle((uv_handle_t *)&hSession->dataPipe[STREAM_MAIN], closeSessionTCPHandle);
-    Base::CloseSocketPair(hSession->dataFd);
+    Base::TryCloseHandle((uv_handle_t *)&hSession->ctrlPipe[STREAM_MAIN], true, closeSessionTCPHandle);
+    Base::TryCloseHandle((uv_handle_t *)&hSession->dataPipe[STREAM_MAIN], true, closeSessionTCPHandle);
     delete hSession->mapTask;
     HdcAuth::FreeKey(!hSession->serverOrDaemon, hSession->listKey);
     delete hSession->listKey;  // to clear
@@ -932,18 +939,27 @@ void HdcSessionBase::ReadCtrlFromMain(uv_stream_t *uvpipe, ssize_t nread, const 
     HdcSessionBase *hSessionBase = (HdcSessionBase *)hSession->classInstance;
     int formatCommandSize = sizeof(CtrlStruct);
     int index = 0;
-    while (index < nread) {
-        if (nread % formatCommandSize != 0) {
-            WRITE_LOG(LOG_FATAL, "ReadCtrlFromMain size failed, nread == %d", nread);
-            break;
-        }
+    bool ret = true;
+    while (true) {
         if (nread < 0) {
             WRITE_LOG(LOG_DEBUG, "SessionCtrl failed,%s", uv_strerror(nread));
+            ret = false;
+            break;
+        }
+        if (nread % formatCommandSize != 0) {
+            WRITE_LOG(LOG_FATAL, "ReadCtrlFromMain size failed, nread == %d", nread);
+            ret = false;
             break;
         }
         CtrlStruct *ctrl = reinterpret_cast<CtrlStruct *>(buf->base + index);
+        if (!(ret = hSessionBase->DispatchMainThreadCommand(hSession, ctrl))) {
+            ret = false;
+            break;
+        }
         index += sizeof(CtrlStruct);
-        hSessionBase->DispatchMainThreadCommand(hSession, ctrl);
+        if (index >= nread) {
+            break;
+        }
     }
     delete[] buf->base;
 }

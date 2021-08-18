@@ -114,7 +114,7 @@ void HdcServerForClient::EchoClient(HChannel hChannel, MessageLevel level, const
     string log = logInfo + Base::StringFormat(msg, vaArgs);
     va_end(vaArgs);
     if (log.back() != '\n') {
-        log += "\n";
+        log += "\r\n";
     }
     Send(hChannel->channelId, (uint8_t *)log.c_str(), log.size());
 }

@@ -28,7 +28,7 @@ public:
         USB_OPTION_RESERVE8 = 8,
     };
     // 1)is finish 2)exitStatus 3)resultString(maybe empty)
-    using CmdResultCallback = std::function<void(bool, int64_t, const string)>;
+    using CmdResultCallback = std::function<bool(bool, int64_t, const string)>;
     static uint32_t GetDefaultOption()
     {
         return OPTION_APPEND_NEWLINE | OPTION_COMMAND_ONETIME;

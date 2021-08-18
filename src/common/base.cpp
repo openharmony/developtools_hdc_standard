@@ -145,7 +145,7 @@ namespace Base {
 
         printf("%s", logBuf.c_str());
         fflush(stdout);
-        // logfile
+        // logfile, not thread-safe
         FILE *fp = fopen("/data/local/tmp/hdc.log", "a");
         if (fp == nullptr) {
             return;
@@ -559,11 +559,17 @@ namespace Base {
 
     bool GetHdcProperty(const char *key, char *value, uint16_t sizeOutBuf)
     {
+#ifndef __MUSL__
 #ifdef HDC_PCDEBUG
         WRITE_LOG(LOG_DEBUG, "Getproperty, key:%s value:%s", key, value);
 #else
         string sKey = key;
         string sBuf = "getprop " + sKey;
+        RunPipeComand(sBuf.c_str(), value, sizeOutBuf, true);
+#endif
+#else
+        string sKey = key;
+        string sBuf = "getparam " + sKey;
         RunPipeComand(sBuf.c_str(), value, sizeOutBuf, true);
 #endif
         value[sizeOutBuf - 1] = '\0';
@@ -1001,7 +1007,13 @@ namespace Base {
 
     string GetVersion()
     {
-        return "Ver: " + VERSION_NUMBER;
+        const uint8_t a = 'a';
+        uint8_t major = (HDC_VERSION_NUMBER >> 28) & 0xff;
+        uint8_t minor = (HDC_VERSION_NUMBER << 4 >> 24) & 0xff;
+        uint8_t version = (HDC_VERSION_NUMBER << 12 >> 24) & 0xff;
+        uint8_t fix = (HDC_VERSION_NUMBER << 20 >> 28) & 0xff;  // max 16, tail is p
+        string ver = StringFormat("%x.%x.%x%c", major, minor, version, a + fix);
+        return "Ver: " + ver;
     }
 
     bool IdleUvTask(uv_loop_t *loop, void *data, uv_idle_cb cb)
