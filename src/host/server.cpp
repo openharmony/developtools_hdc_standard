@@ -76,7 +76,6 @@ bool HdcServer::Initial(const char *listenString)
         WRITE_LOG(LOG_FATAL, "Class init failed");
         return false;
     }
-
     (static_cast<HdcServerForClient *>(clsServerForClient))->Initial();
     clsUSBClt->Initial();
     return true;
@@ -89,6 +88,10 @@ bool HdcServer::CheckToPullUptrServer(const char *listenString)
     size_t nPathSize = sizeof(path);
     uv_exepath(path, &nPathSize);
     if (nPathSize <= 2) {
+        return false;
+    }
+    if (!Base::IsRoot()) {
+        Base::PrintMessage("Pull server need root/admin privilege");
         return false;
     }
 #ifdef _WIN32

@@ -112,21 +112,21 @@ namespace Base {
     }
 
     // Trim from right side
-    inline string& RightTrim(string& s, const string& w = WHITE_SPACES)
+    inline string &RightTrim(string &s, const string &w = WHITE_SPACES)
     {
         s.erase(s.find_last_not_of(w) + 1);
         return s;
     }
 
     // Trim from left side
-    inline string& LeftTrim(string& s, const string& w = WHITE_SPACES)
+    inline string &LeftTrim(string &s, const string &w = WHITE_SPACES)
     {
         s.erase(0, s.find_first_not_of(w));
         return s;
     }
 
     // Trim from both sides
-    inline string& Trim(string& s, const string& w = WHITE_SPACES)
+    inline string &Trim(string &s, const string &w = WHITE_SPACES)
     {
         return LeftTrim(RightTrim(s, w), w);
     }
@@ -135,6 +135,7 @@ namespace Base {
     string GetFileNameAny(string &path);
     uv_os_sock_t DuplicateUvSocket(uv_tcp_t *tcp);
     vector<uint8_t> Md5Sum(uint8_t *buf, int size);
+    bool IsRoot();
 }  // namespace base
 }  // namespace Hdc
 
