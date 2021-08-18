@@ -46,7 +46,7 @@ void AsyncCmd::DoRelease()
         return;
     }
     hasStop = true;  // must set here to deny repeate release
-    ExitCallback(&proc, 0, 0);
+    uv_process_kill(&proc, SIGKILL);
     WRITE_LOG(LOG_DEBUG, "AsyncCmd::DoRelease finish");
 }
 
@@ -58,7 +58,10 @@ void AsyncCmd::ChildReadCallback(uv_stream_t *stream, ssize_t nread, const uv_bu
     } else {
         if (thisClass->options & OPTION_READBACK_OUT) {
             thisClass->cmdResult = buf->base;
-            thisClass->resultCallback(false, 0, thisClass->cmdResult);
+            if (!thisClass->resultCallback(false, 0, thisClass->cmdResult)) {
+                uv_process_kill(&thisClass->proc, SIGKILL);
+                uv_read_stop(stream);
+            }
             thisClass->cmdResult = STRING_EMPTY;
         } else {  // output all when finish
             thisClass->cmdResult += buf->base;
@@ -85,7 +88,6 @@ void AsyncCmd::ExitCallback(uv_process_t *req, int64_t exitStatus, int tersignal
     Base::TryCloseHandle((uv_handle_t *)&thisClass->stdoutPipe, true, funcReqClose);
     Base::TryCloseHandle((uv_handle_t *)&thisClass->stderrPipe, true, funcReqClose);
     Base::TryCloseHandle((uv_handle_t *)req, true, funcReqClose);
-    uv_process_kill(req, SIGKILL);
     thisClass->cmdResult = STRING_EMPTY;
 }
 

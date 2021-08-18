@@ -427,11 +427,13 @@ bool HdcServer::FetchCommand(HSession hSession, const uint32_t channelId, const 
     }
     if (!hChannel) {
         if (command == CMD_KERNEL_CHANNEL_CLOSE) {
-            // Saturated release. Daemon close channel and want to notify server close channel also, but it may has been
+            // Daemon close channel and want to notify server close channel also, but it may has been
             // closed by herself
-            return true;
+        } else {
+            // Client may be ctrl+c and Server remove channel. notify server async
         }
-        return false;
+        Send(hSession->sessionId, channelId, CMD_KERNEL_CHANNEL_CLOSE, payload, 1);
+        return true;
     }
     switch (command) {
         case CMD_KERNEL_ECHO_RAW: {  // Native shell data output
@@ -551,10 +553,10 @@ void HdcServer::UsbPreConnect(uv_timer_t *handle)
     HSession hSession = (HSession)handle->data;
     bool stopLoop = false;
     HdcServer *hdcServer = (HdcServer *)hSession->classInstance;
-    const int usbConnectRetryMax = 100;
+    const int usbConnectRetryMax = 5;
     while (true) {
         WRITE_LOG(LOG_DEBUG, "HdcServer::UsbPreConnect");
-        if (++hSession->hUSB->retryCount > usbConnectRetryMax) {  // max 10s
+        if (++hSession->hUSB->retryCount > usbConnectRetryMax) {  // max 15s
             hdcServer->FreeSession(hSession->sessionId);
             stopLoop = true;
             break;

@@ -115,7 +115,7 @@ bool HdcHostUSB::DetectMyNeed(libusb_device *device, string &sn)
     uv_timer_t *waitTimeDoCmd = new uv_timer_t;
     uv_timer_init(&hdcServer->loopMain, waitTimeDoCmd);
     waitTimeDoCmd->data = hSession;
-    uv_timer_start(waitTimeDoCmd, hdcServer->UsbPreConnect, 10, 100);
+    uv_timer_start(waitTimeDoCmd, hdcServer->UsbPreConnect, 500, 3000);
     mapIgnoreDevice[sn] = HOST_USB_REGISTER;
     ret = true;
     libusb_release_interface(hUSB->devHandle, hUSB->interfaceNumber);

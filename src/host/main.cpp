@@ -142,7 +142,7 @@ int RunClientMode(string &commands, string &serverListenString, string &connectK
 {
     uv_loop_t loopMain;
     uv_loop_init(&loopMain);
-    HdcClient client(false, DEFAULT_SERVER_ADDR, &loopMain);
+    HdcClient client(false, serverListenString, &loopMain);
     if (!commands.size()) {
         Base::PrintMessage("Unknow operation command...");
         TranslateCommand::Usage();
@@ -154,8 +154,10 @@ int RunClientMode(string &commands, string &serverListenString, string &connectK
         client.CtrlServiceWork(commands.c_str());
         return 0;
     }
-    if (isPullServer && Base::ProgramMutex(SERVER_NAME.c_str(), true) == 0) {
-        HdcServer::CheckToPullUptrServer(serverListenString.c_str());
+    if (isPullServer && serverListenString == DEFAULT_SERVER_ADDR
+        && Base::ProgramMutex(SERVER_NAME.c_str(), true) == 0) {
+        // default pullup, just default listenstr.If want to customer listen-string, please use 'hdc -m -s lanip:port'
+        HdcServer::CheckToPullUptrServer(DEFAULT_SERVER_ADDR.c_str());
         uv_sleep(300);  // give time to start serverForClient,at least 200ms
     }
     client.Initial(connectKey);
@@ -175,6 +177,10 @@ bool ParseServerListenString(string &serverListenString, char *optarg)
     }
     char *p = strchr(buf, ':');
     if (!p) {  // Only port
+        if (strlen(buf) > 5) {
+            Base::PrintMessage("The port-string's length must < 5");
+            return false;
+        }
         int port = atoi(buf);
         if (port <= 0 || port > MAX_IP_PORT) {
             Base::PrintMessage("Port range incorrect");
@@ -279,9 +285,8 @@ bool GetCommandlineOptions(int optArgc, const char *optArgv[])
 }
 
 #ifndef UNIT_TEST
-// hdc -l4 -m
-// hdc -l4 discover / hdc -l4 connect 127.0.0.1:10178
-// hdc -l4 -t 127.0.0.1:10178 shell id
+// hdc -l4 -m -s ip:port|hdc -l4 -m
+// hdc -l4 - s ip:port list targets
 int main(int argc, const char *argv[])
 {
     string options;
@@ -295,7 +300,7 @@ int main(int argc, const char *argv[])
         return 0;
     }
     if (g_isServerMode) {
-        // -m server.Run alone in the background
+        // -m server.Run alone in the background, no -s will be listen loopback address,
         Hdc::RunServerMode(g_serverListenString);
     } else if (g_isPcDebugRun) {
         Hdc::RunPcDebugMode(g_isPullServer, g_isTCPorUSB, g_isTestMethod);
