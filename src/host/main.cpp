@@ -110,6 +110,10 @@ int SplitOptionAndCommand(int argc, const char **argv, string &outOption, string
 
 int RunServerMode(string &serverListenString)
 {
+    if (!Base::IsRoot()) {
+        Base::PrintMessage("Server need root/admin privilege");
+        return ERR_PRIVELEGE_NEED;
+    }
     HdcServer server(true);
     if (!server.Initial(serverListenString.c_str())) {
         Base::PrintMessage("Initial failed");

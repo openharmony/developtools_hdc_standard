@@ -692,9 +692,9 @@ namespace Base {
             return ERR_BUF_OVERFLOW;
         }
         // no need to CanonicalizeSpecPath, else not work
-        int fd = open(bufPath, O_RDWR | O_CREAT, (S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH));
+        int fd = open(bufPath, O_RDWR, S_IRWXU | S_IRWXG | S_IRWXO);
         if (fd < 0) {
-            WRITE_LOG(LOG_FATAL, "Open mutex file \"%s\" failed!!!\n", buf);
+            WRITE_LOG(LOG_FATAL, "Open mutex file \"%s\" failed!!!Errno:%d\n", buf, errno);
             return ERR_FILE_OPEN;
         }
 #ifdef _WIN32
@@ -1153,5 +1153,17 @@ namespace Base {
         return ret;
     }
 
+    bool IsRoot()
+    {
+#ifdef _WIN32
+        // reserve
+        return true;
+#else
+        if (getuid() == 0) {
+            return true;
+        }
+#endif
+        return false;
+    }
 }
 }  // namespace Hdc
