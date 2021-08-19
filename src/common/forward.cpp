@@ -133,7 +133,7 @@ void HdcForwardBase::FreeJDWP(HCtxForward ctx)
         close(ctx->fd);
     }
     if (ctx->fdClass) {
-        ctx->fdClass->StopWork();
+        ctx->fdClass->StopWork(false, nullptr);
 
         auto funcReqClose = [](uv_idle_t *handle) -> void {
             uv_close_cb funcIdleHandleClose = [](uv_handle_t *handle) -> void {

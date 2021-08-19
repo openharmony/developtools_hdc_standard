@@ -22,13 +22,13 @@ namespace Hdc {
 // USB EP block max size about 10k, error if too big
 constexpr uint16_t MAX_SIZE_IOBUF = 5120;
 constexpr uint16_t VER_PROTOCOL = 0x01;
-constexpr uint8_t SIZE_THREAD_POOL = 8;
+constexpr uint8_t SIZE_THREAD_POOL = 16;
 constexpr uint8_t GLOBAL_TIMEOUT = 60;
 constexpr uint16_t DEFAULT_PORT = 8710;
 constexpr uint16_t EXTRA_ALLOC_SIZE = 2048;
 constexpr uint8_t MINOR_TIMEOUT = 5;
 constexpr bool ENABLE_IO_CHECKSUM = false;
-
+const string WHITE_SPACES = " \t\n\r";
 const string UT_TMP_PATH = "/tmp/hdc-ut";
 const string SERVER_NAME = "HDCServer";
 const string STRING_EMPTY = "";
@@ -51,13 +51,11 @@ constexpr uint16_t MAX_CONNECTKEY_SIZE = 32;  // usb sn/tcp ipport
 constexpr uint8_t MAX_IO_OVERLAP = 32;        // test on windows 32 is OK
 constexpr auto TIME_BASE = 1000;              // time unit conversion base value
 constexpr uint16_t AID_SHELL = 2000;
-// double-word(hex)=[0]major[1][2]monor[3][4]version[5]fix(a-p)[6][7]reserve
-constexpr uint32_t HDC_VERSION_NUMBER = 0x10100f00;
+// double-word(hex)=[0]major[1][2]minor[3][4]version[5]fix(a-p)[6][7]reserve
+constexpr uint32_t HDC_VERSION_NUMBER = 0x10101200;  // 1.1.1b=0x10101100
 
 // general one argument command argc
 constexpr int CMD_ARG1_COUNT = 2;
-// The first child versions must match, otherwise server and daemon must be upgraded
-const string VERSION_NUMBER = "1.1.0q";       // same with openssl version, 1.1.2==VERNUMBER 0x10102000
 const string HANDSHAKE_MESSAGE = "OHOS HDC";  // sep not char '-', not more than 11 bytes
 const string PACKET_FLAG = "HW";              // must 2bytes
 const string EMPTY_ECHO = "[Empty]";

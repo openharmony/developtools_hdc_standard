@@ -27,7 +27,7 @@ public:
 private:
     void WhenTransferFinish(CtxFile *context);
     void PackageShell(bool installOrUninstall, const char *options, const char *package);
-    void AsyncInstallFinish(bool finish, int64_t exitStatus, const string result);
+    bool AsyncInstallFinish(bool finish, int64_t exitStatus, const string result);
     void Sideload(const char *pathOTA);
 
     AsyncCmd asyncCommand;

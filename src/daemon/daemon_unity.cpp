@@ -14,6 +14,11 @@
  */
 #include "daemon_unity.h"
 #include <sys/mount.h>
+#ifdef __MUSL__
+extern "C" {
+#include "init_reboot.h"
+}
+#endif
 
 namespace Hdc {
 HdcDaemonUnity::HdcDaemonUnity(HTaskInfo hTaskInfo)
@@ -40,27 +45,30 @@ bool HdcDaemonUnity::ReadyForRelease()
     return true;
 }
 
-void HdcDaemonUnity::AsyncCmdOut(bool finish, int64_t exitStatus, const string result)
+bool HdcDaemonUnity::AsyncCmdOut(bool finish, int64_t exitStatus, const string result)
 {
 #ifdef UNIT_TEST
     Base::WriteBinFile((UT_TMP_PATH + "/execute.result").c_str(), (uint8_t *)result.c_str(), result.size(),
                        countUt++ == 0);
 #endif
+    bool ret = false;
     bool wantFinish = false;
     do {
         if (finish) {
             wantFinish = true;
+            ret = true;
             --refCount;
             break;
         }
         if (!SendToAnother(currentDataCommand, (uint8_t *)result.c_str(), result.size())) {
-            asyncCommand.DoRelease();  // will callback self, set wantFinish =true
             break;
         }
+        ret = true;
     } while (false);
     if (wantFinish) {
         TaskFinish();
     }
+    return ret;
 }
 
 int HdcDaemonUnity::ExecuteShell(const char *shellCommand)
@@ -169,6 +177,7 @@ bool HdcDaemonUnity::RemountDevice()
 bool HdcDaemonUnity::RebootDevice(const string &cmd)
 {
     sync();
+#ifndef __MUSL__
     string propertyVal;
     if (!cmd.size()) {
         propertyVal = "reboot";
@@ -176,6 +185,15 @@ bool HdcDaemonUnity::RebootDevice(const string &cmd)
         propertyVal = Base::StringFormat("reboot,%s", cmd.c_str());
     }
     return Base::SetHdcProperty(rebootProperty.c_str(), propertyVal.c_str());
+#else
+    string reason;
+    if (cmd == "recovery") {
+        reason = "updater";
+    } else if (cmd == "bootloader") {
+        reason = "NoArgument";
+    }
+    return DoReboot(reason.c_str());
+#endif
 }
 
 bool HdcDaemonUnity::SetDeviceRunMode(void *daemonIn, const char *cmd)

@@ -39,10 +39,23 @@ bool HdcFileDescriptor::ReadyForRelease()
     return refIO == 0;
 }
 
-// force stop
-void HdcFileDescriptor::StopWork()
+// just tryCloseFdIo = true, callback will be effect
+void HdcFileDescriptor::StopWork(bool tryCloseFdIo, std::function<void()> closeFdCallback)
 {
     workContinue = false;
+    callbackCloseFd = closeFdCallback;
+    if (tryCloseFdIo && refIO > 0) {
+        ++refIO;
+        reqClose.data = this;
+        uv_fs_close(loop, &reqClose, fdIO, [](uv_fs_t *req) {
+            auto thisClass = (HdcFileDescriptor *)req->data;
+            uv_fs_req_cleanup(req);
+            if (thisClass->callbackCloseFd != nullptr) {
+                thisClass->callbackCloseFd();
+            }
+            --thisClass->refIO;
+        });
+    }
 };
 
 void HdcFileDescriptor::OnFileIO(uv_fs_t *req)
@@ -53,7 +66,7 @@ void HdcFileDescriptor::OnFileIO(uv_fs_t *req)
     bool bFinish = false;
     bool fetalFinish = false;
 
-    while (thisClass->workContinue) {
+    do {
         if (req->result > 0) {
             if (req->fs_type == UV_FS_READ) {
                 if (!thisClass->callbackRead(thisClass->callerContext, buf, req->result)) {
@@ -65,12 +78,12 @@ void HdcFileDescriptor::OnFileIO(uv_fs_t *req)
                 // fs_write
             }
         } else {
+            WRITE_LOG(LOG_DEBUG, "OnFileIO fd:%d failed:%s", thisClass->fdIO, uv_strerror(req->result));
             bFinish = true;
             fetalFinish = true;
             break;
         }
-        break;
-    }
+    } while (false);
     uv_fs_req_cleanup(req);
     delete[] buf;
     delete ctxIO;
@@ -95,7 +108,6 @@ int HdcFileDescriptor::LoopRead()
         if (buf) {
             delete[] buf;
         }
-
         WRITE_LOG(LOG_FATAL, "Memory alloc failed");
         callbackFinish(callerContext, true, "Memory alloc failed");
         return -1;
@@ -105,7 +117,6 @@ int HdcFileDescriptor::LoopRead()
     contextIO->thisClass = this;
     req->data = contextIO;
     ++refIO;
-
     iov = uv_buf_init((char *)buf, readMax);
     uv_fs_read(loop, req, fdIO, &iov, 1, -1, OnFileIO);
     return 0;
@@ -113,7 +124,9 @@ int HdcFileDescriptor::LoopRead()
 
 bool HdcFileDescriptor::StartWork()
 {
-    LoopRead();
+    if (LoopRead() < 0) {
+        return false;
+    }
     return true;
 }
 

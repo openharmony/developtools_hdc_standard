@@ -252,13 +252,13 @@ void HdcChannelBase::Send(const uint32_t channelId, uint8_t *bufPtr, const int s
         delete[] data;
         return;
     }
-    ++hChannel->sendRef;
     if (hChannel->hWorkThread == uv_thread_self()) {
         sendStream = (uv_stream_t *)&hChannel->hWorkTCP;
     } else {
         sendStream = (uv_stream_t *)&hChannel->hChildWorkTCP;
     }
     if (uv_is_writable(sendStream)) {
+        ++hChannel->sendRef;
         Base::SendToStreamEx(sendStream, data, sizeNewBuf, nullptr, (void *)WriteCallback, data);
     }
 }

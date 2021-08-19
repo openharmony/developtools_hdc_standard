@@ -61,7 +61,8 @@ ohos_executable("hdcd") {
   ]
   if (use_musl) {
     deps += [
-      "//base/startup/syspara_lite/interfaces/innerkits/native/syspara:syspara",
+      "//base/startup/init_lite/interfaces/innerkits/reboot:libreboot",
+      "//base/startup/syspara_lite/interfaces/innerkits/native/syspara:syspara",      
     ]
   }
   include_dirs = [
@@ -73,7 +74,8 @@ ohos_executable("hdcd") {
   ]
   if (use_musl) {
     include_dirs += [
-      "//base/startup/syspara_lite/interfaces/innerkits/native/syspara/include",
+      "//base/startup/init_lite/interfaces/innerkits/include",
+      "//base/startup/syspara_lite/interfaces/innerkits/native/syspara/include",      
     ]
   }
   install_enable = true
