@@ -692,7 +692,7 @@ namespace Base {
             return ERR_BUF_OVERFLOW;
         }
         // no need to CanonicalizeSpecPath, else not work
-        int fd = open(bufPath, O_RDWR, S_IRWXU | S_IRWXG | S_IRWXO);
+        int fd = open(bufPath, O_RDWR | O_CREAT, (S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH));
         if (fd < 0) {
             WRITE_LOG(LOG_FATAL, "Open mutex file \"%s\" failed!!!Errno:%d\n", buf, errno);
             return ERR_FILE_OPEN;
