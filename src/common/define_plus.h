@@ -81,6 +81,8 @@ enum RetErrCode {
     ERR_UT_MODULE_NOTREADY = -19000,
     ERR_UT_MODULE_WAITMAX,
     ERR_THREAD_MUTEX_FAIL = -20000,
+    ERR_PROCESS_SUB_FAIL = -21000,
+    ERR_PRIVELEGE_NEED = -22000,
 };
 
 // Flags shared by multiple modules

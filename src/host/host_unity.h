@@ -31,7 +31,6 @@ private:
         uv_file fileLog;
         uint64_t fileIOIndex;
         uint64_t fileBufIndex;
-        int ref;
         bool hasFilelogClosed;
         uv_fs_t fsClose;
         HdcHostUnity *thisClass;

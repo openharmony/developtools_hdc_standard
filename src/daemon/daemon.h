@@ -38,7 +38,6 @@ private:
     bool HandDaemonAuth(HSession hSession, const uint32_t channelId, SessionHandShake &handshake);
     void ClearInstanceResource();
     bool DaemonSessionHandshake(HSession hSession, const uint32_t channelId, uint8_t *payload, int payloadSize);
-    bool CheckVersionMatch(string version);
     void TryStopInstance();
 
     bool enableSecure;

@@ -24,14 +24,14 @@ public:
     // callerContext, readBuf, readIOByes
     using CallBackWhenRead = std::function<bool(const void *, uint8_t *, const int)>;
     HdcFileDescriptor(uv_loop_t *loopIn, int fdToRead, void *callerContextIn, CallBackWhenRead callbackReadIn,
-        CmdResultCallback callbackFinishIn);
+                      CmdResultCallback callbackFinishIn);
     virtual ~HdcFileDescriptor();
     int Write(uint8_t *data, int size);
     int WriteWithMem(uint8_t *data, int size);
 
     bool ReadyForRelease();
     bool StartWork();
-    void StopWork();
+    void StopWork(bool tryCloseFdIo, std::function<void()> closeFdCallback);
 
 protected:
 private:
@@ -40,16 +40,18 @@ private:
         uint8_t *bufIO;
         HdcFileDescriptor *thisClass;
     };
+    static void OnFileIO(uv_fs_t *req);
+    int LoopRead();
+
+    std::function<void()> callbackCloseFd;
+    CmdResultCallback callbackFinish;
+    CallBackWhenRead callbackRead;
     uv_loop_t *loop;
+    uv_fs_t reqClose;
     void *callerContext;
     bool workContinue;
     int fdIO;
     int refIO;
-
-    static void OnFileIO(uv_fs_t *req);
-    int LoopRead();
-    CmdResultCallback callbackFinish;
-    CallBackWhenRead callbackRead;
 };
 }  // namespace Hdc
 

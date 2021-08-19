@@ -44,7 +44,8 @@ void HdcDaemonUSB::Stop()
     WRITE_LOG(LOG_DEBUG, "HdcDaemonUSB Stop free main session finish");
 }
 
-string HdcDaemonUSB::GetDevPath(const std::string& path) {
+string HdcDaemonUSB::GetDevPath(const std::string &path)
+{
     DIR *dir = ::opendir(path.c_str());
     if (dir == nullptr) {
         WRITE_LOG(LOG_WARN, "%s: cannot open devpath: errno: %d", path.c_str(), errno);
@@ -256,7 +257,8 @@ int HdcDaemonUSB::SendUSBIOSync(HSession hSession, HUSB hMainUSB, uint8_t *data,
     }
 Finish:
     USBHead *pUSBHead = (USBHead *)data;
-    if (pUSBHead->option & USB_OPTION_TAIL) {
+    if ((pUSBHead->option & USB_OPTION_TAIL) || ret < 0) {
+        // tail or failed, dec Ref
         hSession->sendRef--;
     }
     if (ret < 0) {
@@ -334,6 +336,9 @@ int HdcDaemonUSB::DispatchToWorkThread(const uint32_t sessionId, uint8_t *readBu
         if (!hChildSession) {
             return ERR_SESSION_NOFOUND;
         }
+    }
+    if (hChildSession->childCleared) {
+        return ERR_SESSION_DEAD;
     }
     if (!SendToHdcStream(hChildSession, reinterpret_cast<uv_stream_t *>(&hChildSession->dataPipe[STREAM_MAIN]), readBuf,
                          readBytes)) {

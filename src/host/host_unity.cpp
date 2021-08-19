@@ -45,7 +45,7 @@ void HdcHostUnity::StopTask()
         return;
     }
     if (opContext.enableLog) {
-        runningProtect = true;
+        ++refCount;
         opContext.fsClose.data = &opContext;
         uv_fs_close(loopTask, &opContext.fsClose, opContext.fileLog, OnFileClose);
     }
@@ -57,7 +57,7 @@ void HdcHostUnity::OnFileClose(uv_fs_t *req)
     ContextUnity *context = (ContextUnity *)req->data;
     HdcHostUnity *thisClass = (HdcHostUnity *)context->thisClass;
     context->hasFilelogClosed = true;
-    thisClass->runningProtect = false;
+    --thisClass->refCount;
     return;
 }
 
@@ -80,10 +80,7 @@ void HdcHostUnity::OnFileIO(uv_fs_t *req)
     HdcHostUnity *thisClass = (HdcHostUnity *)context->thisClass;
     uint8_t *bufIO = contextIO->bufIO;
     uv_fs_req_cleanup(req);
-    --context->ref;
-    if (!context->ref) {
-        thisClass->runningProtect = false;
-    }
+    --thisClass->refCount;
     while (true) {
         if (req->result <= 0) {
             if (req->result < 0) {
@@ -115,8 +112,7 @@ bool HdcHostUnity::AppendLocalLog(const char *bufLog, const int sizeLog)
     contextIO->bufIO = buf;
     contextIO->context = &opContext;
     req->data = contextIO;
-    ++opContext.ref;
-    runningProtect = true;
+    ++refCount;
 
     if (memcpy_s(buf, sizeLog, bufLog, sizeLog)) {
     }
