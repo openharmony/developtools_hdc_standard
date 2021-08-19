@@ -90,10 +90,6 @@ bool HdcServer::CheckToPullUptrServer(const char *listenString)
     if (nPathSize <= 2) {
         return false;
     }
-    if (!Base::IsRoot()) {
-        Base::PrintMessage("Pull server need root/admin privilege");
-        return false;
-    }
 #ifdef _WIN32
     char buf[BUF_SIZE_SMALL] = "";
     char shortPath[MAX_PATH] = "";
