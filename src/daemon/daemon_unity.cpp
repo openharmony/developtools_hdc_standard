@@ -159,10 +159,14 @@ bool HdcDaemonUnity::RemountDevice()
     }
     // Test first write root directory
     const char cmd[] = "mount -o remount,rw /";
-    if (-1 == system(cmd)) {
+    signal(SIGCHLD, SIG_DFL);
+    if (system(cmd) == -1) {
         LogMsg(MSG_FAIL, "Mount failed");
+        WRITE_LOG(LOG_WARN, "Mount failed errno:%d - %s", errno, strerror(errno));
+        signal(SIGCHLD, SIG_IGN);
         return false;
     }
+    signal(SIGCHLD, SIG_IGN);
     struct stat info;
     if (!lstat("/vendor", &info) && (info.st_mode & S_IFMT) == S_IFDIR) {
         // has vendor
