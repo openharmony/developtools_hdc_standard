@@ -18,7 +18,9 @@
 namespace Hdc {
 HdcSessionBase::HdcSessionBase(bool serverOrDaemonIn)
 {
-    // server/daemon common initialize
+    // server/daemon common initialization code
+    string threadNum = std::to_string(SIZE_THREAD_POOL);
+    uv_os_setenv("UV_THREADPOOL_SIZE", threadNum.c_str());
     uv_loop_init(&loopMain);
     WRITE_LOG(LOG_DEBUG, "loopMain init");
     uv_rwlock_init(&mainAsync);
@@ -28,16 +30,6 @@ HdcSessionBase::HdcSessionBase(bool serverOrDaemonIn)
     ctxUSB = nullptr;
     wantRestart = false;
 
-    // server/daemon common set
-    string threadNum = std::to_string(SIZE_THREAD_POOL);
-    uv_os_setenv("UV_THREADPOOL_SIZE", threadNum.c_str());
-#ifndef _WIN32
-    // global signal detect
-    umask(0);
-    signal(SIGPIPE, SIG_IGN);  // SIG_DFL
-                               // prevent zoombie process, let 'init' process do process's clear
-    signal(SIGCHLD, SIG_IGN);
-#endif
 #ifdef HDC_HOST
     if (serverOrDaemon) {
         libusb_init((libusb_context **)&ctxUSB);

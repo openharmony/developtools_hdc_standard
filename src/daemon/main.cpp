@@ -36,7 +36,7 @@ bool ForkChildCheck(int argc, const char *argv[])
     // hdcd -fork  #fork
     char modeSet[BUF_SIZE_TINY] = "";
     Base::GetHdcProperty("persist.hdc.mode", modeSet, BUF_SIZE_TINY);
-    Base::PrintMessage("Background mode, persist.hdc.mode:[%s]", modeSet);
+    Base::PrintMessage("Background mode, persist.hdc.mode");
     string workMode = modeSet;
     workMode = Base::Trim(workMode);
     if (workMode == CMDSTR_TMODE_TCP) {
@@ -176,6 +176,9 @@ int main(int argc, const char *argv[])
         return BackgroundRun();
     }
     NeedDropPriv();
+    umask(0);
+    signal(SIGPIPE, SIG_IGN);
+    signal(SIGCHLD, SIG_IGN);
     WRITE_LOG(LOG_DEBUG, "HdcDaemon main run");
     HdcDaemon daemon(false);
     daemon.InitMod(g_enableTcp, g_enableUsb);
