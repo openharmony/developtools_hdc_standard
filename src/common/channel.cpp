@@ -107,9 +107,11 @@ void HdcChannelBase::ReadStream(uv_stream_t *tcp, ssize_t nread, const uv_buf_t 
 
     if (nread == UV_ENOBUFS) {
         WRITE_LOG(LOG_DEBUG, "HdcChannelBase::ReadStream Pipe IOBuf max");
+        return;
     } else if (nread == 0) {
         // maybe just afer accept, second client req
         WRITE_LOG(LOG_DEBUG, "HdcChannelBase::ReadStream idle read");
+        return;
     } else if (nread < 0) {
         Base::TryCloseHandle((uv_handle_t *)tcp);
         WRITE_LOG(LOG_DEBUG, "HdcChannelBase::ReadStream failed2:%s", uv_err_name(nread));

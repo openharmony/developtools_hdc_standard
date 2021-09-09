@@ -20,6 +20,7 @@
 #include <functional>
 #include <list>
 #include <map>
+#include <mutex>
 #include <queue>
 #include <string>
 #include <vector>
@@ -35,6 +36,7 @@
 
 using std::list;
 using std::map;
+using std::mutex;
 using std::string;
 using std::vector;
 

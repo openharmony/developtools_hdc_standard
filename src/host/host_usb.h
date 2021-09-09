@@ -35,30 +35,33 @@ private:
     };
     static int LIBUSB_CALL HotplugHostUSBCallback(libusb_context *ctx, libusb_device *device,
                                                   libusb_hotplug_event event, void *userData);
-    static void LIBUSB_CALL ReadUSBBulkCallback(struct libusb_transfer *transfer);
     static void PenddingUSBIO(uv_idle_t *handle);
-    static void LIBUSB_CALL WriteUSBBulkCallback(struct libusb_transfer *transfer);
     static void WatchDevPlugin(uv_timer_t *handle);
     static void KickoutZombie(HSession hSession);
+    static void LIBUSB_CALL BulkTransferCallback(struct libusb_transfer *transfer);
     int StartupUSBWork();
     int CheckActiveConfig(libusb_device *device, HUSB hUSB);
-    void RegisterReadCallback(HSession hSession);
     int OpenDeviceMyNeed(HUSB hUSB);
     int CheckDescriptor(HUSB hUSB);
     bool IsDebuggableDev(const struct libusb_interface_descriptor *ifDescriptor);
     bool ReadyForWorkThread(HSession hSession);
     bool FindDeviceByID(HUSB hUSB, const char *usbMountPoint, libusb_context *ctxUSB);
-    void UpdateUSBDaemonInfo(HUSB hUSB, HSession hSession, uint8_t connStatus);
     bool DetectMyNeed(libusb_device *device, string &sn);
+    int FillBulkAndSubmit(HSession hSession, bool readWrite, uint8_t *sendBuf = nullptr, int sendSize = 0);
+    bool WaitMaxOverlap(HSession hSession);
+    inline bool EndpointReadOrWrite(uint8_t ep)
+    {
+        return (ep & LIBUSB_ENDPOINT_DIR_MASK) == LIBUSB_ENDPOINT_IN;
+    }
     void SendUsbReset(HUSB hUSB, uint32_t sessionId);
     void RestoreHdcProtocol(HUSB hUsb, const uint8_t *buf, int bufSize);
-    bool WaitMaxOverlap(HSession hSession);
+    void UpdateUSBDaemonInfo(HUSB hUSB, HSession hSession, uint8_t connStatus);
+    void RegisterReadCallback(HSession hSession);
 
     uv_idle_t usbWork;
     libusb_context *ctxUSB;
     uv_timer_t devListWatcher;
     map<string, UsbCheckStatus> mapIgnoreDevice;
-    uv_sem_t semUsbSend;
 
 private:
 };
