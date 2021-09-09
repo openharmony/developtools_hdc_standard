@@ -318,7 +318,6 @@ int HdcSessionBase::MallocSessionByConnectType(HSession hSession)
             hUSB->sizeEpBuf = max;
             hUSB->bulkInRead.buf = new uint8_t[max]();
             hUSB->bulkOutWrite.buf = new uint8_t[max]();
-            uv_sem_init(&hUSB->semUsbSend, 1);
 #else
 #endif
             break;
@@ -409,7 +408,6 @@ void HdcSessionBase::FreeSessionByConnectType(HSession hSession)
         }
         delete[] hUSB->bulkInRead.buf;
         delete[] hUSB->bulkOutWrite.buf;
-        uv_sem_destroy(&hUSB->semUsbSend);
 #else
         if (hUSB->bulkIn > 0) {
             close(hUSB->bulkIn);

@@ -48,7 +48,6 @@ private:
     bool FindDeviceByID(HUSB hUSB, const char *usbMountPoint, libusb_context *ctxUSB);
     bool DetectMyNeed(libusb_device *device, string &sn);
     int FillBulkAndSubmit(HSession hSession, bool readWrite, uint8_t *sendBuf = nullptr, int sendSize = 0);
-    bool WaitMaxOverlap(HSession hSession);
     inline bool EndpointReadOrWrite(uint8_t ep)
     {
         return (ep & LIBUSB_ENDPOINT_DIR_MASK) == LIBUSB_ENDPOINT_IN;

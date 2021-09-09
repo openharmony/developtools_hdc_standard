@@ -1037,7 +1037,6 @@ namespace Base {
         }
         timer->data = data;
         uv_timer_init(loop, timer);
-        // default 250ms
         uv_timer_start(timer, cb, 0, repeatTimeout);
         // delete by callback
         return true;
