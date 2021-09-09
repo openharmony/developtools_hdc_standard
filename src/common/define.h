@@ -48,11 +48,10 @@ constexpr uint16_t MAX_IP_PORT = 65535;
 constexpr uint8_t STREAM_MAIN = 0;            // work at main thread
 constexpr uint8_t STREAM_WORK = 1;            // work at work thread
 constexpr uint16_t MAX_CONNECTKEY_SIZE = 32;  // usb sn/tcp ipport
-constexpr uint8_t MAX_IO_OVERLAP = 32;        // test on windows 32 is OK
 constexpr auto TIME_BASE = 1000;              // time unit conversion base value
 constexpr uint16_t AID_SHELL = 2000;
 // double-word(hex)=[0]major[1][2]minor[3][4]version[5]fix(a-p)[6][7]reserve
-constexpr uint32_t HDC_VERSION_NUMBER = 0x10101200;  // 1.1.1b=0x10101100
+constexpr uint32_t HDC_VERSION_NUMBER = 0x10101300;  // 1.1.1b=0x10101100
 
 // general one argument command argc
 constexpr int CMD_ARG1_COUNT = 2;

@@ -18,7 +18,9 @@
 namespace Hdc {
 HdcSessionBase::HdcSessionBase(bool serverOrDaemonIn)
 {
-    // server/daemon common initialize
+    // server/daemon common initialization code
+    string threadNum = std::to_string(SIZE_THREAD_POOL);
+    uv_os_setenv("UV_THREADPOOL_SIZE", threadNum.c_str());
     uv_loop_init(&loopMain);
     WRITE_LOG(LOG_DEBUG, "loopMain init");
     uv_rwlock_init(&mainAsync);
@@ -28,16 +30,6 @@ HdcSessionBase::HdcSessionBase(bool serverOrDaemonIn)
     ctxUSB = nullptr;
     wantRestart = false;
 
-    // server/daemon common set
-    string threadNum = std::to_string(SIZE_THREAD_POOL);
-    uv_os_setenv("UV_THREADPOOL_SIZE", threadNum.c_str());
-#ifndef _WIN32
-    // global signal detect
-    umask(0);
-    signal(SIGPIPE, SIG_IGN);  // SIG_DFL
-                               // prevent zoombie process, let 'init' process do process's clear
-    signal(SIGCHLD, SIG_IGN);
-#endif
 #ifdef HDC_HOST
     if (serverOrDaemon) {
         libusb_init((libusb_context **)&ctxUSB);
@@ -323,10 +315,10 @@ int HdcSessionBase::MallocSessionByConnectType(HSession hSession)
 #ifdef HDC_HOST
             constexpr auto maxBufFactor = 1.5;
             int max = Base::GetMaxBufSize() * maxBufFactor + sizeof(USBHead);
-            hUSB->bufSizeDevice = max;
-            hUSB->bufSizeHost = max;
-            hUSB->bufDevice = new uint8_t[hUSB->bufSizeDevice]();
-            hUSB->bufHost = new uint8_t[hUSB->bufSizeHost]();
+            hUSB->sizeEpBuf = max;
+            hUSB->bulkInRead.buf = new uint8_t[max]();
+            hUSB->bulkOutWrite.buf = new uint8_t[max]();
+            uv_sem_init(&hUSB->semUsbSend, 1);
 #else
 #endif
             break;
@@ -415,12 +407,9 @@ void HdcSessionBase::FreeSessionByConnectType(HSession hSession)
             libusb_close(hUSB->devHandle);
             hUSB->devHandle = nullptr;
         }
-        if (hUSB->bufDevice) {
-            delete[] hUSB->bufDevice;
-        }
-        if (hUSB->bufHost) {
-            delete[] hUSB->bufHost;
-        }
+        delete[] hUSB->bulkInRead.buf;
+        delete[] hUSB->bulkOutWrite.buf;
+        uv_sem_destroy(&hUSB->semUsbSend);
 #else
         if (hUSB->bulkIn > 0) {
             close(hUSB->bulkIn);
@@ -490,7 +479,7 @@ void HdcSessionBase::FreeSessionOpeate(uv_timer_t *handle)
         return;
     }
 #ifdef HDC_HOST
-    if (hSession->hUSB != nullptr && hSession->hUSB->transferRecv != nullptr) {
+    if (hSession->hUSB != nullptr && hSession->hUSB->bulkInRead.working) {
         return;
     }
 #endif
@@ -921,7 +910,7 @@ bool HdcSessionBase::DispatchMainThreadCommand(HSession hSession, const CtrlStru
             if (!serverOrDaemon) {
                 break;  // Only Server has this feature
             }
-            DeatchChannel(channelId);
+            DeatchChannel(hSession, channelId);
             break;
         }
         default:
