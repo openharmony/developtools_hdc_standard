@@ -209,6 +209,8 @@ struct ContextHostBulk {
     mutex lockDeviceTransfer;
     uint8_t *buf;
     bool working;
+    bool ioComplete;
+    condition_variable cv;
 };
 #endif
 
@@ -231,7 +233,6 @@ struct HdcUSB {
     string usbMountPoint;
 
     mutex lockDeviceHandle;
-    uv_sem_t semUsbSend;
     ContextHostBulk bulkOutWrite;
     ContextHostBulk bulkInRead;
 #endif

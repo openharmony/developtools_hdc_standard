@@ -17,6 +17,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <condition_variable>
 #include <functional>
 #include <list>
 #include <map>
@@ -34,6 +35,7 @@
 #include <time.h>
 #include <unistd.h>
 
+using std::condition_variable;
 using std::list;
 using std::map;
 using std::mutex;

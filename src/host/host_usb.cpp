@@ -97,11 +97,16 @@ bool HdcHostUSB::DetectMyNeed(libusb_device *device, string &sn)
     bool ret = false;
     HUSB hUSB = new HdcUSB();
     hUSB->device = device;
+    // just get usb SN, close handle immediately
     int childRet = OpenDeviceMyNeed(hUSB);
     if (childRet < 0) {
         delete hUSB;
         return false;
     }
+    libusb_release_interface(hUSB->devHandle, hUSB->interfaceNumber);
+    libusb_close(hUSB->devHandle);
+    hUSB->devHandle = nullptr;
+
     WRITE_LOG(LOG_INFO, "Needed device found, busid:%d devid:%d connectkey:%s", hUSB->busId, hUSB->devId,
               hUSB->serialNumber.c_str());
     // USB device is automatically connected after recognition, auto connect USB
@@ -112,12 +117,10 @@ bool HdcHostUSB::DetectMyNeed(libusb_device *device, string &sn)
     uv_timer_t *waitTimeDoCmd = new uv_timer_t;
     uv_timer_init(&hdcServer->loopMain, waitTimeDoCmd);
     waitTimeDoCmd->data = hSession;
-    uv_timer_start(waitTimeDoCmd, hdcServer->UsbPreConnect, 0, 3000);
+    constexpr uint16_t PRECONNECT_INTERVAL = 3000;
+    uv_timer_start(waitTimeDoCmd, hdcServer->UsbPreConnect, UV_DEFAULT_INTERVAL, PRECONNECT_INTERVAL);
     mapIgnoreDevice[sn] = HOST_USB_REGISTER;
     ret = true;
-    libusb_release_interface(hUSB->devHandle, hUSB->interfaceNumber);
-    libusb_close(hUSB->devHandle);
-    hUSB->devHandle = nullptr;
     delete hUSB;
     return ret;
 }
@@ -361,7 +364,8 @@ void LIBUSB_CALL HdcHostUSB::BulkTransferCallback(struct libusb_transfer *transf
         if (usbHead->option & USB_OPTION_TAIL) {
             --hSession->sendRef;
         }
-        uv_sem_post(&hUsb->semUsbSend);
+        ctxHostBulk->ioComplete = true;
+        ctxHostBulk->cv.notify_one();
     }
     if (!ret) {
         libusb_cancel_transfer(hUsb->bulkInRead.transfer);
@@ -395,10 +399,14 @@ int HdcHostUSB::FillBulkAndSubmit(HSession hSession, bool readWrite, uint8_t *se
     }
     std::unique_lock<std::mutex> lockDeviceHandle(hUsb->lockDeviceHandle);
     std::unique_lock<std::mutex> lock(ctxHostBulk->lockDeviceTransfer);
+    ctxHostBulk->ioComplete = false;
     libusb_fill_bulk_transfer(ctxHostBulk->transfer, hUsb->devHandle, endpoint, ctxHostBulk->buf, length,
                               BulkTransferCallback, hSession, 0);
     if ((childRet = libusb_submit_transfer(ctxHostBulk->transfer)) < 0) {
         return ERR_IO_FAIL;
+    }
+    if (!readWrite) {  // write block
+        ctxHostBulk->cv.wait(lock, [ctxHostBulk]() { return ctxHostBulk->ioComplete; });
     }
     return ERR_SUCCESS;
 }
@@ -438,43 +446,13 @@ int HdcHostUSB::OpenDeviceMyNeed(HUSB hUSB)
     return ret;
 }
 
-bool HdcHostUSB::WaitMaxOverlap(HSession hSession)
-{
-    int result = 0;
-    bool ret = false;
-    while (true) {
-        result = uv_sem_trywait(&hSession->hUSB->semUsbSend);
-        if (result == 0) {
-            ret = true;
-            break;
-        } else if (result == UV_EAGAIN && !hSession->isDead) {
-            uv_sleep(1);
-            continue;
-        } else {
-            break;
-        }
-    }
-    return ret;
-}
 // libusb can send directly across threads?!!!
 // Just call from child work thread, it will be block when overlap full
 int HdcHostUSB::SendUSBRaw(HSession hSession, uint8_t *data, const int length)
 {
-    int ret = 0;
-    bool semOK = false;
-    do {
-        if (!WaitMaxOverlap(hSession)) {
-            ret = ERR_THREAD_MUTEX_FAIL;
-            break;
-        }
-        semOK = true;
-        ret = FillBulkAndSubmit(hSession, false, data, length);
-    } while (false);
+    int ret = FillBulkAndSubmit(hSession, false, data, length);
     if (ret != ERR_SUCCESS) {
         --hSession->sendRef;
-        if (semOK) {
-            uv_sem_post(&hSession->hUSB->semUsbSend);
-        }
         if (hSession->hUSB->bulkInRead.working) {
             libusb_cancel_transfer(hSession->hUSB->bulkInRead.transfer);
         }
