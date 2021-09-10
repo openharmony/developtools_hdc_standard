@@ -106,7 +106,7 @@ int TestTaskCommand(int method, const string &debugServerPort, const string &deb
             TestRunClient(debugServerPort, debugConnectKey, bufString);
             break;
         case UT_TEST_TMP:
-            TestRunClient(debugServerPort, debugConnectKey, "shell");
+            TestRunClient(debugServerPort, debugConnectKey, "file send /mnt/hgfs/vtmp/f.txt /tmp/f2.txt");
 #ifdef DEF_NULL
             while (true) {
                 uv_sleep(50);
