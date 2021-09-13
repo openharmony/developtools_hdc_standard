@@ -21,6 +21,7 @@
 #include <openssl/evp.h>
 #include <openssl/md5.h>
 #include <random>
+#include <thread>
 #ifdef __MUSL__
 extern "C" {
 #include "parameter.h"
@@ -41,20 +42,14 @@ namespace Base {
 #ifdef ENABLE_DEBUGLOG
     void GetLogDebugFunctioname(string &debugInfo, int line, string &threadIdString)
     {
-        uint32_t currentThreadId = 0;
         string tmpString = GetFileNameAny(debugInfo);
-#ifdef _WIN32
-        currentThreadId = GetCurrentThreadId();
-#else
-        currentThreadId = uv_thread_self();  // 64bit OS, just dispaly 32bit ptr
-#endif
         debugInfo = StringFormat("%s:%d", tmpString.c_str(), line);
         if (g_logLevel < LOG_FULL) {
             debugInfo = "";
             threadIdString = "";
         } else {
             debugInfo = "[" + debugInfo + "]";
-            threadIdString = StringFormat("[%x]", currentThreadId);
+            threadIdString = StringFormat("[%x]", std::hash<std::thread::id>{}(std::this_thread::get_id()));
         }
     }
 
@@ -411,7 +406,7 @@ namespace Base {
             return ERR_BUF_COPY;
         }
         *outPort = wPort;
-        return ERR_SUCCESS;
+        return RET_SUCCESS;
     }
 
     // After creating the session worker thread, execute it on the main thread
@@ -660,7 +655,7 @@ namespace Base {
         if (bytesDone != bufLen) {
             return ERR_BUF_SIZE;
         }
-        return ERR_SUCCESS;
+        return RET_SUCCESS;
     }
 
     void CloseIdleCallback(uv_handle_t *handle)
@@ -731,7 +726,7 @@ namespace Base {
             close(fd);
         }
         // Do not close the file descriptor, the process will be mutext effect under no-Win32 OS
-        return ERR_SUCCESS;
+        return RET_SUCCESS;
     }
 
     void SplitString(const string &origString, const string &seq, vector<string> &resultStrings)
@@ -800,7 +795,22 @@ namespace Base {
     int CreateSocketPair(int *fds)
     {
 #ifndef _WIN32
+#ifdef HOST_MAC
+        int ret = socketpair(AF_UNIX, SOCK_STREAM, 0, fds);
+        if (ret == 0) {
+          for (auto i = 0; i < 2; ++i) {
+            if (fcntl(fds[i], F_SETFD, FD_CLOEXEC) == -1) {
+              close(fds[0]);
+              close(fds[1]);
+              WRITE_LOG(LOG_WARN, "fcntl failed to set FD_CLOEXEC: %s", strerror(errno));
+              return -1;
+            }
+          }
+        }
+        return ret;
+#else
         return socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, fds);
+#endif
 #else
         struct sockaddr_in addr;
         socklen_t addrlen = sizeof(addr);

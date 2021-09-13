@@ -355,6 +355,7 @@ void LIBUSB_CALL HdcHostUSB::BulkTransferCallback(struct libusb_transfer *transf
             if (libusb_submit_transfer(transfer) != 0) {
                 break;
             }
+            return;  // continue read
         }
         ret = true;
     } while (false);
@@ -364,11 +365,12 @@ void LIBUSB_CALL HdcHostUSB::BulkTransferCallback(struct libusb_transfer *transf
         if (usbHead->option & USB_OPTION_TAIL) {
             --hSession->sendRef;
         }
-        ctxHostBulk->ioComplete = true;
-        ctxHostBulk->cv.notify_one();
     }
+    ctxHostBulk->ioComplete = true;
+    ctxHostBulk->cv.notify_one();
     if (!ret) {
         libusb_cancel_transfer(hUsb->bulkInRead.transfer);
+        // cannnot cancel send transfer direct, otherwise lock will not release
         ctxHostBulk->working = false;
         server->FreeSession(hSession->sessionId);
     }
@@ -400,6 +402,7 @@ int HdcHostUSB::FillBulkAndSubmit(HSession hSession, bool readWrite, uint8_t *se
     std::unique_lock<std::mutex> lockDeviceHandle(hUsb->lockDeviceHandle);
     std::unique_lock<std::mutex> lock(ctxHostBulk->lockDeviceTransfer);
     ctxHostBulk->ioComplete = false;
+    ctxHostBulk->working = true;
     libusb_fill_bulk_transfer(ctxHostBulk->transfer, hUsb->devHandle, endpoint, ctxHostBulk->buf, length,
                               BulkTransferCallback, hSession, 0);
     if ((childRet = libusb_submit_transfer(ctxHostBulk->transfer)) < 0) {
@@ -408,7 +411,7 @@ int HdcHostUSB::FillBulkAndSubmit(HSession hSession, bool readWrite, uint8_t *se
     if (!readWrite) {  // write block
         ctxHostBulk->cv.wait(lock, [ctxHostBulk]() { return ctxHostBulk->ioComplete; });
     }
-    return ERR_SUCCESS;
+    return RET_SUCCESS;
 }
 
 void HdcHostUSB::RegisterReadCallback(HSession hSession)
@@ -450,14 +453,24 @@ int HdcHostUSB::OpenDeviceMyNeed(HUSB hUSB)
 // Just call from child work thread, it will be block when overlap full
 int HdcHostUSB::SendUSBRaw(HSession hSession, uint8_t *data, const int length)
 {
-    int ret = FillBulkAndSubmit(hSession, false, data, length);
-    if (ret != ERR_SUCCESS) {
-        --hSession->sendRef;
-        if (hSession->hUSB->bulkInRead.working) {
-            libusb_cancel_transfer(hSession->hUSB->bulkInRead.transfer);
+    int ret = ERR_GENERIC;
+    HUSB hUsb = hSession->hUSB;
+    do {
+        if (!hUsb->bulkInRead.working) {
+            break;
         }
-    } else {
+        if ((ret = FillBulkAndSubmit(hSession, false, data, length)) != RET_SUCCESS) {
+            break;
+        }
         ret = length;
+        break;
+    } while (hUsb->bulkOutWrite.working);
+    if (ret < 0) {
+        --hSession->sendRef;
+        hUsb->bulkOutWrite.working = false;
+        if (hUsb->bulkInRead.working) {
+            libusb_cancel_transfer(hUsb->bulkInRead.transfer);
+        }
     }
     return ret;
 }

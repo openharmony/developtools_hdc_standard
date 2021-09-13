@@ -194,6 +194,9 @@ void HdcChannelBase::AsyncMainLoopTask(uv_idle_t *handle)
 void HdcChannelBase::MainAsyncCallback(uv_async_t *handle)
 {
     HdcChannelBase *thisClass = (HdcChannelBase *)handle->data;
+    if (uv_is_closing((uv_handle_t *)thisClass->loopMain)) {
+        return;
+    }
     list<void *>::iterator i;
     list<void *> &lst = thisClass->lstMainThreadOP;
     uv_rwlock_wrlock(&thisClass->mainAsync);
@@ -208,6 +211,9 @@ void HdcChannelBase::MainAsyncCallback(uv_async_t *handle)
 void HdcChannelBase::PushAsyncMessage(const uint32_t channelId, const uint8_t method, const void *data,
                                       const int dataSize)
 {
+    if (uv_is_closing((uv_handle_t *)&asyncMainLoop)) {
+        return;
+    }
     auto param = new AsyncParam();
     if (!param) {
         return;
@@ -259,7 +265,7 @@ void HdcChannelBase::Send(const uint32_t channelId, uint8_t *bufPtr, const int s
     } else {
         sendStream = (uv_stream_t *)&hChannel->hChildWorkTCP;
     }
-    if (uv_is_writable(sendStream)) {
+    if (!uv_is_closing((const uv_handle_t *)sendStream) && uv_is_writable(sendStream)) {
         ++hChannel->sendRef;
         Base::SendToStreamEx(sendStream, data, sizeNewBuf, nullptr, (void *)WriteCallback, data);
     }

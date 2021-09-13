@@ -95,12 +95,15 @@ bool HdcServer::CheckToPullUptrServer(const char *listenString)
     char buf[BUF_SIZE_SMALL] = "";
     char shortPath[MAX_PATH] = "";
     ret = GetShortPathName(path, shortPath, MAX_PATH);
+    std::string runPath = shortPath;
     if (ret == 0) {
         int err = GetLastError();
-        WRITE_LOG(LOG_WARN, "GetShortPath err:%d errmsg:%s", err, strerror(err));
+        WRITE_LOG(LOG_WARN, "GetShortPath path:[%s] err:%d errmsg:%s", path, err, strerror(err));
+        string uvPath = path;
+        runPath = uvPath.substr(uvPath.find_last_of("/\\") + 1);
     }
-    WRITE_LOG(LOG_DEBUG, "server shortpath:[%s]", shortPath);
-    if (sprintf_s(buf, sizeof(buf), "%s -l4 -s %s -m", shortPath, listenString) < 0) {
+    WRITE_LOG(LOG_DEBUG, "server shortpath:[%s] runPath:[%s]", shortPath, runPath.c_str());
+    if (sprintf_s(buf, sizeof(buf), "%s -l4 -s %s -m", runPath.c_str(), listenString) < 0) {
         return false;
     }
     WRITE_LOG(LOG_DEBUG, "Run server in debug-forground, cmd:%s", buf);
@@ -580,7 +583,7 @@ void HdcServer::UsbPreConnect(uv_timer_t *handle)
         stopLoop = true;
         break;
     }
-    if (stopLoop) {
+    if (stopLoop && !uv_is_closing((const uv_handle_t *)handle)) {
         uv_close((uv_handle_t *)handle, Base::CloseTimerCallback);
     }
 }
@@ -596,7 +599,7 @@ int HdcServer::CreateConnect(const string &connectKey)
     }
     HDaemonInfo hdi = nullptr;
     if (connectKey == "any") {
-        return ERR_SUCCESS;
+        return RET_SUCCESS;
     }
     AdminDaemonMap(OP_QUERY, connectKey, hdi);
     if (hdi == nullptr) {
@@ -634,7 +637,7 @@ int HdcServer::CreateConnect(const string &connectKey)
         HDaemonInfo hdiNew = &diNew;
         AdminDaemonMap(OP_UPDATE, hdiQuery->connectKey, hdiNew);
     }
-    return ERR_SUCCESS;
+    return RET_SUCCESS;
 }
 
 void HdcServer::AttachChannel(HSession hSession, const uint32_t channelId)

@@ -51,7 +51,7 @@ enum OperateID {
 };
 
 enum RetErrCode {
-    ERR_SUCCESS = 0,
+    RET_SUCCESS = 0,
     ERR_GENERIC = -1,
     ERR_BUF_SIZE = -10000,
     ERR_BUF_ALLOC,
