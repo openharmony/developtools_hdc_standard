@@ -42,7 +42,7 @@ namespace Debug {
         fwrite(buf, 1, bufLen, fp);
         fflush(fp);
         fclose(fp);
-        return ERR_SUCCESS;
+        return RET_SUCCESS;
     }
 
     int ReadHexFromDebugFile(const char *fileName, uint8_t *buf, const int bufLen)

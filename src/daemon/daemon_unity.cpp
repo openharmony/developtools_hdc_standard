@@ -83,7 +83,7 @@ int HdcDaemonUnity::ExecuteShell(const char *shellCommand)
         }
         asyncCommand.ExecuteCommand(shellCommand);
         ++refCount;
-        return ERR_SUCCESS;
+        return RET_SUCCESS;
     } while (false);
 
     TaskFinish();

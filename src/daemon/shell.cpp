@@ -205,7 +205,7 @@ int HdcShell::StartShell()
         childReady = true;
         ++refCount;
     } while (false);
-    if (ret != ERR_SUCCESS) {
+    if (ret != RET_SUCCESS) {
         if (pidShell > 0) {
             kill(pidShell, SIGKILL);
         }

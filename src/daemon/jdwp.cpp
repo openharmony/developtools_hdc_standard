@@ -306,6 +306,6 @@ int HdcJdwp::Initial()
     if (!JdwpListen()) {
         return ERR_MODULE_JDWP_FAILED;
     }
-    return ERR_SUCCESS;
+    return RET_SUCCESS;
 }
 }
