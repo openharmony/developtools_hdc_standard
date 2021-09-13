@@ -307,6 +307,13 @@ namespace SerialStruct {
             }
         }
 
+#if defined(HOST_MAC)
+        static void WriteVarint(unsigned long value, Writer &out)
+        {
+            WriteVarint((uint64_t)value, out);
+        }
+#endif
+
         static bool ReadVarint(uint32_t &value, reader &in)
         {
             value = 0;
@@ -339,6 +346,13 @@ namespace SerialStruct {
             }
             return false;
         }
+
+#if defined(HOST_MAC)
+        static bool ReadVarint(unsigned long &value, reader &in)
+        {
+            return ReadVarint(value, in);
+        }
+#endif
 
         static void WriteFixed(uint32_t value, Writer &out)
         {

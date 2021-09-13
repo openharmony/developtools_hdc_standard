@@ -105,7 +105,7 @@ bool HdcUSBBase::SendToHdcStream(HSession hSession, uv_stream_t *stream, uint8_t
 {
     vector<uint8_t> &bufRecv = hSession->hUSB->bufRecv;
     bufRecv.insert(bufRecv.end(), appendData, appendData + dataSize);
-    int ret = ERR_SUCCESS;
+    int ret = RET_SUCCESS;
     while (bufRecv.size() > sizeof(USBHead)) {
         USBHead *usbHeader = (USBHead *)bufRecv.data();
         if (memcmp(usbHeader->flag, PACKET_FLAG.c_str(), PACKET_FLAG.size())) {
@@ -132,6 +132,6 @@ bool HdcUSBBase::SendToHdcStream(HSession hSession, uv_stream_t *stream, uint8_t
         }
         bufRecv.erase(bufRecv.begin(), bufRecv.begin() + sizeof(USBHead) + usbHeader->dataSize);
     }
-    return ret == ERR_SUCCESS;
+    return ret == RET_SUCCESS;
 }
 }
