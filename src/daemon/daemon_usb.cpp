@@ -136,10 +136,10 @@ int HdcDaemonUSB::ConnectEPPoint(HUSB hUSB)
 
         WRITE_LOG(LOG_DEBUG, "New bulk in\\out open bulkout:%d bulkin:%d", hUSB->bulkOut, hUSB->bulkIn);
         hUSB->bufRecv.clear();
-        ret = ERR_SUCCESS;
+        ret = RET_SUCCESS;
         break;
     }
-    if (ret != ERR_SUCCESS) {
+    if (ret != RET_SUCCESS) {
         CloseEndpoint(hUSB, true);
     }
     return ret;
@@ -469,7 +469,7 @@ void HdcDaemonUSB::WatchEPTimer(uv_timer_t *handle)
     if (resetEp) {
         return;
     }
-    if (thisClass->ConnectEPPoint(hUSB) != ERR_SUCCESS) {
+    if (thisClass->ConnectEPPoint(hUSB) != RET_SUCCESS) {
         return;
     }
     // connect OK

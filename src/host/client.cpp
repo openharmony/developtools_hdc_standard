@@ -177,6 +177,9 @@ int HdcClient::Initial(const string &connectKeyIn)
 
 int HdcClient::ConnectServerForClient(const char *ip, uint16_t port)
 {
+    if (uv_is_closing((const uv_handle_t *)&channel->hWorkTCP)) {
+        return ERR_SOCKET_FAIL;
+    }
     WRITE_LOG(LOG_DEBUG, "Try to connect %s:%d", ip, port);
     struct sockaddr_in dest;
     uv_ip4_addr(ip, port, &dest);
@@ -283,7 +286,7 @@ void HdcClient::Connect(uv_connect_t *connection, int status)
     HdcClient *thisClass = (HdcClient *)connection->data;
     delete connection;
     HChannel hChannel = (HChannel)thisClass->channel;
-    if (status < 0) {
+    if (status < 0 || uv_is_closing((const uv_handle_t *)&hChannel->hWorkTCP)) {
         WRITE_LOG(LOG_FATAL, "connect failed");
         thisClass->FreeChannel(hChannel->channelId);
         return;
@@ -316,7 +319,7 @@ int HdcClient::PreHandshake(HChannel hChannel, const uint8_t *buf)
     }
     Send(hChannel->channelId, reinterpret_cast<uint8_t *>(hShake), sizeof(ChannelHandShake));
     hChannel->handshakeOK = true;
-    return ERR_SUCCESS;
+    return RET_SUCCESS;
 }
 
 // read serverForClient(server)TCP data

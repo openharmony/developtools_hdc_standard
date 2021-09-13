@@ -522,7 +522,8 @@ int HdcServerForClient::BindChannelToSession(HChannel hChannel, uint8_t *bufPtr,
     if ((hSession = FindAliveSessionFromDaemonMap(hChannel)) == nullptr) {
         return ERR_SESSION_NOFOUND;
     }
-    if ((hChannel->fdChildWorkTCP = Base::DuplicateUvSocket(&hChannel->hWorkTCP)) < 0) {
+    bool isClosing = uv_is_closing((const uv_handle_t *)&hChannel->hWorkTCP);
+    if (!isClosing && (hChannel->fdChildWorkTCP = Base::DuplicateUvSocket(&hChannel->hWorkTCP)) < 0) {
         WRITE_LOG(LOG_FATAL, "Duplicate socket failed, cid:%d", hChannel->channelId);
         return ERR_SOCKET_DUPLICATE;
     }
@@ -531,7 +532,9 @@ int HdcServerForClient::BindChannelToSession(HChannel hChannel, uint8_t *bufPtr,
         --hChannel->sendRef;
     };
     ++hChannel->sendRef;
-    uv_close((uv_handle_t *)&hChannel->hWorkTCP, funcWorkTcpClose);
+    if (!isClosing) {
+        uv_close((uv_handle_t *)&hChannel->hWorkTCP, funcWorkTcpClose);
+    }
     Base::DoNextLoop(loopMain, hChannel, [](const uint8_t flag, string &msg, const void *data) {
         // Thread message can avoid using thread lock and improve program efficiency
         // If not next loop call, ReadStream will thread conflict
@@ -544,7 +547,7 @@ int HdcServerForClient::BindChannelToSession(HChannel hChannel, uint8_t *bufPtr,
         auto ctrl = HdcSessionBase::BuildCtrlString(SP_ATTACH_CHANNEL, hChannel->channelId, nullptr, 0);
         Base::SendToStream((uv_stream_t *)&hSession->ctrlPipe[STREAM_MAIN], ctrl.data(), ctrl.size());
     });
-    return ERR_SUCCESS;
+    return RET_SUCCESS;
 }
 
 bool HdcServerForClient::CheckAutoFillTarget(HChannel hChannel)
