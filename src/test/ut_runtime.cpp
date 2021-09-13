@@ -122,7 +122,7 @@ int Runtime::CheckServerDaemonReady()
         PreConnectDaemon(DEBUG_ADDRESS.c_str(), DEBUG_TCP_CONNECT_KEY.c_str());
     }
     hashInitialize = true;
-    return ERR_SUCCESS;
+    return RET_SUCCESS;
 }
 
 void Runtime::DoCheck(uv_timer_t *handle)

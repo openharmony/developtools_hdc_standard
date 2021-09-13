@@ -477,7 +477,7 @@ void HdcSessionBase::FreeSessionOpeate(uv_timer_t *handle)
         return;
     }
 #ifdef HDC_HOST
-    if (hSession->hUSB != nullptr && hSession->hUSB->bulkInRead.working) {
+    if (hSession->hUSB != nullptr && (hSession->hUSB->bulkInRead.working || hSession->hUSB->bulkOutWrite.working)) {
         return;
     }
 #endif
@@ -682,7 +682,7 @@ int HdcSessionBase::DecryptPayload(HSession hSession, PayloadHead *payloadHeadBe
         WRITE_LOG(LOG_WARN, "FetchCommand failed");
         return ERR_GENERIC;
     }
-    return ERR_SUCCESS;
+    return RET_SUCCESS;
 }
 
 int HdcSessionBase::OnRead(HSession hSession, uint8_t *bufPtr, const int bufLen)

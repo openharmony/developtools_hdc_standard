@@ -143,7 +143,7 @@ int GetUserInfo(char *buf, size_t len)
     if (snprintf_s(buf, len, len - 1, " %s@%s", username, hostname) < 0) {
         return ERR_BUF_OVERFLOW;
     }
-    return ERR_SUCCESS;
+    return RET_SUCCESS;
 }
 
 int WritePublicKeyfile(RSA *private_key, const char *private_key_path)

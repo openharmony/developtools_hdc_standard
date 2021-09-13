@@ -89,6 +89,9 @@ ohos_executable("hdc_std") {
     "HDC_HOST",
     "HARMONY_PROJECT",
   ]
+  if (is_mac) {
+    defines += [ "HOST_MAC" ]
+  }
   cflags_cc = [
     "-Wno-error",
     "-Wno-error=unused-variable",
