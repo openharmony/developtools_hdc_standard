@@ -116,7 +116,7 @@ void HdcHostTCP::Connect(uv_connect_t *connection, int status)
     Base::SendToStream((uv_stream_t *)&hSession->ctrlPipe[STREAM_MAIN], ctrl.data(), ctrl.size());
     return;
 Finish:
-    WRITE_LOG(LOG_DEBUG, "Connect failed");
+    WRITE_LOG(LOG_FATAL, "Connect failed");
     ptrConnect->FreeSession(hSession->sessionId);
 }
 

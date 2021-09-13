@@ -86,15 +86,24 @@ bool HdcServer::CheckToPullUptrServer(const char *listenString)
 {
     char path[BUF_SIZE_SMALL] = "";
     size_t nPathSize = sizeof(path);
-    uv_exepath(path, &nPathSize);
-    if (nPathSize <= 2) {
+    int ret = uv_exepath(path, &nPathSize);
+    if (ret < 0) {
+        WRITE_LOG(LOG_WARN, "uvexepath ret:%d error:%s", ret, uv_err_name(ret));
         return false;
     }
 #ifdef _WIN32
     char buf[BUF_SIZE_SMALL] = "";
     char shortPath[MAX_PATH] = "";
-    GetShortPathName(path, shortPath, MAX_PATH);
-    if (sprintf_s(buf, sizeof(buf), "%s -l4 -s %s -m", shortPath, listenString) < 0) {
+    ret = GetShortPathName(path, shortPath, MAX_PATH);
+    std::string runPath = shortPath;
+    if (ret == 0) {
+        int err = GetLastError();
+        WRITE_LOG(LOG_WARN, "GetShortPath path:[%s] err:%d errmsg:%s", path, err, strerror(err));
+        string uvPath = path;
+        runPath = uvPath.substr(uvPath.find_last_of("/\\") + 1);
+    }
+    WRITE_LOG(LOG_DEBUG, "server shortpath:[%s] runPath:[%s]", shortPath, runPath.c_str());
+    if (sprintf_s(buf, sizeof(buf), "%s -l4 -s %s -m", runPath.c_str(), listenString) < 0) {
         return false;
     }
     WRITE_LOG(LOG_DEBUG, "Run server in debug-forground, cmd:%s", buf);
@@ -315,7 +324,7 @@ void HdcServer::NotifyInstanceSessionFree(HSession hSession, bool freeOrClear)
         AdminDaemonMap(OP_UPDATE, hSession->connectKey, hdiNew);
     } else {  // step2
         string usbMountPoint = hdiOld->usbMountPoint;
-        constexpr int waitDaemonReconnect = 250;  // can be call directory, not delay?
+        constexpr int waitDaemonReconnect = UV_DEFAULT_INTERVAL;  // can be call directory, not delay?
         auto funcDelayUsbNotify = [this, usbMountPoint](const uint8_t flag, string &msg, const void *) -> void {
             string s = usbMountPoint;
             clsUSBClt->RemoveIgnoreDevice(s);
@@ -574,7 +583,7 @@ void HdcServer::UsbPreConnect(uv_timer_t *handle)
         stopLoop = true;
         break;
     }
-    if (stopLoop) {
+    if (stopLoop && !uv_is_closing((const uv_handle_t *)handle)) {
         uv_close((uv_handle_t *)handle, Base::CloseTimerCallback);
     }
 }
@@ -590,7 +599,7 @@ int HdcServer::CreateConnect(const string &connectKey)
     }
     HDaemonInfo hdi = nullptr;
     if (connectKey == "any") {
-        return ERR_SUCCESS;
+        return RET_SUCCESS;
     }
     AdminDaemonMap(OP_QUERY, connectKey, hdi);
     if (hdi == nullptr) {
@@ -628,7 +637,7 @@ int HdcServer::CreateConnect(const string &connectKey)
         HDaemonInfo hdiNew = &diNew;
         AdminDaemonMap(OP_UPDATE, hdiQuery->connectKey, hdiNew);
     }
-    return ERR_SUCCESS;
+    return RET_SUCCESS;
 }
 
 void HdcServer::AttachChannel(HSession hSession, const uint32_t channelId)
@@ -645,22 +654,32 @@ void HdcServer::AttachChannel(HSession hSession, const uint32_t channelId)
     if ((ret = uv_tcp_open((uv_tcp_t *)&hChannel->hChildWorkTCP, hChannel->fdChildWorkTCP)) < 0) {
         WRITE_LOG(LOG_DEBUG, "Hdcserver AttachChannel uv_tcp_open failed %s, channelid:%d fdChildWorkTCP:%d",
                   uv_err_name(ret), hChannel->channelId, hChannel->fdChildWorkTCP);
+        Base::TryCloseHandle((uv_handle_t *)&hChannel->hChildWorkTCP);
         return;
     }
     Base::SetTcpOptions((uv_tcp_t *)&hChannel->hChildWorkTCP);
     uv_read_start((uv_stream_t *)&hChannel->hChildWorkTCP, hSfc->AllocCallback, hSfc->ReadStream);
 };
 
-void HdcServer::DeatchChannel(const uint32_t channelId)
+void HdcServer::DeatchChannel(HSession hSession, const uint32_t channelId)
 {
     HdcServerForClient *hSfc = static_cast<HdcServerForClient *>(clsServerForClient);
     HChannel hChannel = hSfc->AdminChannel(OP_QUERY, channelId, nullptr);
     if (!hChannel) {
         return;
     }
+    if (hChannel->childCleared) {
+        WRITE_LOG(LOG_DEBUG, "Childchannel has already freed, cid:%d", channelId);
+        return;
+    }
+    uint8_t count = 1;
+    Send(hSession->sessionId, hChannel->channelId, CMD_KERNEL_CHANNEL_CLOSE, &count, 1);
     if (uv_is_closing((const uv_handle_t *)&hChannel->hChildWorkTCP)) {
-        hChannel->childCleared = true;
-        WRITE_LOG(LOG_DEBUG, "Childchannel free direct, cid:%d", channelId);
+        Base::DoNextLoop(&hSession->childLoop, hChannel, [](const uint8_t flag, string &msg, const void *data) {
+            HChannel hChannel = (HChannel)data;
+            hChannel->childCleared = true;
+            WRITE_LOG(LOG_DEBUG, "Childchannel free direct, cid:%d", hChannel->channelId);
+        });
     } else {
         Base::TryCloseHandle((uv_handle_t *)&hChannel->hChildWorkTCP, [](uv_handle_t *handle) -> void {
             HChannel hChannel = (HChannel)handle->data;

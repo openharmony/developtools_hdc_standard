@@ -67,7 +67,7 @@ void HdcDaemonTCP::AcceptClient(uv_stream_t *server, int status)
     HdcDaemonTCP *thisClass = (HdcDaemonTCP *)pServTCP->data;
     HdcSessionBase *ptrConnect = (HdcSessionBase *)thisClass->clsMainBase;
     HdcSessionBase *daemon = reinterpret_cast<HdcSessionBase *>(thisClass->clsMainBase);
-    const uint16_t maxWaitTime = 250;
+    const uint16_t maxWaitTime = UV_DEFAULT_INTERVAL;
     auto ctrl = daemon->BuildCtrlString(SP_START_SESSION, 0, nullptr, 0);
     HSession hSession = ptrConnect->MallocSession(false, CONN_TCP, thisClass);
     if (!hSession) {
@@ -132,20 +132,20 @@ int HdcDaemonTCP::SetTCPListen()
         return ERR_API_FAIL;
     }
     tcpListenPort = ntohs(addr.sin_port);
-    return ERR_SUCCESS;
+    return RET_SUCCESS;
 }
 
 int HdcDaemonTCP::Initial()
 {
     WRITE_LOG(LOG_DEBUG, "HdcDaemonTCP init");
     SetUDPListen();
-    if (SetTCPListen() != ERR_SUCCESS) {
+    if (SetTCPListen() != RET_SUCCESS) {
         WRITE_LOG(LOG_FATAL, "TCP listen failed");
         return ERR_GENERIC;
     }
 #ifndef UNIT_TEST
     WRITE_LOG(LOG_INFO, "TCP listen on port:[%d]", tcpListenPort);
 #endif
-    return ERR_SUCCESS;
+    return RET_SUCCESS;
 }
 }  // namespace Hdc

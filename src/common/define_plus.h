@@ -51,7 +51,7 @@ enum OperateID {
 };
 
 enum RetErrCode {
-    ERR_SUCCESS = 0,
+    RET_SUCCESS = 0,
     ERR_GENERIC = -1,
     ERR_BUF_SIZE = -10000,
     ERR_BUF_ALLOC,
@@ -75,6 +75,7 @@ enum RetErrCode {
     ERR_SESSION_DEAD,
     ERR_HANDSHAKE_NOTMATCH = -16000,
     ERR_HANDSHAKE_CONNECTKEY_FAILED,
+    ERR_HANDSHAKE_HANGUP_CHILD,
     ERR_SOCKET_FAIL = -17000,
     ERR_SOCKET_DUPLICATE,
     ERR_MODULE_JDWP_FAILED = -18000,
@@ -194,27 +195,46 @@ struct TaskInformation {
 using HTaskInfo = TaskInformation *;
 
 #pragma pack(pop)
+#ifdef HDC_HOST
+struct ContextHostBulk {
+    ContextHostBulk()
+    {
+        transfer = libusb_alloc_transfer(0);
+    }
+    ~ContextHostBulk()
+    {
+        libusb_free_transfer(transfer);
+    }
+    libusb_transfer *transfer;
+    mutex lockDeviceTransfer;
+    uint8_t *buf;
+    bool working;
+    bool ioComplete;
+    condition_variable cv;
+};
+#endif
 
 struct HdcUSB {
 #ifdef HDC_HOST
-    uint16_t retryCount;
+    libusb_context *ctxUSB = nullptr;  // child-use, main null
     libusb_device *device;
     libusb_device_handle *devHandle;
     uint8_t interfaceNumber;
+    uint16_t retryCount;
     // D2H device to host endpoint's address
     uint8_t epDevice;
     // H2D host to device endpoint's address
     uint8_t epHost;
     uint8_t devId;
     uint8_t busId;
-    int32_t bufSizeDevice;  // packetSizeD2H
-    uint8_t *bufDevice;
-    uint8_t *bufHost;
-    uint32_t bufSizeHost;
+    int32_t sizeEpBuf;
+    uint16_t wMaxPacketSize;
     string serialNumber;
     string usbMountPoint;
-    libusb_context *ctxUSB = nullptr;  // child-use, main null
-    libusb_transfer *transferRecv;
+
+    mutex lockDeviceHandle;
+    ContextHostBulk bulkOutWrite;
+    ContextHostBulk bulkInRead;
 #endif
     // usb accessory FunctionFS
     // USB main thread use, sub-thread disable, sub-thread uses the main thread USB handle

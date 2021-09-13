@@ -98,7 +98,7 @@ namespace Base {
     // clang-format on
     string GetVersion();
     bool IdleUvTask(uv_loop_t *loop, void *data, uv_idle_cb cb);
-    bool TimerUvTask(uv_loop_t *loop, void *data, uv_timer_cb cb, int repeatTimeout = 250);
+    bool TimerUvTask(uv_loop_t *loop, void *data, uv_timer_cb cb, int repeatTimeout = UV_DEFAULT_INTERVAL);
     bool DelayDo(uv_loop_t *loop, const int delayMs, const uint8_t flag, string msg, void *data,
                  std::function<void(const uint8_t, string &, const void *)> cb);
     inline bool DelayDoSimple(uv_loop_t *loop, const int delayMs,
