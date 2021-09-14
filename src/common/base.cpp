@@ -20,7 +20,6 @@
 #include <openssl/buffer.h>
 #include <openssl/evp.h>
 #include <openssl/md5.h>
-#include <random>
 #include <thread>
 #ifdef __MUSL__
 extern "C" {
@@ -366,20 +365,18 @@ namespace Base {
     uint64_t GetRandom(const uint64_t min, const uint64_t max)
     {
         uint64_t ret;
-        std::random_device rd;
-        std::mt19937 gen(rd());
-        std::uniform_int_distribution<uint64_t> dis(min, max);
-        ret = dis(gen);
+        uv_random(nullptr, nullptr, &ret, sizeof(ret), 0, nullptr);
         return ret;
     }
 
     string GetRandomString(const uint16_t expectedLen)
     {
-        std::string str("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz");
-        std::random_device rd;
-        std::mt19937 generator(rd());
-        std::shuffle(str.begin(), str.end(), generator);
-        return str.substr(0, expectedLen);
+        srand(static_cast<unsigned int>(GetRandom()));
+        string ret = string(expectedLen, '0');
+        for (auto i = 0; i < expectedLen; ++i) {
+            sprintf(&ret[i], "%X", rand() % BUF_SIZE_MICRO);
+        }
+        return ret;
     }
 
     int GetRandomNum(const int min, const int max)
