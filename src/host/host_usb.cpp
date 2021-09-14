@@ -367,11 +367,11 @@ void LIBUSB_CALL HdcHostUSB::BulkTransferCallback(struct libusb_transfer *transf
         }
     }
     ctxHostBulk->ioComplete = true;
+    ctxHostBulk->working = false;
     ctxHostBulk->cv.notify_one();
     if (!ret) {
         libusb_cancel_transfer(hUsb->bulkInRead.transfer);
         // cannnot cancel send transfer direct, otherwise lock will not release
-        ctxHostBulk->working = false;
         server->FreeSession(hSession->sessionId);
     }
 }
