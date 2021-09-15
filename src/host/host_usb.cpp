@@ -366,7 +366,6 @@ void LIBUSB_CALL HdcHostUSB::BulkTransferCallback(struct libusb_transfer *transf
             --hSession->sendRef;
         }
     }
-    ctxHostBulk->ioComplete = true;
     ctxHostBulk->working = false;
     ctxHostBulk->cv.notify_one();
     if (!ret) {
@@ -401,15 +400,15 @@ int HdcHostUSB::FillBulkAndSubmit(HSession hSession, bool readWrite, uint8_t *se
     }
     std::unique_lock<std::mutex> lockDeviceHandle(hUsb->lockDeviceHandle);
     std::unique_lock<std::mutex> lock(ctxHostBulk->lockDeviceTransfer);
-    ctxHostBulk->ioComplete = false;
-    ctxHostBulk->working = true;
     libusb_fill_bulk_transfer(ctxHostBulk->transfer, hUsb->devHandle, endpoint, ctxHostBulk->buf, length,
                               BulkTransferCallback, hSession, 0);
+    ctxHostBulk->working = true;
     if ((childRet = libusb_submit_transfer(ctxHostBulk->transfer)) < 0) {
+        ctxHostBulk->working = false;
         return ERR_IO_FAIL;
     }
     if (!readWrite) {  // write block
-        ctxHostBulk->cv.wait(lock, [ctxHostBulk]() { return ctxHostBulk->ioComplete; });
+        ctxHostBulk->cv.wait(lock, [ctxHostBulk]() { return !ctxHostBulk->working; });
     }
     return RET_SUCCESS;
 }
