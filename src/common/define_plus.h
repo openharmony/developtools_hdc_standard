@@ -209,6 +209,7 @@ struct ContextHostBulk {
     mutex lockDeviceTransfer;
     uint8_t *buf;
     bool working;
+    bool ioComplete;
     condition_variable cv;
 };
 #endif
