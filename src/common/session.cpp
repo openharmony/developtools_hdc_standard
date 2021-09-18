@@ -477,7 +477,7 @@ void HdcSessionBase::FreeSessionOpeate(uv_timer_t *handle)
         return;
     }
 #ifdef HDC_HOST
-    if (hSession->hUSB != nullptr && (hSession->hUSB->bulkInRead.working || hSession->hUSB->bulkOutWrite.working)) {
+    if (hSession->hUSB != nullptr && hSession->hUSB->bulkInRead.working) {
         return;
     }
 #endif
