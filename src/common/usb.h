@@ -28,10 +28,9 @@ public:
     virtual bool ReadyForWorkThread(HSession hSession);
     int SendUSBBlock(HSession hSession, uint8_t *data, const int length);
     static void ReadUSB(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf);
-    bool SendToHdcStream(HSession hSession, uv_stream_t *stream, uint8_t *appendData, int dataSize);
+    int SendToHdcStream(HSession hSession, uv_stream_t *stream, uint8_t *appendData, int dataSize);
 
 protected:
-    virtual void SendUsbReset(HUSB hUSB, uint32_t sessionId) {};
     void *clsMainBase;
     bool serverOrDaemon;
     bool modRunning;

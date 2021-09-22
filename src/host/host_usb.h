@@ -38,7 +38,8 @@ private:
     static void PenddingUSBIO(uv_idle_t *handle);
     static void WatchDevPlugin(uv_timer_t *handle);
     static void KickoutZombie(HSession hSession);
-    static void LIBUSB_CALL BulkTransferCallback(struct libusb_transfer *transfer);
+    static void LIBUSB_CALL WriteUSBBulkCallback(struct libusb_transfer *transfer);
+    static void LIBUSB_CALL ReadUSBBulkCallback(struct libusb_transfer *transfer);
     int StartupUSBWork();
     int CheckActiveConfig(libusb_device *device, HUSB hUSB);
     int OpenDeviceMyNeed(HUSB hUSB);
@@ -47,12 +48,7 @@ private:
     bool ReadyForWorkThread(HSession hSession);
     bool FindDeviceByID(HUSB hUSB, const char *usbMountPoint, libusb_context *ctxUSB);
     bool DetectMyNeed(libusb_device *device, string &sn);
-    int FillBulkAndSubmit(HSession hSession, bool readWrite, uint8_t *sendBuf = nullptr, int sendSize = 0);
-    inline bool EndpointReadOrWrite(uint8_t ep)
-    {
-        return (ep & LIBUSB_ENDPOINT_DIR_MASK) == LIBUSB_ENDPOINT_IN;
-    }
-    void SendUsbReset(HUSB hUSB, uint32_t sessionId);
+    void SendUsbSoftReset(HUSB hUSB, uint32_t sessionId);
     void RestoreHdcProtocol(HUSB hUsb, const uint8_t *buf, int bufSize);
     void UpdateUSBDaemonInfo(HUSB hUSB, HSession hSession, uint8_t connStatus);
     void RegisterReadCallback(HSession hSession);
