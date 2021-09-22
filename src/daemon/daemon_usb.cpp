@@ -164,27 +164,29 @@ void HdcDaemonUSB::CloseEndpoint(HUSB hUSB, bool closeCtrlEp)
 }
 
 // Prevent other USB data misfortunes to send the program crash
-bool HdcDaemonUSB::AvailablePacket(uint8_t *ioBuf, uint32_t *sessionId)
+int HdcDaemonUSB::AvailablePacket(uint8_t *ioBuf, uint32_t *sessionId)
 {
-    bool ret = false;
+    int ret = RET_SUCCESS;
     constexpr auto maxBufFactor = 1.2;
     while (true) {
         struct USBHead *usbPayloadHeader = (struct USBHead *)ioBuf;
         if (memcmp(usbPayloadHeader->flag, PACKET_FLAG.c_str(), PACKET_FLAG.size())) {
+            ret = ERR_BUF_CHECK;
             break;
         }
         if (usbPayloadHeader->dataSize > MAX_SIZE_IOBUF * maxBufFactor + sizeof(USBHead)) {
+            ret = ERR_BUF_SIZE;
             break;
         }
         if ((usbPayloadHeader->option & USB_OPTION_RESET)) {
             HdcDaemon *daemon = reinterpret_cast<HdcDaemon *>(clsMainBase);
             // The Host end program is restarted, but the USB cable is still connected
-            WRITE_LOG(LOG_WARN, "Hostside want restart daemon, restart old sessionId:%u", usbPayloadHeader->sessionId);
+            WRITE_LOG(LOG_WARN, "Hostside softreset to restart daemon, old sessionId:%u", usbPayloadHeader->sessionId);
             daemon->PushAsyncMessage(usbPayloadHeader->sessionId, ASYNC_FREE_SESSION, nullptr, 0);
+            ret = ERR_IO_SOFT_RESET;
             break;
         }
         *sessionId = usbPayloadHeader->sessionId;
-        ret = true;
         break;
     }
     return ret;
@@ -340,8 +342,9 @@ int HdcDaemonUSB::DispatchToWorkThread(const uint32_t sessionId, uint8_t *readBu
     if (hChildSession->childCleared) {
         return ERR_SESSION_DEAD;
     }
-    if (!SendToHdcStream(hChildSession, reinterpret_cast<uv_stream_t *>(&hChildSession->dataPipe[STREAM_MAIN]), readBuf,
-                         readBytes)) {
+    if (SendToHdcStream(hChildSession, reinterpret_cast<uv_stream_t *>(&hChildSession->dataPipe[STREAM_MAIN]), readBuf,
+                        readBytes)
+        != RET_SUCCESS) {
         return ERR_IO_FAIL;
     }
     return readBytes;
@@ -369,10 +372,15 @@ void HdcDaemonUSB::OnUSBRead(uv_fs_t *req)
     ssize_t bytesIOBytes = req->result;
     uint32_t sessionId = 0;
     bool ret = false;
+    int childRet = 0;
     while (thisClass->isAlive) {
         // Don't care is module running, first deal with this
         if (bytesIOBytes < 0) {
             WRITE_LOG(LOG_WARN, "USBIO failed1 %s", uv_strerror(bytesIOBytes));
+            break;
+        } else if (bytesIOBytes == 0) {
+            // zero packet
+            ret = true;
             break;
         }
         if (thisClass->JumpAntiquePacket(*bufPtr, bytesIOBytes)) {
@@ -381,8 +389,10 @@ void HdcDaemonUSB::OnUSBRead(uv_fs_t *req)
             break;
         }
         // guess is head of packet
-        if (!thisClass->AvailablePacket((uint8_t *)bufPtr, &sessionId)) {
-            WRITE_LOG(LOG_WARN, "AvailablePacket check failed, ret:%d buf:%-50s", bytesIOBytes, bufPtr);
+        if ((childRet = thisClass->AvailablePacket((uint8_t *)bufPtr, &sessionId)) != RET_SUCCESS) {
+            if (childRet != ERR_IO_SOFT_RESET) {
+                WRITE_LOG(LOG_WARN, "AvailablePacket check failed, ret:%d buf:%-50s", bytesIOBytes, bufPtr);
+            }
             break;
         }
         // can debug payload here
