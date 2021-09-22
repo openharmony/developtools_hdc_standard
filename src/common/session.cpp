@@ -316,8 +316,10 @@ int HdcSessionBase::MallocSessionByConnectType(HSession hSession)
             constexpr auto maxBufFactor = 1.5;
             int max = Base::GetMaxBufSize() * maxBufFactor + sizeof(USBHead);
             hUSB->sizeEpBuf = max;
-            hUSB->bulkInRead.buf = new uint8_t[max]();
-            hUSB->bulkOutWrite.buf = new uint8_t[max]();
+            hUSB->bufDevice = new uint8_t[max]();
+            hUSB->bufHost = new uint8_t[max]();
+            hUSB->transferRecv = libusb_alloc_transfer(0);
+            hUSB->transferSend = libusb_alloc_transfer(0);
 #else
 #endif
             break;
@@ -406,8 +408,11 @@ void HdcSessionBase::FreeSessionByConnectType(HSession hSession)
             libusb_close(hUSB->devHandle);
             hUSB->devHandle = nullptr;
         }
-        delete[] hUSB->bulkInRead.buf;
-        delete[] hUSB->bulkOutWrite.buf;
+
+        delete[] hUSB->bufDevice;
+        delete[] hUSB->bufHost;
+        libusb_free_transfer(hUSB->transferRecv);
+        libusb_free_transfer(hUSB->transferSend);
 #else
         if (hUSB->bulkIn > 0) {
             close(hUSB->bulkIn);
@@ -477,7 +482,7 @@ void HdcSessionBase::FreeSessionOpeate(uv_timer_t *handle)
         return;
     }
 #ifdef HDC_HOST
-    if (hSession->hUSB != nullptr && hSession->hUSB->bulkInRead.working) {
+    if (hSession->hUSB != nullptr && (!hSession->hUSB->recvIOComplete || !hSession->hUSB->sendIOComplete)) {
         return;
     }
 #endif
