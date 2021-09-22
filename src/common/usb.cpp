@@ -101,7 +101,7 @@ int HdcUSBBase::SendUSBBlock(HSession hSession, uint8_t *data, const int length)
     return offset;
 }
 
-bool HdcUSBBase::SendToHdcStream(HSession hSession, uv_stream_t *stream, uint8_t *appendData, int dataSize)
+int HdcUSBBase::SendToHdcStream(HSession hSession, uv_stream_t *stream, uint8_t *appendData, int dataSize)
 {
     vector<uint8_t> &bufRecv = hSession->hUSB->bufRecv;
     bufRecv.insert(bufRecv.end(), appendData, appendData + dataSize);
@@ -118,7 +118,6 @@ bool HdcUSBBase::SendToHdcStream(HSession hSession, uv_stream_t *stream, uint8_t
             break;  // successful , but not enough
         }
         if (usbHeader->sessionId != hSession->sessionId) {
-            SendUsbReset(hSession->hUSB, usbHeader->sessionId);
             ret = ERR_SESSION_NOFOUND;
             WRITE_LOG(LOG_FATAL, "SendToHdcStream sessionId not matched");
             break;
@@ -132,6 +131,6 @@ bool HdcUSBBase::SendToHdcStream(HSession hSession, uv_stream_t *stream, uint8_t
         }
         bufRecv.erase(bufRecv.begin(), bufRecv.begin() + sizeof(USBHead) + usbHeader->dataSize);
     }
-    return ret == RET_SUCCESS;
+    return ret;
 }
 }

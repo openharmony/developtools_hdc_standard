@@ -70,6 +70,7 @@ enum RetErrCode {
     ERR_API_FAIL = -13000,
     ERR_IO_FAIL = -14000,
     ERR_IO_TIMEOUT,
+    ERR_IO_SOFT_RESET,
     ERR_SESSION_NOFOUND = -15000,
     ERR_SESSION_OFFLINE,
     ERR_SESSION_DEAD,
@@ -195,24 +196,6 @@ struct TaskInformation {
 using HTaskInfo = TaskInformation *;
 
 #pragma pack(pop)
-#ifdef HDC_HOST
-struct ContextHostBulk {
-    ContextHostBulk()
-    {
-        transfer = libusb_alloc_transfer(0);
-    }
-    ~ContextHostBulk()
-    {
-        libusb_free_transfer(transfer);
-    }
-    libusb_transfer *transfer;
-    mutex lockDeviceTransfer;
-    uint8_t *buf;
-    bool working;
-    bool ioComplete;
-    condition_variable cv;
-};
-#endif
 
 struct HdcUSB {
 #ifdef HDC_HOST
@@ -231,10 +214,17 @@ struct HdcUSB {
     uint16_t wMaxPacketSize;
     string serialNumber;
     string usbMountPoint;
+    uint8_t *bufDevice;
+    uint8_t *bufHost;
 
     mutex lockDeviceHandle;
-    ContextHostBulk bulkOutWrite;
-    ContextHostBulk bulkInRead;
+    libusb_transfer *transferRecv;
+    bool recvIOComplete;
+
+    mutex lockSend;
+    condition_variable cvTransferSend;
+    libusb_transfer *transferSend;
+    bool sendIOComplete;
 #endif
     // usb accessory FunctionFS
     // USB main thread use, sub-thread disable, sub-thread uses the main thread USB handle
