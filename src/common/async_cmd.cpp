@@ -108,6 +108,7 @@ bool AsyncCmd::Initial(uv_loop_t *loopIn, const CmdResultCallback callback, uint
 bool AsyncCmd::ExecuteCommand(const string &command) const
 {
     string cmd = command;
+    Base::Trim(cmd, "\"");
     if (options & OPTION_APPEND_NEWLINE) {
         cmd += "\n";
     }
