@@ -310,7 +310,7 @@ namespace SerialStruct {
 #if defined(HOST_MAC)
         static void WriteVarint(unsigned long value, Writer &out)
         {
-            WriteVarint((uint64_t)value, out);
+            WriteVarint(static_cast<uint64_t>(value), out);
         }
 #endif
 
@@ -350,7 +350,12 @@ namespace SerialStruct {
 #if defined(HOST_MAC)
         static bool ReadVarint(unsigned long &value, reader &in)
         {
-            return ReadVarint(value, in);
+            uint64_t intermediateValue;
+            if (ReadVarint(intermediateValue, in)) {
+                value = static_cast<unsigned long>(intermediateValue);
+                return true;
+            }
+            return false;
         }
 #endif
 
