@@ -561,7 +561,7 @@ namespace Base {
 #endif
 #else
         string sKey = key;
-        string sBuf = "getparam " + sKey;
+        string sBuf = "param get " + sKey;
         RunPipeComand(sBuf.c_str(), value, sizeOutBuf, true);
 #endif
         value[sizeOutBuf - 1] = '\0';
