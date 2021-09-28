@@ -373,8 +373,12 @@ namespace Base {
     {
         srand(static_cast<unsigned int>(GetRandom()));
         string ret = string(expectedLen, '0');
+        constexpr size_t maxDest = 1;
         for (auto i = 0; i < expectedLen; ++i) {
-            sprintf(&ret[i], "%X", rand() % BUF_SIZE_MICRO);
+            if (sprintf_s(&ret[i], maxDest, "%X", rand() % BUF_SIZE_MICRO) < 0) {
+                WRITE_LOG(LOG_FATAL, "GetRandomString sprintf_s failed");
+                break;
+            }
         }
         return ret;
     }

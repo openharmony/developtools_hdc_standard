@@ -385,11 +385,13 @@ void ReadDaemonKeys(const char *file, list<void *> *listPublicKey)
         ret = Base::Base64DecodeBuf(reinterpret_cast<uint8_t *>(buf), strlen(buf), (uint8_t *)key);
         if (ret != sizeof(RSAPublicKey)) {
             WRITE_LOG(LOG_DEBUG, "%s: Invalid base64 data ret=%d", file, ret);
+            delete key;
             continue;
         }
 
         if (key->wordModulusSize != RSANUMWORDS) {
             WRITE_LOG(LOG_DEBUG, "%s: Invalid key len %d\n", file, key->wordModulusSize);
+            delete key;
             continue;
         }
         listPublicKey->push_back(key);
