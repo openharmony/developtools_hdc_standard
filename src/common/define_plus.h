@@ -282,7 +282,7 @@ struct HdcChannel {
     string connectKey;
     uv_tcp_t hWorkTCP;  // work channel for client, forward channel for server
     uv_thread_t hWorkThread;
-    uint8_t uvRef;  // libuv handle ref -- just main thread now
+    uint8_t uvRef = 0;  // libuv handle ref -- just main thread now
     bool handshakeOK;
     bool isDead;
     bool serverOrClient;  // client's channel/ server's channel

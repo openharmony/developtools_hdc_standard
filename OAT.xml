@@ -61,6 +61,9 @@ Note:If the text contains special characters, please escape them according to th
                 <filteritem type="filepath" name="prebuilt/windows/hdc_std.exe" desc="the prebuilt binary file for windows, the file is self-developed"/>
                 <filteritem type="filepath" name="prebuilt/linux/hdc_std" desc="the prebuilt binary file for linux, the file is self-developed"/>
             </filefilter>
+            <filefilter name="defaultPolicyFilter" desc="Filters for compatibility，license header policies">
+                <filteritem type="filename" name="prebuilt/NOTICE" desc="no license header"/>
+            </filefilter>
         </filefilterlist>
     </oatconfig>
 </configuration>
