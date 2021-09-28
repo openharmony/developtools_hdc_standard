@@ -20,6 +20,7 @@
 #include <openssl/buffer.h>
 #include <openssl/evp.h>
 #include <openssl/md5.h>
+#include <sstream>
 #include <thread>
 #ifdef __MUSL__
 extern "C" {
@@ -373,9 +374,11 @@ namespace Base {
     {
         srand(static_cast<unsigned int>(GetRandom()));
         string ret = string(expectedLen, '0');
+        std::stringstream val;
         for (auto i = 0; i < expectedLen; ++i) {
-            sprintf(&ret[i], "%X", rand() % BUF_SIZE_MICRO);
+            val << std::hex << (rand() % BUF_SIZE_MICRO);
         }
+        ret = val.str();
         return ret;
     }
 
