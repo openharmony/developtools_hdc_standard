@@ -57,7 +57,7 @@ private:
     string cmdResult;
     bool running;
     bool hasStop = false;
-    uint32_t options;
+    uint32_t options = 0;
     uint8_t uvRef = 0;
 };
 }  // namespace Hdc
