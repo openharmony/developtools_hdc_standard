@@ -20,50 +20,61 @@
 
 namespace Hdc {
 namespace SerialStruct {
+    constexpr int fieldOne = 1;
+    constexpr int fieldTwo = 2;
+    constexpr int fieldThree = 3;
+    constexpr int fieldFour = 4;
+    constexpr int fieldFive = 5;
+    constexpr int fieldSix = 6;
+    constexpr int fieldSeven = 7;
+    constexpr int fieldEight = 8;
+    constexpr int fieldNine = 9;
+    constexpr int fieldTen = 10;
+
     template<> struct Descriptor<Hdc::HdcTransferBase::TransferConfig> {
         static auto type()
         {
-            return Message(Field<1, &Hdc::HdcTransferBase::TransferConfig::fileSize>("fileSize"),
-                           Field<2, &Hdc::HdcTransferBase::TransferConfig::atime>("atime"),
-                           Field<3, &Hdc::HdcTransferBase::TransferConfig::mtime>("mtime"),
-                           Field<4, &Hdc::HdcTransferBase::TransferConfig::options>("options"),
-                           Field<5, &Hdc::HdcTransferBase::TransferConfig::path>("path"),
-                           Field<6, &Hdc::HdcTransferBase::TransferConfig::optionalName>("optionalName"),
-                           Field<7, &Hdc::HdcTransferBase::TransferConfig::updateIfNew>("updateIfNew"),
-                           Field<8, &Hdc::HdcTransferBase::TransferConfig::compressType>("compressType"),
-                           Field<9, &Hdc::HdcTransferBase::TransferConfig::holdTimestamp>("holdTimestamp"),
-                           Field<10, &Hdc::HdcTransferBase::TransferConfig::functionName>("functionName"));
+            return Message(Field<fieldOne, &Hdc::HdcTransferBase::TransferConfig::fileSize>("fileSize"),
+                           Field<fieldTwo, &Hdc::HdcTransferBase::TransferConfig::atime>("atime"),
+                           Field<fieldThree, &Hdc::HdcTransferBase::TransferConfig::mtime>("mtime"),
+                           Field<fieldFour, &Hdc::HdcTransferBase::TransferConfig::options>("options"),
+                           Field<fieldFive, &Hdc::HdcTransferBase::TransferConfig::path>("path"),
+                           Field<fieldSix, &Hdc::HdcTransferBase::TransferConfig::optionalName>("optionalName"),
+                           Field<fieldSeven, &Hdc::HdcTransferBase::TransferConfig::updateIfNew>("updateIfNew"),
+                           Field<fieldEight, &Hdc::HdcTransferBase::TransferConfig::compressType>("compressType"),
+                           Field<fieldNine, &Hdc::HdcTransferBase::TransferConfig::holdTimestamp>("holdTimestamp"),
+                           Field<fieldTen, &Hdc::HdcTransferBase::TransferConfig::functionName>("functionName"));
         }
     };
 
     template<> struct Descriptor<Hdc::HdcTransferBase::TransferPayload> {
         static auto type()
         {
-            return Message(Field<1, &Hdc::HdcTransferBase::TransferPayload::index>("index"),
-                           Field<2, &Hdc::HdcTransferBase::TransferPayload::compressType>("compressType"),
-                           Field<3, &Hdc::HdcTransferBase::TransferPayload::compressSize>("compressSize"),
-                           Field<4, &Hdc::HdcTransferBase::TransferPayload::uncompressSize>("uncompressSize"));
+            return Message(Field<fieldOne, &Hdc::HdcTransferBase::TransferPayload::index>("index"),
+                           Field<fieldTwo, &Hdc::HdcTransferBase::TransferPayload::compressType>("compressType"),
+                           Field<fieldThree, &Hdc::HdcTransferBase::TransferPayload::compressSize>("compressSize"),
+                           Field<fieldFour, &Hdc::HdcTransferBase::TransferPayload::uncompressSize>("uncompressSize"));
         }
     };
 
     template<> struct Descriptor<Hdc::HdcSessionBase::SessionHandShake> {
         static auto type()
         {
-            return Message(Field<1, &Hdc::HdcSessionBase::SessionHandShake::banner>("banner"),
-                           Field<2, &Hdc::HdcSessionBase::SessionHandShake::authType>("authType"),
-                           Field<3, &Hdc::HdcSessionBase::SessionHandShake::sessionId>("sessionId"),
-                           Field<4, &Hdc::HdcSessionBase::SessionHandShake::connectKey>("connectKey"),
-                           Field<5, &Hdc::HdcSessionBase::SessionHandShake::buf>("buf"));
+            return Message(Field<fieldOne, &Hdc::HdcSessionBase::SessionHandShake::banner>("banner"),
+                           Field<fieldTwo, &Hdc::HdcSessionBase::SessionHandShake::authType>("authType"),
+                           Field<fieldThree, &Hdc::HdcSessionBase::SessionHandShake::sessionId>("sessionId"),
+                           Field<fieldFour, &Hdc::HdcSessionBase::SessionHandShake::connectKey>("connectKey"),
+                           Field<fieldFive, &Hdc::HdcSessionBase::SessionHandShake::buf>("buf"));
         }
     };
 
     template<> struct Descriptor<Hdc::HdcSessionBase::PayloadProtect> {
         static auto type()
         {
-            return Message(Field<1, &Hdc::HdcSessionBase::PayloadProtect::channelId>("channelId"),
-                           Field<2, &Hdc::HdcSessionBase::PayloadProtect::commandFlag>("commandFlag"),
-                           Field<3, &Hdc::HdcSessionBase::PayloadProtect::checkSum>("checkSum"),
-                           Field<4, &Hdc::HdcSessionBase::PayloadProtect::vCode>("vCode"));
+            return Message(Field<fieldOne, &Hdc::HdcSessionBase::PayloadProtect::channelId>("channelId"),
+                           Field<fieldTwo, &Hdc::HdcSessionBase::PayloadProtect::commandFlag>("commandFlag"),
+                           Field<fieldThree, &Hdc::HdcSessionBase::PayloadProtect::checkSum>("checkSum"),
+                           Field<fieldFour, &Hdc::HdcSessionBase::PayloadProtect::vCode>("vCode"));
         }
     };
 }  // SerialStruct
