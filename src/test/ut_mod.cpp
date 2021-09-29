@@ -75,7 +75,8 @@ bool TestShellExecute(void *runtimePtr)
     while (true) {
         // test1
         rt->InnerCall(UT_SHELL_BASIC);
-        if ((bytesIO = Base::ReadBinFile((UT_TMP_PATH + "/" + resultFile).c_str(), (void **)&bufPtr, 0)) < 10) {
+        constexpr int expert = 10;
+        if ((bytesIO = Base::ReadBinFile((UT_TMP_PATH + "/" + resultFile).c_str(), (void **)&bufPtr, 0)) < expert) {
             break;
         }
         Base::RunPipeComand((const char *)"id", bufString, sizeof(bufString), false);
@@ -88,7 +89,6 @@ bool TestShellExecute(void *runtimePtr)
         // test 2
         rt->ResetUtTmpFile(resultFile);
         rt->InnerCall(UT_SHELL_LIGHT);
-        constexpr int expert = 10;
         if ((bytesIO = Base::ReadBinFile((UT_TMP_PATH + "/" + resultFile).c_str(), (void **)&bufPtr, 0)) < expert) {
             break;
         }

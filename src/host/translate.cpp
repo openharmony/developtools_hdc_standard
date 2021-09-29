@@ -263,7 +263,7 @@ namespace TranslateCommand {
         } else if (!strncmp(input, CMDSTR_BUGREPORT.c_str(), CMDSTR_BUGREPORT.size())) {
             outCmd->cmdFlag = CMD_UNITY_BUGREPORT_INIT;
             outCmd->paraments = input;
-            if (outCmd->paraments.size() == 9) {
+            if (outCmd->paraments.size() == CMDSTR_BUGREPORT.size()) {
                 outCmd->paraments += " ";
             }
         } else {
