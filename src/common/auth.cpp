@@ -20,6 +20,7 @@
 #include <openssl/sha.h>
 
 using namespace Hdc;
+#define BIGNUMTOBIT    32
 
 namespace HdcAuth {
 // ---------------------------------------Cheat compiler---------------------------------------------------------
@@ -97,8 +98,8 @@ int RSA2RSAPublicKey(RSA *rsa, RSAPublicKey *publicKey)
             break;
         }
 
-        BN_set_bit(r32, 32);
-        BN_set_bit(rsaR, RSANUMWORDS * 32);
+        BN_set_bit(r32, BIGNUMTOBIT);
+        BN_set_bit(rsaR, RSANUMWORDS * BIGNUMTOBIT);
         BN_mod_sqr(rsaRR, rsaR, n, ctx);
         BN_div(nullptr, rsaRem, n, r32, ctx);
         BN_mod_inverse(rsaN0inv, rsaRem, r32, ctx);
@@ -187,7 +188,7 @@ bool GenerateKey(const char *file)
         BN_set_word(exponent, RSA_F4);
         RSA_generate_key_ex(rsa, 2048, exponent, nullptr);
         EVP_PKEY_set1_RSA(publicKey, rsa);
-        old_mask = umask(077);
+        old_mask = umask(077); // 077:permission
 
         fKey = fopen(file, "w");
         if (!fKey) {
@@ -255,7 +256,7 @@ int GetUserKeyPath(string &path)
     path = string(buf) + string(sep) + string(harmoneyPath) + string(sep);
     if (stat(path.c_str(), &status)) {
         uv_fs_t req;
-        uv_fs_mkdir(nullptr, &req, path.c_str(), 0750, nullptr);
+        uv_fs_mkdir(nullptr, &req, path.c_str(), 0750, nullptr); // 0750:permission
         uv_fs_req_cleanup(&req);
         if (req.result < 0) {
             WRITE_LOG(LOG_DEBUG, "Cannot mkdir '%s'", path.c_str());
