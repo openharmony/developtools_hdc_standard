@@ -1,4 +1,4 @@
-# HDC-鸿蒙设备连接器<a name="ZH-CN_TOPIC_0000001149090043"></a>
+# HDC-OpenHarmony设备连接器<a name="ZH-CN_TOPIC_0000001149090043"></a>
 
 -   [简介](#section662115419449)
 -   [架构](#section15908143623714)
@@ -15,7 +15,7 @@
 
 ## 简介<a name="section662115419449"></a>
 
-HDC（Harmony Device Connector） 是OpenHarmony为开发人员提供的用于设备连接调试的命令行工具，pc端开发机使用命令行工具hdc_std(为方便起见，下文统称hdc)，该工具需支持部署在Windows/Linux/Mac等系统上与鸿蒙设备（或模拟器）进行连接调试通信。PC端hdc工具需要针对以上开发机操作系统平台分别发布相应的版本，设备端hdc daemon需跟随设备镜像发布包括对模拟器进行支持。下文将介绍hdc的常用命令及使用举例。
+HDC（OpenHarmony Device Connector） 是为开发人员提供的用于设备连接调试的命令行工具，pc端开发机使用命令行工具hdc_std(为方便起见，下文统称hdc)，该工具需支持部署在Windows/Linux/Mac等系统上与OpenHarmony设备（或模拟器）进行连接调试通信。PC端hdc工具需要针对以上开发机操作系统平台分别发布相应的版本，设备端hdc daemon需跟随设备镜像发布包括对模拟器进行支持。下文将介绍hdc的常用命令及使用举例。
 
 ## 架构<a name="section15908143623714"></a>
 
@@ -25,7 +25,7 @@ hdc主要有三部分组成：
 
 2. hdc server部分：作为后台进程也运行于开发机器，server管理client和设备端daemon之间通信包括连接的复用、数据通信包的收发，以及个别本地命令的直接处理。
 
-3. hdc daemon部分：daemon部署于鸿蒙设备端作为守护进程来按需运行，负责处理来自client端的请求。
+3. hdc daemon部分：daemon部署于OpenHarmony设备端作为守护进程来按需运行，负责处理来自client端的请求。
 
 ## 目录<a name="section161941989596"></a>
 
