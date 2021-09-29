@@ -199,20 +199,20 @@ static const struct {
     .config2Desc = config2,
     .config3Desc = config3,
     .wosHead = {
-            .interface = 1,
-            .dwLength = LONG_LE(sizeof(USB_FFS_DESC.wosHead) + sizeof(USB_FFS_DESC.wosDesc)),
-            .bcdVersion = SHORT_LE(1),
-            .wIndex = SHORT_LE(4),
-            .bCount = 1,
-            .Reserved = 0,
-        },
+        .interface = 1,
+        .dwLength = LONG_LE(sizeof(USB_FFS_DESC.wosHead) + sizeof(USB_FFS_DESC.wosDesc)),
+        .bcdVersion = SHORT_LE(1),
+        .wIndex = SHORT_LE(4),
+        .bCount = 1,
+        .Reserved = 0,
+    },
     .wosDesc = {
-            .bFirstInterfaceNumber = 0,
-            .Reserved1 = 1,
-            .CompatibleID = { 'W', 'I', 'N', 'U', 'S', 'B', '\0', '\0'},
-            .SubCompatibleID = {0},
-            .Reserved2 = {0},
-        }
+        .bFirstInterfaceNumber = 0,
+        .Reserved1 = 1,
+        .CompatibleID = { 'W', 'I', 'N', 'U', 'S', 'B', '\0', '\0'},
+        .SubCompatibleID = {0},
+        .Reserved2 = {0},
+    }
 };
 }  // namespace Hdc
 #endif

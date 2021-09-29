@@ -131,8 +131,9 @@ protected:
             ptrTask = new T(hTaskInfo);
             hTaskInfo->taskClass = ptrTask;
             hTaskInfo->taskType = taskType;
-        } else
+        } else {
             ptrTask = (T *)hTaskInfo->taskClass;
+        }
         if (!ptrTask->CommandDispatch(command, payload, payloadSize)) {
             ptrTask->TaskFinish();
         }

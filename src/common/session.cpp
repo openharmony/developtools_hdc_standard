@@ -1059,5 +1059,4 @@ void HdcSessionBase::PostStopInstanceMessage(bool restart)
     WRITE_LOG(LOG_DEBUG, "StopDaemon has sended");
     wantRestart = restart;
 }
-
 }  // namespace Hdc
