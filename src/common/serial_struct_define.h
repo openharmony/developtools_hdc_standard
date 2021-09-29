@@ -1262,7 +1262,7 @@ namespace SerialStruct {
             return false;
         }
     };
-     template<> struct Serializer<uint16_t> {
+    template<> struct Serializer<uint16_t> {
         static void Serialize(uint32_t tag, uint16_t value, FlagsType<>, Writer &out, bool force = false)
         {
             Serializer<uint32_t>::Serialize(tag, value, FlagsType(), out, force);
