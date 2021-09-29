@@ -16,7 +16,6 @@
 using namespace Hdc;
 
 namespace HdcTest {
-
 TEST(HdcBaseFunction, HandleNoneZeroInput)
 {
     char bufString[256] = "";
@@ -69,7 +68,6 @@ TEST(AppCommand, HandleNoneZeroInput)
     GTEST_ASSERT_EQ(true, ftest->CheckEntry(ftest->UT_MOD_APP));
     delete ftest;
 }
-
 }  // namespace HdcTest
 
 int main(int argc, const char *argv[])
