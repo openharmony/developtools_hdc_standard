@@ -462,7 +462,7 @@ bool HdcForwardBase::BeginForward(const char *command, string &sError)
     }
     char **argv = Base::SplitCommandToArgs(command, &argc);
     while (true) {
-        if (argc < 2) { // 2 : 2 args
+        if (argc < CMD_ARG1_COUNT) {
             break;
         }
         if (strlen(argv[0]) > BUF_SIZE_SMALL || strlen(argv[1]) > BUF_SIZE_SMALL) {
