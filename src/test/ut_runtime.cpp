@@ -112,7 +112,8 @@ void Runtime::StartDaemon(uv_work_t *arg)
 
 int Runtime::CheckServerDaemonReady()
 {
-    if (++waitServerDaemonReadyCount > 10) {
+    constexpr auto waitCount = 10;
+    if (++waitServerDaemonReadyCount > waitCount) {
         return ERR_UT_MODULE_WAITMAX;
     }
     if (!serverRunning || !daemonRunning) {
