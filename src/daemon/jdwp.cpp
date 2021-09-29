@@ -269,7 +269,7 @@ bool HdcJdwp::SendJdwpNewFD(uint32_t targetPID, int fd)
         // transfer fd to jvm
         // clang-format off
         if (Base::SendToStreamEx((uv_stream_t *)&ctx->pipe, (uint8_t *)&ctx->dummy, 1, (uv_stream_t *)&ctx->jvmTCP,
-                (void *)SendCallbackJdwpNewFD, (const void *)ctx) < 0) {
+            (void *)SendCallbackJdwpNewFD, (const void *)ctx) < 0) {
             break;
         }
         // clang-format on

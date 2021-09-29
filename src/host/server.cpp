@@ -767,5 +767,4 @@ bool HdcServer::RemoveInstanceTask(const uint8_t op, HTaskInfo hTask)
     }
     return ret;
 }
-
 }  // namespace Hdc
