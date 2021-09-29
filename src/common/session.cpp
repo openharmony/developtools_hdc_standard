@@ -693,7 +693,7 @@ int HdcSessionBase::DecryptPayload(HSession hSession, PayloadHead *payloadHeadBe
 int HdcSessionBase::OnRead(HSession hSession, uint8_t *bufPtr, const int bufLen)
 {
     int ret = ERR_GENERIC;
-    if (memcmp(bufPtr, PACKET_FLAG.c_str(), 2)) {
+    if (memcmp(bufPtr, PACKET_FLAG.c_str(), PACKET_FLAG.size())) {
         return ERR_BUF_CHECK;
     }
     struct PayloadHead *payloadHead = (struct PayloadHead *)bufPtr;
@@ -799,7 +799,7 @@ void HdcSessionBase::ReadCtrlFromSession(uv_stream_t *uvpipe, ssize_t nread, con
             WRITE_LOG(LOG_DEBUG, "SessionCtrl failed,%s", uv_strerror(nread));
             break;
         }
-        if (nread > 64) {
+        if (nread > 64) {  // 64 : max length
             WRITE_LOG(LOG_WARN, "HdcSessionBase read overlap data");
             break;
         }
