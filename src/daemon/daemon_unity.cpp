@@ -118,7 +118,7 @@ bool HdcDaemonUnity::FindMountDeviceByPath(const char *toQuery, char *dev)
         // clang-format on
         dev[BUF_SIZE_SMALL - 1] = '\0';
         dir[BUF_SIZE_SMALL - 1] = '\0';
-        if (res == 4 && (strcmp(toQuery, dir) == 0)) {
+        if (res == 4 && (strcmp(toQuery, dir) == 0)) { // 4 : The correct number of parameters
             return true;
         }
         token = strtok(nullptr, delims);
@@ -132,7 +132,7 @@ bool HdcDaemonUnity::RemountPartition(const char *dir)
     int off = 0;
     char dev[BUF_SIZE_SMALL] = "";
 
-    if (!FindMountDeviceByPath(dir, dev) || strlen(dev) < 4) {
+    if (!FindMountDeviceByPath(dir, dev) || strlen(dev) < 4) { // 4 : file count
         WRITE_LOG(LOG_DEBUG, "FindMountDeviceByPath failed");
         return false;
     }
@@ -202,9 +202,9 @@ bool HdcDaemonUnity::SetDeviceRunMode(void *daemonIn, const char *cmd)
     WRITE_LOG(LOG_DEBUG, "Set run mode:%s", cmd);
     if (!strcmp(CMDSTR_TMODE_USB.c_str(), cmd)) {
         Base::SetHdcProperty("persist.hdc.mode", CMDSTR_TMODE_USB.c_str());
-    } else if (!strncmp("port", cmd, 4)) {
+    } else if (!strncmp("port", cmd, strlen("port"))) {
         Base::SetHdcProperty("persist.hdc.mode", CMDSTR_TMODE_TCP.c_str());
-        if (!strncmp("port ", cmd, 5)) {
+        if (!strncmp("port ", cmd, strlen("port "))) {
             const char *port = cmd + 5;
             Base::SetHdcProperty("persist.hdc.port", port);
         }

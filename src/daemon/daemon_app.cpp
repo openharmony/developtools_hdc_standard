@@ -112,7 +112,7 @@ void HdcDaemonApp::PackageShell(bool installOrUninstall, const char *options, co
 {
     ++refCount;
     // asynccmd Other processes, no RunningProtect protection
-    chmod(package, 0644);
+    chmod(package, 0644); // 0644 : permission
     string doBuf;
     if (installOrUninstall) {
         doBuf = Base::StringFormat("bm install %s -p %s", options, package);
