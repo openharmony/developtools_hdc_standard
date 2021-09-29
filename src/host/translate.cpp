@@ -20,7 +20,7 @@ namespace TranslateCommand {
     {
         string ret;
 
-        ret = "\n                         Harmony device connector(HDC) ...\n\n"
+        ret = "\n                         OpenHarmony device connector(HDC) ...\n\n"
               "---------------------------------global commands:----------------------------------\n"
               " -h/help                               - Print hdc help\n"
               " -v/version                            - Print hdc version\n"
