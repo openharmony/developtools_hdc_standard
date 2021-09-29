@@ -74,7 +74,7 @@ int HdcUSBBase::SendUSBBlock(HSession hSession, uint8_t *data, const int length)
     }
     for (i = 0; i < iCount; ++i) {
         USBHead *pUSBHead = (USBHead *)ioBuf;
-        int errCode = memcpy_s(pUSBHead->flag, sizeof(pUSBHead->flag), PACKET_FLAG.c_str(), 2);
+        int errCode = memcpy_s(pUSBHead->flag, sizeof(pUSBHead->flag), PACKET_FLAG.c_str(), PACKET_FLAG.size());
         if (errCode != EOK) {
             offset = ERR_BUF_COPY;
             break;
