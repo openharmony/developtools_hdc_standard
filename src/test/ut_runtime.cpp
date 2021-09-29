@@ -225,5 +225,4 @@ void Runtime::WorkerPendding()
     uv_run(&loopMain, UV_RUN_DEFAULT);
     WRITE_LOG(LOG_DEBUG, "TesPendding free");
 }
-
 }  // namespace HdcTest

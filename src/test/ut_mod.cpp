@@ -284,5 +284,4 @@ bool TestAppCommand(void *runtimePtr)
     }
     return true;
 }
-
 }  // namespace HdcTest
