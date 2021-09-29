@@ -53,7 +53,7 @@ bool ForkChildCheck(int argc, const char *argv[])
         WRITE_LOG(LOG_DEBUG, "Default USB mode");
         g_enableUsb = true;
     }
-    if (argc == 2) {
+    if (argc == 2) { // 2 : 2 args
         if (!strcmp(argv[1], "-forkchild")) {
             g_backgroundRun = false;  // forkchild,Forced foreground
         } else if (!strcmp(argv[1], "-b")) {
