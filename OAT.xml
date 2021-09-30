@@ -57,9 +57,8 @@ Note:If the text contains special characters, please escape them according to th
 <configuration>
     <oatconfig> 
         <filefilterlist>
-            <filefilter name="binaryFileTypePolicyFilter" desc="Filters for binary file policies" >
-                <filteritem type="filepath" name="prebuilt/windows/hdc_std.exe" desc="the prebuilt binary file for windows, the file is self-developed"/>
-                <filteritem type="filepath" name="prebuilt/linux/hdc_std" desc="the prebuilt binary file for linux, the file is self-developed"/>
+            <filefilter name="defaultPolicyFilter" desc="Filters for compatibility，license header policies">
+                <filteritem type="filepath" name="prebuilt/NOTICE" desc="no license header"/>
             </filefilter>
         </filefilterlist>
     </oatconfig>

@@ -94,15 +94,15 @@ void HdcJdwp::ReadStream(uv_stream_t *pipe, ssize_t nread, const uv_buf_t *buf)
         if (nread == UV_ENOBUFS) {  // It is definite enough, usually only 4 bytes
             WRITE_LOG(LOG_DEBUG, "HdcJdwp::ReadStream IOBuf max");
             break;
-        } else if (nread <= 0 || nread != 4) {
+        } else if (nread <= 0 || nread != 4) { // 4 : 4 bytes
             WRITE_LOG(LOG_DEBUG, "HdcJdwp::ReadStream program exit pid:%d", ctxJdwp->pid);
             break;
         }
-        int errCode = memcpy_s(temp, sizeof(temp), ctxJdwp->buf + offset, 4);
+        int errCode = memcpy_s(temp, sizeof(temp), ctxJdwp->buf + offset, 4); // 4 : 4 bytes
         if (errCode != EOK) {
             break;
         }
-        temp[4] = 0;
+        temp[4] = 0; // 4 : pid length
         if (sscanf_s(temp, "%04x", &pid) != 1) {
             WRITE_LOG(LOG_WARN, "could not decode PID number: '%s'", temp);
             break;
@@ -110,7 +110,7 @@ void HdcJdwp::ReadStream(uv_stream_t *pipe, ssize_t nread, const uv_buf_t *buf)
         WRITE_LOG(LOG_DEBUG, "JDWP accept pid:%d", pid);
         ctxJdwp->pid = pid;
         thisClass->AdminContext(OP_ADD, pid, ctxJdwp);
-        offset += 4;
+        offset += 4; // 4 : 4 bytes
         ret = true;
         break;  // just 4bytes, now finish
     }

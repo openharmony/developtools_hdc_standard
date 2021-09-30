@@ -20,7 +20,7 @@
 #include <openssl/buffer.h>
 #include <openssl/evp.h>
 #include <openssl/md5.h>
-#include <sstream>
+#include <random>
 #include <thread>
 #ifdef __MUSL__
 extern "C" {
@@ -366,20 +366,20 @@ namespace Base {
     uint64_t GetRandom(const uint64_t min, const uint64_t max)
     {
         uint64_t ret;
-        uv_random(nullptr, nullptr, &ret, sizeof(ret), 0, nullptr);
+        std::random_device rd;
+        std::mt19937 gen(rd());
+        std::uniform_int_distribution<uint64_t> dis(min, max);
+        ret = dis(gen);
         return ret;
     }
 
     string GetRandomString(const uint16_t expectedLen)
     {
-        srand(static_cast<unsigned int>(GetRandom()));
-        string ret = string(expectedLen, '0');
-        std::stringstream val;
-        for (auto i = 0; i < expectedLen; ++i) {
-            val << std::hex << (rand() % BUF_SIZE_MICRO);
-        }
-        ret = val.str();
-        return ret;
+        std::string str("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz");
+        std::random_device rd;
+        std::mt19937 generator(rd());
+        std::shuffle(str.begin(), str.end(), generator);
+        return str.substr(0, expectedLen);
     }
 
     int GetRandomNum(const int min, const int max)
@@ -564,7 +564,7 @@ namespace Base {
 #endif
 #else
         string sKey = key;
-        string sBuf = "param get " + sKey;
+        string sBuf = "getparam " + sKey;
         RunPipeComand(sBuf.c_str(), value, sizeOutBuf, true);
 #endif
         value[sizeOutBuf - 1] = '\0';
@@ -939,7 +939,7 @@ namespace Base {
         int padding = 0;
         if (b64input[len - 1] == '=' && b64input[len - 2] == '=') {
             // last two chars are =
-            padding = 2;
+            padding = 2;  // 2 : last two chars
         } else if (b64input[len - 1] == '=') {
             // last char is =
             padding = 1;

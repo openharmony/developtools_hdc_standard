@@ -403,19 +403,19 @@ bool HdcServerForClient::TaskCommand(HChannel hChannel, void *formatCommandInput
     uint8_t sizeCmdFlag = 0;
     if (CMD_FILE_INIT == formatCommand->cmdFlag) {
         cmdFlag = "send ";
-        sizeCmdFlag = 5;
+        sizeCmdFlag = 5; // 5: cmdFlag send size
     } else if (CMD_FORWARD_INIT == formatCommand->cmdFlag) {
         cmdFlag = "fport ";
-        sizeCmdFlag = 6;
+        sizeCmdFlag = 6; // 6: cmdFlag fport size
     } else if (CMD_APP_INIT == formatCommand->cmdFlag) {
         cmdFlag = "install ";
-        sizeCmdFlag = 8;
+        sizeCmdFlag = 8; // 8: cmdFlag install size
     } else if (CMD_APP_UNINSTALL == formatCommand->cmdFlag) {
         cmdFlag = "uninstall ";
-        sizeCmdFlag = 10;
+        sizeCmdFlag = 10; // 10: cmdFlag uninstall size
     } else if (CMD_UNITY_BUGREPORT_INIT == formatCommand->cmdFlag) {
         cmdFlag = "bugreport ";
-        sizeCmdFlag = 10;
+        sizeCmdFlag = 10; // 10: cmdFlag bugreport size
     } else if (CMD_APP_SIDELOAD == formatCommand->cmdFlag) {
         cmdFlag = "sideload ";
         sizeCmdFlag = 9;
@@ -627,7 +627,7 @@ int HdcServerForClient::ReadChannel(HChannel hChannel, uint8_t *bufPtr, const in
         formatCommand.cmdFlag = CMD_SHELL_DATA;
     }
     if (!DoCommand(hChannel, &formatCommand)) {
-        return -3;  // error or want close
+        return -3;  // -3: error or want close
     }
     ret = bytesIO;
     return ret;

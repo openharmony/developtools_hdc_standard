@@ -86,7 +86,7 @@ void HdcDaemon::InitMod(bool bEnableTCP, bool bEnableUSB)
 
     // enable security
     char value[4] = "0";
-    Base::GetHdcProperty("ro.hdc.secure", value, 4);
+    Base::GetHdcProperty("ro.hdc.secure", value, sizeof(value));
     string secure = value;
     enableSecure = (Base::Trim(secure) == "1");
 }
@@ -293,7 +293,7 @@ bool HdcDaemon::ServerCommand(const uint32_t sessionId, const uint32_t channelId
 void HdcDaemon::JdwpNewFileDescriptor(const uint8_t *buf, const int bytesIO)
 {
     uint32_t pid = *(uint32_t *)(buf + 1);
-    uint32_t fd = *(uint32_t *)(buf + 5);
+    uint32_t fd = *(uint32_t *)(buf + 5); // 5 : fd offset
     ((HdcJdwp *)clsJdwp)->SendJdwpNewFD(pid, fd);
 };
 }  // namespace Hdc
