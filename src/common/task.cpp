@@ -85,7 +85,7 @@ int HdcTaskBase::ThreadCtrlCommunicate(const uint8_t *bufPtr, const int size)
     } else if (uv_thread_self() == hSession->hWorkChildThread) {
         handleStream = (uv_stream_t *)&hSession->ctrlPipe[STREAM_WORK];
     } else {
-        return -2;
+        return ERR_GENERIC;
     }
     return Base::SendToStream(handleStream, bufPtr, size);
 }

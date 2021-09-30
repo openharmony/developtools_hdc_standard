@@ -133,7 +133,7 @@ int HdcShell::ShellFork(const char *cmd, const char *arg0, const char *arg1)
     pid = fork();
     if (pid < 0) {
         WRITE_LOG(LOG_DEBUG, "Fork shell failed:%s", strerror(errno));
-        return -4;
+        return ERR_GENERIC;
     }
     if (pid == 0) {
         HdcShell::mutexPty.unlock();
