@@ -1156,9 +1156,8 @@ namespace Base {
     vector<uint8_t> Md5Sum(uint8_t *buf, int size)
     {
         vector<uint8_t> ret;
-        uint8_t md5Hash[MD5_DIGEST_LENGTH] = { 0 };
-        if (EVP_Digest(buf, size, md5Hash, NULL, EVP_md5(), NULL)) {
-            ret.insert(ret.begin(), md5Hash, md5Hash + sizeof(md5Hash));
+        if (buf != nullptr && size > 0) {  // dummy for security temp
+            ret.push_back(0);
         }
         return ret;
     }
