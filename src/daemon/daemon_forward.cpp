@@ -59,12 +59,14 @@ bool HdcDaemonForward::SetupJdwpPoint(HCtxForward ctxPoint)
     if (uv_tcp_open(&ctxPoint->tcp, fds[0])) {
         return ret;
     }
-    uint8_t flag[9];
+    constexpr auto len = sizeof(uint32_t);
+    uint8_t flag[1 + len + len];
     flag[0] = SP_JDWP_NEWFD;
-    if (memcpy_s(flag + 1, sizeof(flag) - 1, &pid, 4) || memcpy_s(flag + 5, sizeof(flag) - 5, &fds[1], 4)) {
+    if (memcpy_s(flag + 1, sizeof(flag) - 1, &pid, len) ||
+        memcpy_s(flag + 1 + len, sizeof(flag) - len - 1, &fds[1], len)) {
         return ret;
     }
-    if (ThreadCtrlCommunicate(flag, 9) > 0) {
+    if (ThreadCtrlCommunicate(flag, sizeof(flag)) > 0) {
         ret = true;
     }
     WRITE_LOG(LOG_DEBUG, "SendJdwpNewFD Finish,ret:%d fd0:%d fd1:%d", ret, fds[0], fds[1]);

@@ -98,31 +98,34 @@ bool AsyncCmd::Initial(uv_loop_t *loopIn, const CmdResultCallback callback, uint
     }
     loop = loopIn;
     resultCallback = callback;
-    if (StartProcess() < 0) {
-        return false;
-    }
     options = optionsIn;
     return true;
 }
 
-bool AsyncCmd::ExecuteCommand(const string &command) const
+bool AsyncCmd::ExecuteCommand(const string &command)
 {
     string cmd = command;
     Base::Trim(cmd, "\"");
-    if (options & OPTION_APPEND_NEWLINE) {
-        cmd += "\n";
+    if (!(options & OPTION_COMMAND_ONETIME)) {
+        if (StartProcess() < 0) {
+            return false;
+        }
+        if (options & OPTION_APPEND_NEWLINE) {
+            cmd += "\n";
+        }
+        Base::SendToStream((uv_stream_t *)&stdinPipe, (uint8_t *)cmd.c_str(), cmd.size() + 1);
+    } else {
+        if (StartProcess(cmd) < 0) {
+            return false;
+        }
     }
-    if (options & OPTION_COMMAND_ONETIME) {
-        cmd += "exit\n";
-    }
-    Base::SendToStream((uv_stream_t *)&stdinPipe, (uint8_t *)cmd.c_str(), cmd.size() + 1);
     return true;
 }
 
-int AsyncCmd::StartProcess()
+int AsyncCmd::StartProcess(string command)
 {
     constexpr auto countStdIOCount = 3;
-    char *ppShellArgs[2];
+    char **ppShellArgs = nullptr;
     string shellPath = Base::GetShellPath();
     uv_stdio_container_t stdioShellProc[3];
     while (true) {
@@ -142,8 +145,20 @@ int AsyncCmd::StartProcess()
         procOptions.stdio_count = countStdIOCount;
         procOptions.file = shellPath.c_str();
         procOptions.exit_cb = ExitCallback;
-        ppShellArgs[0] = (char *)shellPath.c_str();
-        ppShellArgs[1] = nullptr;
+
+        if (command.size() > 0) {
+            constexpr auto args = 4;
+            ppShellArgs = new char *[args];
+            const string shellCommandFlag = "-c";
+            ppShellArgs[0] = (char *)shellPath.c_str();
+            ppShellArgs[1] = (char *)shellCommandFlag.c_str();
+            ppShellArgs[args - CMD_ARG1_COUNT] = (char *)command.c_str();
+            ppShellArgs[args - 1] = nullptr;
+        } else {
+            ppShellArgs = new char *[CMD_ARG1_COUNT];
+            ppShellArgs[0] = (char *)shellPath.c_str();
+            ppShellArgs[1] = nullptr;
+        }
         procOptions.args = ppShellArgs;
         proc.data = this;
 
@@ -159,6 +174,9 @@ int AsyncCmd::StartProcess()
         }
         running = true;
         break;
+    }
+    if (ppShellArgs) {
+        delete[] ppShellArgs;
     }
     if (!running) {
         // failed
