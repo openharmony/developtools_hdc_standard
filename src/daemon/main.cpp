@@ -53,7 +53,7 @@ bool ForkChildCheck(int argc, const char *argv[])
         WRITE_LOG(LOG_DEBUG, "Default USB mode");
         g_enableUsb = true;
     }
-    if (argc == 2) {
+    if (argc == CMD_ARG1_COUNT) {
         if (!strcmp(argv[1], "-forkchild")) {
             g_backgroundRun = false;  // forkchild,Forced foreground
         } else if (!strcmp(argv[1], "-b")) {
@@ -163,7 +163,7 @@ int main(int argc, const char *argv[])
         fprintf(stderr, "%s\n", ver.c_str());
         return 0;
     }
-    if (argc == 1 || (argc == 2 && (!strcmp(argv[1], "-forkchild") || !strcmp(argv[1], "-b")))) {
+    if (argc == 1 || (argc == CMD_ARG1_COUNT && (!strcmp(argv[1], "-forkchild") || !strcmp(argv[1], "-b")))) {
         ForkChildCheck(argc, argv);
     } else {
         GetDaemonCommandlineOptions(argc, argv);
