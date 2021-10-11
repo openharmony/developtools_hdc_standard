@@ -100,7 +100,7 @@ namespace TranslateCommand {
             outCmd->cmdFlag = CMD_KERNEL_TARGET_DISCONNECT;
         } else {
             outCmd->cmdFlag = CMD_KERNEL_TARGET_CONNECT;
-            if (outCmd->paraments.size() > 22) {  // tcp max=21,USB max=8bytes
+            if (outCmd->paraments.size() > 22) {  // 22: tcp max=21,USB max=8bytes
                 stringError = "Error connect key's size";
                 outCmd->bJumpDo = true;
             }
@@ -214,7 +214,7 @@ namespace TranslateCommand {
         } else if (!strncmp(input, CMDSTR_FILE_SEND.c_str(), CMDSTR_FILE_SEND.size())
                    || !strncmp(input, CMDSTR_FILE_RECV.c_str(), CMDSTR_FILE_RECV.size())) {
             outCmd->cmdFlag = CMD_FILE_INIT;
-            outCmd->paraments = input + 5;  // CMDSTR_FORWARD_FPORT CMDSTR_FORWARD_RPORT size
+            outCmd->paraments = input + 5;  // 5: CMDSTR_FORWARD_FPORT CMDSTR_FORWARD_RPORT size
         } else if (!strncmp(input, string(CMDSTR_FORWARD_FPORT + " ").c_str(), CMDSTR_FORWARD_FPORT.size() + 1)
                    || !strncmp(input, string(CMDSTR_FORWARD_RPORT + " ").c_str(), CMDSTR_FORWARD_RPORT.size() + 1)) {
             stringError = ForwardPort(input, outCmd);
@@ -263,7 +263,7 @@ namespace TranslateCommand {
         } else if (!strncmp(input, CMDSTR_BUGREPORT.c_str(), CMDSTR_BUGREPORT.size())) {
             outCmd->cmdFlag = CMD_UNITY_BUGREPORT_INIT;
             outCmd->paraments = input;
-            if (outCmd->paraments.size() == 9) {
+            if (outCmd->paraments.size() == CMDSTR_BUGREPORT.size()) {
                 outCmd->paraments += " ";
             }
         } else {
