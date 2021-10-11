@@ -462,7 +462,7 @@ bool HdcForwardBase::BeginForward(const char *command, string &sError)
     }
     char **argv = Base::SplitCommandToArgs(command, &argc);
     while (true) {
-        if (argc < 2) {
+        if (argc < CMD_ARG1_COUNT) {
             break;
         }
         if (strlen(argv[0]) > BUF_SIZE_SMALL || strlen(argv[1]) > BUF_SIZE_SMALL) {
@@ -662,7 +662,7 @@ bool HdcForwardBase::ForwardCommandDispatch(const uint16_t command, uint8_t *pay
     uint32_t id = 0;
     HCtxForward ctx = nullptr;
     FilterCommand(payload, &id, &pContent);
-    sizeContent = payloadSize - 4;
+    sizeContent = payloadSize - DWORD_SERIALIZE_SIZE;
     if (!(ctx = (HCtxForward)AdminContext(OP_QUERY, id, nullptr))) {
         WRITE_LOG(LOG_WARN, "Query id failed");
         return false;

@@ -4,10 +4,10 @@
 -   [架构](#section15908143623714)
 -   [目录](#section161941989596)
     -   [pc端编译说明](#section129654513262)
-    -   [预制pc端下载说明](#section129654513263)
-        -    [1.通过git clone方式下载(建议)](#section161941989591)
-        -    [2.通过网页形式下载](#section161941989592)
-        -    [3.支持环境](#section161941989593)
+    -   [pc端获取说明](#section129654513263)
+        -    [1.下载sdk获取(建议)](#section161941989591)
+        -    [2.自行编译](#section161941989592)
+        -    [3.支持运行环境](#section161941989593)
     -   [命令帮助](#section129654513264)
 
 -   [使用问题自查说明](#section1371113476307)
@@ -52,24 +52,21 @@ hdc pc端可执行文件编译步骤：
 3. 编译：在目标开发机上运行上面调整好的sdk编译命令， 正常编译hdc_std会输出到sdk平台相关目录下； 注意： ubuntu环境下只能编译windows/linux版本工具，mac版需要在macos开发机上编译。
 
 
-### 预制pc端下载说明<a name="section129654513263"></a>
+### pc端获取说明<a name="section129654513263"></a>
 
 
-[1.通过git clone方式下载(建议)](#section161941989591)
+[1.下载sdk获取(建议)](#section161941989591)
 ```
-下载命令格式:  git clone git@gitee.com:projectname/developtools_hdc_standard.git
-git clone https://gitee.com/projectname/developtools_hdc_standard.git
-其中 projectname为 本仓所在的开源社区项目英文名(譬如: openharmony)
-完整命令示意:  git clone git@gitee.com:openharmony/developtools_hdc_standard.git
-或     git clone https://gitee.com/openharmony/developtools_hdc_standard.git
+通过访问本社区网站下载dailybuilds或正式发布的sdk压缩包，从中根据自己平台到相应的目录toolchain下解压提取
 ```
 
-[2.通过网页形式下载](#section161941989592)
-通过网页形式下载prebuilt，请使用类似如下URL打开网页:
-``` https://gitee.com/openharmony/developtools_hdc_standard/blob/master/prebuilt/windows/hdc-std.exe```
-点击中间下载方式进行下载，windows版本文件大小在**5M左右**，linux版本在**2M左右**，请勿使用右击另存为方式进行保存下载，下载后检查文件大小(**说三遍**)。
+[2.自行编译](#section161941989592)
 
-[3.支持环境](#section161941989593)
+编译请参考上面单独小节，本项目仓prebuilt目录下不再提供预制
+
+
+[3.支持运行环境](#section161941989593)
+
 linux版本建议ubuntu 16.04以上 64位，其他相近版本也可；libc++.so引用错误请使用ldd/readelf等命令检查库引用 windows版本建议windows10 64位，如果低版本windows winusb库缺失，请使用zadig更新库。
 
 

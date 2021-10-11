@@ -380,7 +380,8 @@ bool HdcTransferBase::CommandDispatch(const uint16_t command, uint8_t *payload, 
             context->transferBegin = Base::GetRuntimeMSec();
         } else if (command == commandData) {
             // The size of the actual HOST end may be larger than maxbuf
-            if (payloadSize > MAX_SIZE_IOBUF * 2 || payloadSize < 0) {
+            constexpr auto doubleSize = 2;
+            if (payloadSize > MAX_SIZE_IOBUF * doubleSize || payloadSize < 0) {
                 ret = false;
                 break;
             }

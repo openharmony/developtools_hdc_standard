@@ -939,7 +939,7 @@ namespace Base {
         int padding = 0;
         if (b64input[len - 1] == '=' && b64input[len - 2] == '=') {
             // last two chars are =
-            padding = 2;
+            padding = 2;  // 2 : last two chars
         } else if (b64input[len - 1] == '=') {
             // last char is =
             padding = 1;
