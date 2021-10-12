@@ -47,7 +47,7 @@ hdc pc端可执行文件编译步骤：
 
 1. 工程准备：更新下载整个工程，使得工程包含https://gitee.com/openharmony/build/pulls/89 等必要的提交。
 
-2. 编译命令：调试编译命令 在整个工程编译命令的基础上增加 "--build-target build_ohos_sdk --gn-args build_ohos_sdk=true" 参数即可。
+2. 编译命令：编译sdk命令 请参考https://gitee.com/openharmony/build/blob/master/README_zh.md 仓编译sdk说明， 执行其指定的sdk编译命令来编译整个sdk， hdc会被编译打包到里面。
 
 3. 编译：在目标开发机上运行上面调整好的sdk编译命令， 正常编译hdc_std会输出到sdk平台相关目录下； 注意： ubuntu环境下只能编译windows/linux版本工具，mac版需要在macos开发机上编译。
 
