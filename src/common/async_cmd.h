@@ -36,11 +36,11 @@ public:
     // uv_loop_t loop is given to uv_spawn, which can't be const
     bool Initial(uv_loop_t *loopIn, const CmdResultCallback callback, uint32_t optionsIn = GetDefaultOption());
     void DoRelease();  // Release process resources
-    bool ExecuteCommand(const string &command) const;
+    bool ExecuteCommand(const string &command);
     bool ReadyForRelease() const;
 
 private:
-    int StartProcess();
+    int StartProcess(string command = STRING_EMPTY);
     // uv_read_cb callback 1st parameter can't be changed, const can't be added
     static void ChildReadCallback(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf);
     // uv_exit_cb callback 1st parameter can't be changed, const can't be added
