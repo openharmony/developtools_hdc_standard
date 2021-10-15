@@ -86,6 +86,7 @@ ohos_executable("hdcd") {
 ohos_executable("hdc_std") {
   configs = [ ":hdc_config" ]
   defines = [
+    "HDC_HOST",
     "HARMONY_PROJECT",
   ]
   if (is_mac) {
@@ -97,11 +98,21 @@ ohos_executable("hdc_std") {
     "-Wno-unused-variable",
   ]
   sources = [
+    "src/host/client.cpp",
+    "src/host/host_app.cpp",
+    "src/host/host_forward.cpp",
+    "src/host/host_tcp.cpp",
+    "src/host/host_unity.cpp",
+    "src/host/host_usb.cpp",
     "src/host/main.cpp",
+    "src/host/server.cpp",
+    "src/host/server_for_client.cpp",
+    "src/host/translate.cpp",
   ]
   sources += hdc_common_sources
 
   deps = [
+    "//third_party/libusb:libusb",
     "//third_party/libuv:uv_static",
     "//third_party/lz4:liblz4_static",
     "//third_party/openssl:libcrypto_static",
