@@ -81,20 +81,12 @@ bool HdcServer::Initial(const char *listenString)
     return true;
 }
 
-// Only detects that the default call is in the loop address, the other tubes are not
-bool HdcServer::CheckToPullUptrServer(const char *listenString)
+bool HdcServer::CheckToPullUptrServerWin32(const char *path, const char *listenString)
 {
-    char path[BUF_SIZE_SMALL] = "";
-    size_t nPathSize = sizeof(path);
-    int ret = uv_exepath(path, &nPathSize);
-    if (ret < 0) {
-        WRITE_LOG(LOG_WARN, "uvexepath ret:%d error:%s", ret, uv_err_name(ret));
-        return false;
-    }
 #ifdef _WIN32
     char buf[BUF_SIZE_SMALL] = "";
     char shortPath[MAX_PATH] = "";
-    ret = GetShortPathName(path, shortPath, MAX_PATH);
+    int ret = GetShortPathName(path, shortPath, MAX_PATH);
     std::string runPath = shortPath;
     if (ret == 0) {
         int err = GetLastError();
@@ -119,6 +111,25 @@ bool HdcServer::CheckToPullUptrServer(const char *listenString)
     CreateProcess(nullptr, buf, nullptr, nullptr, true, CREATE_NEW_CONSOLE, nullptr, nullptr, &si, &pi);
     CloseHandle(pi.hThread);
     CloseHandle(pi.hProcess);
+#endif
+    return true;
+}
+
+// Only detects that the default call is in the loop address, the other tubes are not
+bool HdcServer::CheckToPullUptrServer(const char *listenString)
+{
+    char path[BUF_SIZE_SMALL] = "";
+    size_t nPathSize = sizeof(path);
+    int ret = uv_exepath(path, &nPathSize);
+    if (ret < 0) {
+        WRITE_LOG(LOG_WARN, "uvexepath ret:%d error:%s", ret, uv_err_name(ret));
+        return false;
+    }
+
+#ifdef _WIN32
+    if (!CheckToPullUptrServerWin32(path, listenString)) {
+        return false;
+    }
 #else
     pid_t pc = fork();  // create process as daemon process
     if (pc < 0) {

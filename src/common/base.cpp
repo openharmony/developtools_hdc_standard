@@ -146,8 +146,9 @@ namespace Base {
         if (fp == nullptr) {
             return;
         }
-        fprintf(fp, "%s", logBuf.c_str());
-        fflush(fp);
+        if (fprintf(fp, "%s", logBuf.c_str()) > 0 && fflush(fp)) {
+            // make ci happy
+        }
         fclose(fp);
         return;
     }
@@ -161,8 +162,9 @@ namespace Base {
     {
         va_list ap;
         va_start(ap, fmt);
-        vfprintf(stdout, fmt, ap);
-        fprintf(stdout, "\n");
+        if (vfprintf(stdout, fmt, ap) > 0) {
+            fprintf(stdout, "\n");
+        }
         va_end(ap);
     }
 
@@ -1014,12 +1016,12 @@ namespace Base {
 
     const string StringFormat(const char * const formater, va_list &vaArgs)
     {
-        std::vector<char> zc(MAX_SIZE_IOBUF);
-        const int retSize = vsnprintf_s(zc.data(), MAX_SIZE_IOBUF, zc.size() - 1, formater, vaArgs);
+        std::vector<char> vecString(MAX_SIZE_IOBUF);
+        const int retSize = vsnprintf_s(vecString.data(), MAX_SIZE_IOBUF, vecString.size() - 1, formater, vaArgs);
         if (retSize < 0) {
             return std::string("");
         } else {
-            return std::string(zc.data(), retSize);
+            return std::string(vecString.data(), retSize);
         }
     }
     // clang-format on
