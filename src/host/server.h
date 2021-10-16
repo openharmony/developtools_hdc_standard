@@ -53,6 +53,7 @@ private:
     bool ServerSessionHandshake(HSession hSession, uint8_t *payload, int payloadSize);
     void GetDaemonMapOnlyOne(HDaemonInfo &hDaemonInfoInOut);
     void TryStopInstance();
+    static bool CheckToPullUptrServerWin32(const char *path, const char *listenString);
 
     uv_rwlock_t daemonAdmin;
     map<string, HDaemonInfo> mapDaemon;

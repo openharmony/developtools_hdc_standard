@@ -161,12 +161,13 @@ void HdcDaemonUSB::CloseEndpoint(HUSB hUSB, bool closeCtrlEp)
     WRITE_LOG(LOG_FATAL, "DaemonUSB close endpoint");
 }
 
-void HdcDaemonUSB::ResetOldSession(uint32_t sessionId)
+void HdcDaemonUSB::ResetOldSession(const uint32_t sessionId)
 {
     HdcDaemon *daemon = reinterpret_cast<HdcDaemon *>(clsMainBase);
     HSession hSession = daemon->AdminSession(OP_QUERY, sessionId, nullptr);
-    if (hSession == nullptr)
+    if (hSession == nullptr) {
         return;
+    }
     hSession->hUSB->resetIO = true;
     // The Host end program is restarted, but the USB cable is still connected
     WRITE_LOG(LOG_WARN, "Hostside softreset to restart daemon, old sessionId:%u", sessionId);
@@ -233,7 +234,7 @@ int HdcDaemonUSB::CloseBulkEp(bool bulkInOut, int bulkFd, uv_loop_t *loop)
     return 0;
 }
 
-int HdcDaemonUSB::SendUSBIOSync(HSession hSession, HUSB hMainUSB, uint8_t *data, const int length)
+int HdcDaemonUSB::SendUSBIOSync(HSession hSession, HUSB hMainUSB, const uint8_t *data, const int length)
 {
     int bulkIn = hMainUSB->bulkIn;
     int childRet = 0;
