@@ -74,7 +74,6 @@ string HdcDaemonUSB::GetDevPath(const std::string &path)
 
 int HdcDaemonUSB::Initial()
 {
-    // 4.4   Kit Kat      |19, 20     |3.10
     // after Linux-3.8，kernel switch to the USB Function FS
     // Implement USB hdc function in user space
     WRITE_LOG(LOG_DEBUG, "HdcDaemonUSB init");
@@ -83,12 +82,11 @@ int HdcDaemonUSB::Initial()
         WRITE_LOG(LOG_DEBUG, "Only support usb-ffs, make sure kernel3.8+ and usb-ffs enabled, usbmode disabled");
         return -1;
     }
-    const uint16_t usbFfsScanInterval = 1500;
     HdcDaemon *daemon = (HdcDaemon *)clsMainBase;
     WRITE_LOG(LOG_DEBUG, "HdcDaemonUSB::Initiall");
     uv_timer_init(&daemon->loopMain, &checkEP);
     checkEP.data = this;
-    uv_timer_start(&checkEP, WatchEPTimer, 0, usbFfsScanInterval);
+    uv_timer_start(&checkEP, WatchEPTimer, 0, UV_DEFAULT_INTERVAL);
     return 0;
 }
 
@@ -163,6 +161,18 @@ void HdcDaemonUSB::CloseEndpoint(HUSB hUSB, bool closeCtrlEp)
     WRITE_LOG(LOG_FATAL, "DaemonUSB close endpoint");
 }
 
+void HdcDaemonUSB::ResetOldSession(uint32_t sessionId)
+{
+    HdcDaemon *daemon = reinterpret_cast<HdcDaemon *>(clsMainBase);
+    HSession hSession = daemon->AdminSession(OP_QUERY, sessionId, nullptr);
+    if (hSession == nullptr)
+        return;
+    hSession->hUSB->resetIO = true;
+    // The Host end program is restarted, but the USB cable is still connected
+    WRITE_LOG(LOG_WARN, "Hostside softreset to restart daemon, old sessionId:%u", sessionId);
+    daemon->PushAsyncMessage(sessionId, ASYNC_FREE_SESSION, nullptr, 0);
+}
+
 // Prevent other USB data misfortunes to send the program crash
 int HdcDaemonUSB::AvailablePacket(uint8_t *ioBuf, uint32_t *sessionId)
 {
@@ -179,10 +189,7 @@ int HdcDaemonUSB::AvailablePacket(uint8_t *ioBuf, uint32_t *sessionId)
             break;
         }
         if ((usbPayloadHeader->option & USB_OPTION_RESET)) {
-            HdcDaemon *daemon = reinterpret_cast<HdcDaemon *>(clsMainBase);
-            // The Host end program is restarted, but the USB cable is still connected
-            WRITE_LOG(LOG_WARN, "Hostside softreset to restart daemon, old sessionId:%u", usbPayloadHeader->sessionId);
-            daemon->PushAsyncMessage(usbPayloadHeader->sessionId, ASYNC_FREE_SESSION, nullptr, 0);
+            ResetOldSession(usbPayloadHeader->sessionId);
             ret = ERR_IO_SOFT_RESET;
             break;
         }
@@ -230,12 +237,9 @@ int HdcDaemonUSB::SendUSBIOSync(HSession hSession, HUSB hMainUSB, uint8_t *data,
 {
     int bulkIn = hMainUSB->bulkIn;
     int childRet = 0;
-    int ret = -1;
+    int ret = ERR_IO_FAIL;
     int offset = 0;
-    if (!isAlive || !modRunning) {
-        goto Finish;
-    }
-    while (modRunning && !hSession->isDead) {
+    while (modRunning && isAlive && !hSession->isDead && !hSession->hUSB->resetIO) {
         childRet = write(bulkIn, (uint8_t *)data + offset, length - offset);
         if (childRet <= 0) {
             int err = errno;
@@ -244,6 +248,7 @@ int HdcDaemonUSB::SendUSBIOSync(HSession hSession, HUSB hMainUSB, uint8_t *data,
                 continue;
             } else {
                 WRITE_LOG(LOG_DEBUG, "BulkinWrite write fatal errno %d", err);
+                isAlive = false;
             }
             break;
         }
@@ -255,17 +260,14 @@ int HdcDaemonUSB::SendUSBIOSync(HSession hSession, HUSB hMainUSB, uint8_t *data,
     if (offset == length) {
         ret = length;
     } else {
-        WRITE_LOG(LOG_FATAL, "BulkinWrite write failed, nsize:%d really:%d", length, offset);
+        WRITE_LOG(LOG_FATAL,
+                  "BulkinWrite write failed, nsize:%d really:%d modRunning:%d isAlive:%d SessionDead:%d usbReset:%d",
+                  length, offset, modRunning, isAlive, hSession->isDead, hSession->hUSB->resetIO);
     }
-Finish:
     USBHead *pUSBHead = (USBHead *)data;
     if ((pUSBHead->option & USB_OPTION_TAIL) || ret < 0) {
         // tail or failed, dec Ref
         hSession->sendRef--;
-    }
-    if (ret < 0) {
-        WRITE_LOG(LOG_FATAL, "BulkinWrite CloseEndpoint");
-        isAlive = false;
     }
     return ret;
 }
@@ -373,6 +375,7 @@ void HdcDaemonUSB::OnUSBRead(uv_fs_t *req)
     uint32_t sessionId = 0;
     bool ret = false;
     int childRet = 0;
+    --thisClass->ref;
     while (thisClass->isAlive) {
         // Don't care is module running, first deal with this
         if (bytesIOBytes < 0) {
@@ -392,13 +395,15 @@ void HdcDaemonUSB::OnUSBRead(uv_fs_t *req)
         if ((childRet = thisClass->AvailablePacket((uint8_t *)bufPtr, &sessionId)) != RET_SUCCESS) {
             if (childRet != ERR_IO_SOFT_RESET) {
                 WRITE_LOG(LOG_WARN, "AvailablePacket check failed, ret:%d buf:%-50s", bytesIOBytes, bufPtr);
+                break;
             }
-            break;
-        }
-        // can debug payload here
-        if (thisClass->DispatchToWorkThread(sessionId, bufPtr, bytesIOBytes) < 0) {
-            WRITE_LOG(LOG_FATAL, "DispatchToWorkThread failed");
-            break;
+            // reset packet
+        } else {
+            // is AvailablePacket
+            if (thisClass->DispatchToWorkThread(sessionId, bufPtr, bytesIOBytes) < 0) {
+                WRITE_LOG(LOG_FATAL, "DispatchToWorkThread failed");
+                break;
+            }
         }
         if (thisClass->LoopUSBRead(hUSB) < 0) {
             WRITE_LOG(LOG_FATAL, "LoopUSBRead failed");
@@ -440,6 +445,7 @@ int HdcDaemonUSB::LoopUSBRead(HUSB hUSB)
         WRITE_LOG(LOG_FATAL, "uv_fs_read < 0");
         goto FAILED;
     }
+    ++this->ref;
     return 0;
 FAILED:
     if (ctxIo != nullptr) {
@@ -476,9 +482,10 @@ void HdcDaemonUSB::WatchEPTimer(uv_timer_t *handle)
             resetEp = true;
         }
     } while (false);
-    if (resetEp) {
+    if (resetEp || thisClass->usbHandle.bulkIn != 0 || thisClass->usbHandle.bulkOut != 0) {
         return;
     }
+    // until all bulkport reset
     if (thisClass->ConnectEPPoint(hUSB) != RET_SUCCESS) {
         return;
     }

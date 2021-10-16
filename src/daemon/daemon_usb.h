@@ -47,6 +47,7 @@ private:
     bool JumpAntiquePacket(const uint8_t &buf, ssize_t bytes) const;
     int SendUSBIOSync(HSession hSession, HUSB hMainUSB, uint8_t *data, const int length);
     int CloseBulkEp(bool bulkInOut, int bulkFd, uv_loop_t *loop);
+    void ResetOldSession(uint32_t sessionId);
 
     HdcUSB usbHandle;
     string basePath;                // usb device's base path
