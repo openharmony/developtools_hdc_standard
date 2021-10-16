@@ -147,14 +147,15 @@ int AsyncCmd::StartProcess(string command)
         procOptions.exit_cb = ExitCallback;
 
         if (command.size() > 0) {
-            ppShellArgs = new char *[4];
+            constexpr auto args = 4;
+            ppShellArgs = new char *[args];
             const string shellCommandFlag = "-c";
             ppShellArgs[0] = (char *)shellPath.c_str();
             ppShellArgs[1] = (char *)shellCommandFlag.c_str();
-            ppShellArgs[2] = (char *)command.c_str();
-            ppShellArgs[3] = nullptr;
+            ppShellArgs[args - CMD_ARG1_COUNT] = (char *)command.c_str();
+            ppShellArgs[args - 1] = nullptr;
         } else {
-            ppShellArgs = new char *[2];
+            ppShellArgs = new char *[CMD_ARG1_COUNT];
             ppShellArgs[0] = (char *)shellPath.c_str();
             ppShellArgs[1] = nullptr;
         }
