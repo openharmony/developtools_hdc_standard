@@ -103,7 +103,8 @@ int HdcUSBBase::SendUSBBlock(HSession hSession, uint8_t *data, const int length)
 
 int HdcUSBBase::SendToHdcStream(HSession hSession, uv_stream_t *stream, uint8_t *appendData, int dataSize)
 {
-    vector<uint8_t> &bufRecv = hSession->hUSB->bufRecv;
+    HUSB hUSB = hSession->hUSB;
+    vector<uint8_t> &bufRecv = hUSB->bufRecv;
     bufRecv.insert(bufRecv.end(), appendData, appendData + dataSize);
     int ret = RET_SUCCESS;
     while (bufRecv.size() > sizeof(USBHead)) {
@@ -118,9 +119,16 @@ int HdcUSBBase::SendToHdcStream(HSession hSession, uv_stream_t *stream, uint8_t 
             break;  // successful , but not enough
         }
         if (usbHeader->sessionId != hSession->sessionId) {
-            ret = ERR_SESSION_NOFOUND;
-            WRITE_LOG(LOG_FATAL, "SendToHdcStream sessionId not matched");
-            break;
+            // just server do here, daemon 'SendUsbSoftReset' not effect
+            // hilog + ctrl^C to reproduction scene
+            //
+            // Because the API of reset-USB does not support on all platforms, the last session IO data may be
+            // recveived, we need to ignore it.
+            if (hSession->serverOrDaemon && !hUSB->resetIO) {
+                WRITE_LOG(LOG_WARN, "SendToHdcStream sessionId not matched");
+                SendUsbSoftReset(hUSB, usbHeader->sessionId);
+                hUSB->resetIO = true;
+            }
         } else {
             // usb data to logic
             if (Base::SendToStream(stream, bufRecv.data() + sizeof(USBHead), usbHeader->dataSize) < 0) {
