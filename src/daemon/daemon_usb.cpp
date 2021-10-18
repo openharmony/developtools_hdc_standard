@@ -20,6 +20,7 @@ HdcDaemonUSB::HdcDaemonUSB(const bool serverOrDaemonIn, void *ptrMainBase)
     : HdcUSBBase(serverOrDaemonIn, ptrMainBase)
 {
     Base::ZeroStruct(sendEP);
+    Base::ZeroStruct(usbHandle);
     uv_mutex_init(&sendEP);
 }
 
@@ -86,7 +87,7 @@ int HdcDaemonUSB::Initial()
     WRITE_LOG(LOG_DEBUG, "HdcDaemonUSB::Initiall");
     uv_timer_init(&daemon->loopMain, &checkEP);
     checkEP.data = this;
-    uv_timer_start(&checkEP, WatchEPTimer, 0, UV_DEFAULT_INTERVAL);
+    uv_timer_start(&checkEP, WatchEPTimer, 0, 1 * TIME_BASE);
     return 0;
 }
 
