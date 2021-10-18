@@ -81,7 +81,7 @@ bool HdcServer::Initial(const char *listenString)
     return true;
 }
 
-bool HdcServer::CheckToPullUptrServerWin32(const char *path, const char *listenString)
+bool HdcServer::PullupServerWin32(const char *path, const char *listenString)
 {
 #ifdef _WIN32
     char buf[BUF_SIZE_SMALL] = "";
@@ -116,7 +116,7 @@ bool HdcServer::CheckToPullUptrServerWin32(const char *path, const char *listenS
 }
 
 // Only detects that the default call is in the loop address, the other tubes are not
-bool HdcServer::CheckToPullUptrServer(const char *listenString)
+bool HdcServer::PullupServer(const char *listenString)
 {
     char path[BUF_SIZE_SMALL] = "";
     size_t nPathSize = sizeof(path);
@@ -127,7 +127,7 @@ bool HdcServer::CheckToPullUptrServer(const char *listenString)
     }
 
 #ifdef _WIN32
-    if (!CheckToPullUptrServerWin32(path, listenString)) {
+    if (!PullupServerWin32(path, listenString)) {
         return false;
     }
 #else
