@@ -45,8 +45,9 @@ private:
     int LoopUSBRead(HUSB hUSB);
     HSession PrepareNewSession(uint32_t sessionId, uint8_t *pRecvBuf, int recvBytesIO);
     bool JumpAntiquePacket(const uint8_t &buf, ssize_t bytes) const;
-    int SendUSBIOSync(HSession hSession, HUSB hMainUSB, uint8_t *data, const int length);
+    int SendUSBIOSync(HSession hSession, HUSB hMainUSB, const uint8_t *data, const int length);
     int CloseBulkEp(bool bulkInOut, int bulkFd, uv_loop_t *loop);
+    void ResetOldSession(const uint32_t sessionId);
 
     HdcUSB usbHandle;
     string basePath;                // usb device's base path
