@@ -131,7 +131,7 @@ bool HdcHostUSB::DetectMyNeed(libusb_device *device, string &sn)
     uv_timer_init(&hdcServer->loopMain, waitTimeDoCmd);
     waitTimeDoCmd->data = hSession;
     constexpr uint16_t PRECONNECT_INTERVAL = 3000;
-    uv_timer_start(waitTimeDoCmd, hdcServer->UsbPreConnect, UV_DEFAULT_INTERVAL, PRECONNECT_INTERVAL);
+    uv_timer_start(waitTimeDoCmd, hdcServer->UsbPreConnect, GLOBAL_TIMEOUT, PRECONNECT_INTERVAL);
     mapIgnoreDevice[sn] = HOST_USB_REGISTER;
     ret = true;
     delete hUSB;
