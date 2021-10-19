@@ -131,7 +131,7 @@ bool HdcHostUSB::DetectMyNeed(libusb_device *device, string &sn)
     uv_timer_init(&hdcServer->loopMain, waitTimeDoCmd);
     waitTimeDoCmd->data = hSession;
     constexpr uint16_t PRECONNECT_INTERVAL = 3000;
-    uv_timer_start(waitTimeDoCmd, hdcServer->UsbPreConnect, UV_DEFAULT_INTERVAL, PRECONNECT_INTERVAL);
+    uv_timer_start(waitTimeDoCmd, hdcServer->UsbPreConnect, GLOBAL_TIMEOUT, PRECONNECT_INTERVAL);
     mapIgnoreDevice[sn] = HOST_USB_REGISTER;
     ret = true;
     delete hUSB;
@@ -342,13 +342,10 @@ void LIBUSB_CALL HdcHostUSB::ReadUSBBulkCallback(struct libusb_transfer *transfe
             WRITE_LOG(LOG_FATAL, "Host usb not LIBUSB_TRANSFER_COMPLETED, status:%d", transfer->status);
             break;
         }
-        if ((childRet
-             = thisClass->SendToHdcStream(hSession, reinterpret_cast<uv_stream_t *>(&hSession->dataPipe[STREAM_MAIN]),
-                                          hUSB->bufDevice, transfer->actual_length))
-            != RET_SUCCESS) {
-            if (childRet == ERR_SESSION_NOFOUND) {
-                thisClass->SendUsbSoftReset(hUSB, hSession->sessionId);
-            }
+        childRet
+            = thisClass->SendToHdcStream(hSession, reinterpret_cast<uv_stream_t *>(&hSession->dataPipe[STREAM_MAIN]),
+                                         hUSB->bufDevice, transfer->actual_length);
+        if (childRet != RET_SUCCESS && childRet != ERR_SESSION_NOFOUND) {
             break;
         }
         hUSB->lockDeviceHandle.lock();
@@ -366,7 +363,6 @@ void LIBUSB_CALL HdcHostUSB::ReadUSBBulkCallback(struct libusb_transfer *transfe
     }
     if (!bOK) {
         auto server = reinterpret_cast<HdcServer *>(thisClass->clsMainBase);
-
         server->FreeSession(hSession->sessionId);
         hUSB->recvIOComplete = true;
         WRITE_LOG(LOG_WARN, "ReadUSBBulkCallback failed");
@@ -429,6 +425,7 @@ void LIBUSB_CALL HdcHostUSB::WriteUSBBulkCallback(struct libusb_transfer *transf
     HdcSessionBase *server = reinterpret_cast<HdcSessionBase *>(hSession->classInstance);
     uint16_t zeroMask = hSession->hUSB->wMaxPacketSize - 1;
     if (transfer->length != 0 && zeroMask != 0 && (transfer->length & zeroMask) == 0) {
+        // Zero packet
         transfer->length = 0;
         if (libusb_submit_transfer(transfer) == 0) {
             return;
@@ -547,7 +544,6 @@ HSession HdcHostUSB::ConnectDetectDaemon(const HSession hSession, const HDaemonI
     }
     UpdateUSBDaemonInfo(hUSB, hSession, STATUS_CONNECTED);
     RegisterReadCallback(hSession);
-
     hUSB->usbMountPoint = pdi->usbMountPoint;
     WRITE_LOG(LOG_DEBUG, "HSession HdcHostUSB::ConnectDaemon");
 

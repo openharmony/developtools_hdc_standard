@@ -20,6 +20,7 @@
 #include <openssl/buffer.h>
 #include <openssl/evp.h>
 #include <openssl/md5.h>
+#include <random>
 #include <sstream>
 #include <thread>
 #ifdef __MUSL__
@@ -145,8 +146,9 @@ namespace Base {
         if (fp == nullptr) {
             return;
         }
-        fprintf(fp, "%s", logBuf.c_str());
-        fflush(fp);
+        if (fprintf(fp, "%s", logBuf.c_str()) > 0 && fflush(fp)) {
+            // make ci happy
+        }
         fclose(fp);
         return;
     }
@@ -160,8 +162,9 @@ namespace Base {
     {
         va_list ap;
         va_start(ap, fmt);
-        vfprintf(stdout, fmt, ap);
-        fprintf(stdout, "\n");
+        if (vfprintf(stdout, fmt, ap) > 0) {
+            fprintf(stdout, "\n");
+        }
         va_end(ap);
     }
 
@@ -365,8 +368,16 @@ namespace Base {
 
     uint64_t GetRandom(const uint64_t min, const uint64_t max)
     {
+#ifdef HARMONY_PROJECT
         uint64_t ret;
         uv_random(nullptr, nullptr, &ret, sizeof(ret), 0, nullptr);
+#else
+        uint64_t ret;
+        std::random_device rd;
+        std::mt19937 gen(rd());
+        std::uniform_int_distribution<uint64_t> dis(min, max);
+        ret = dis(gen);
+#endif
         return ret;
     }
 
@@ -1005,12 +1016,12 @@ namespace Base {
 
     const string StringFormat(const char * const formater, va_list &vaArgs)
     {
-        std::vector<char> zc(MAX_SIZE_IOBUF);
-        const int retSize = vsnprintf_s(zc.data(), MAX_SIZE_IOBUF, zc.size() - 1, formater, vaArgs);
+        std::vector<char> args(MAX_SIZE_IOBUF);
+        const int retSize = vsnprintf_s(args.data(), MAX_SIZE_IOBUF, args.size() - 1, formater, vaArgs);
         if (retSize < 0) {
             return std::string("");
         } else {
-            return std::string(zc.data(), retSize);
+            return std::string(args.data(), retSize);
         }
     }
     // clang-format on

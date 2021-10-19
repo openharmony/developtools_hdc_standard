@@ -26,6 +26,7 @@ public:
         return 0;
     }
     virtual bool ReadyForWorkThread(HSession hSession);
+    virtual void SendUsbSoftReset(HUSB hUSB, uint32_t sessionId) {};
     int SendUSBBlock(HSession hSession, uint8_t *data, const int length);
     static void ReadUSB(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf);
     int SendToHdcStream(HSession hSession, uv_stream_t *stream, uint8_t *appendData, int dataSize);
