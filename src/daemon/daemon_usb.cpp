@@ -20,6 +20,7 @@ HdcDaemonUSB::HdcDaemonUSB(const bool serverOrDaemonIn, void *ptrMainBase)
     : HdcUSBBase(serverOrDaemonIn, ptrMainBase)
 {
     Base::ZeroStruct(sendEP);
+    Base::ZeroStruct(usbHandle);
     uv_mutex_init(&sendEP);
 }
 
