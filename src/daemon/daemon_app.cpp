@@ -76,9 +76,10 @@ bool HdcDaemonApp::CommandDispatch(const uint16_t command, uint8_t *payload, con
                        UV_FS_O_TRUNC | UV_FS_O_CREAT | UV_FS_O_WRONLY, S_IRUSR, OnFileOpen);
             break;
         }
-        case CMD_APP_UNINSTALL: {  // This command has a command to implant the risk, but it is a controllable device,
-                                   // it can be ignored
-            PackageShell(false, "", (const char *)payload);  // Connection parameters to pass over the interface
+        case CMD_APP_UNINSTALL: {
+            // This command has a command to implant the risk, but it is a controllable device, it can be ignored
+            string bufString((char *)payload, payloadSize);
+            PackageShell(false, "", bufString);  // Connection parameters to pass over the interface
             break;
         }
         default:
@@ -108,16 +109,16 @@ bool HdcDaemonApp::AsyncInstallFinish(bool finish, int64_t exitStatus, const str
     return true;
 }
 
-void HdcDaemonApp::PackageShell(bool installOrUninstall, const char *options, const char *package)
+void HdcDaemonApp::PackageShell(bool installOrUninstall, const char *options, const string package)
 {
     ++refCount;
     // asynccmd Other processes, no RunningProtect protection
-    chmod(package, 0644); // 0644 : permission
+    chmod(package.c_str(), 0644);  // 0644 : permission
     string doBuf;
     if (installOrUninstall) {
-        doBuf = Base::StringFormat("bm install %s -p %s", options, package);
+        doBuf = Base::StringFormat("bm install %s -p %s", options, package.c_str());
     } else {
-        doBuf = Base::StringFormat("bm uninstall %s -n %s", options, package);
+        doBuf = Base::StringFormat("bm uninstall %s -n %s", options, package.c_str());
     }
     funcAppModFinish = std::bind(&HdcDaemonApp::AsyncInstallFinish, this, std::placeholders::_1, std::placeholders::_2,
                                  std::placeholders::_3);
