@@ -225,12 +225,14 @@ struct HdcUSB {
     condition_variable cvTransferSend;
     libusb_transfer *transferSend;
     bool sendIOComplete;
-#endif
+#else
     // usb accessory FunctionFS
     // USB main thread use, sub-thread disable, sub-thread uses the main thread USB handle
-    int bulkOut;  // EP1
-    int bulkIn;   // EP2
+    int bulkOut;  // EP1 device recv
+    int bulkIn;   // EP2 device send
+#endif
     vector<uint8_t> bufRecv;
+    bool resetIO;  // if true, must break write and read,default false
 };
 using HUSB = struct HdcUSB *;
 
