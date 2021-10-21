@@ -1,14 +1,14 @@
 # HDC-OpenHarmony设备连接器<a name="ZH-CN_TOPIC_0000001149090043"></a>
 
--   [简介](#section662115419449)
--   [架构](#section15908143623714)
--   [目录](#section161941989596)
-    -   [pc端编译说明](#section129654513262)
-    -   [pc端获取说明](#section129654513263)
-        -    [1.下载sdk获取(建议)](#section161941989591)
-        -    [2.自行编译](#section161941989592)
-        -    [3.支持运行环境](#section161941989593)
-    -   [命令帮助](#section129654513264)
+- [HDC-OpenHarmony设备连接器<a name="ZH-CN_TOPIC_0000001149090043"></a>](#hdc-OpenHarmony设备连接器)
+  - [简介<a name="section662115419449"></a>](#简介)
+  - [架构<a name="section15908143623714"></a>](#架构)
+  - [目录<a name="section161941989596"></a>](#目录)
+    - [pc端编译说明<a name="section129654513262"></a>](#pc端编译说明)
+    - [pc端获取说明<a name="section129654513263"></a>](#pc端获取说明)
+    - [命令帮助<a name="section129654513264"></a>](#命令帮助)
+  - [使用问题自查说明<a name="section1371113476307"></a>](#使用问题自查说明)
+  - [FAQ<a name="section1371113476308"></a>](#faq)
 
 -   [使用问题自查说明](#section1371113476307)
 -   [FAQ](#section1371113476308)
@@ -36,8 +36,7 @@ hdc主要有三部分组成：
 │       ├── common    # 设备端和host端公用的代码目录
 │       ├── daemon    # 设备端的代码目录 
 │       ├── host      # host端的代码目录
-│       ├── test      # 测试用例的代码目录 
-│   └── prebuilt      # 预编译目录，存放预编译的二进制文件
+│       └── test      # 测试用例的代码目录  
 ```
 
 ### pc端编译说明<a name="section129654513262"></a>
@@ -45,11 +44,9 @@ hdc主要有三部分组成：
 
 hdc pc端可执行文件编译步骤：
 
-1. 工程准备：更新下载整个工程，使得工程包含https://gitee.com/openharmony/build/pulls/89 等必要的提交。
+1. 编译命令：编译sdk命令 请参考https://gitee.com/openharmony/build/blob/master/README_zh.md 仓编译sdk说明， 执行其指定的sdk编译命令来编译整个sdk， hdc会被编译打包到里面。
 
-2. 编译命令：编译sdk命令 请参考https://gitee.com/openharmony/build/blob/master/README_zh.md 仓编译sdk说明， 执行其指定的sdk编译命令来编译整个sdk， hdc会被编译打包到里面。
-
-3. 编译：在目标开发机上运行上面调整好的sdk编译命令， 正常编译hdc_std会输出到sdk平台相关目录下； 注意： ubuntu环境下只能编译windows/linux版本工具，mac版需要在macos开发机上编译。
+2. 编译：在目标开发机上运行上面调整好的sdk编译命令， 正常编译hdc_std会输出到sdk平台相关目录下； 注意： ubuntu环境下只能编译windows/linux版本工具，mac版需要在macos开发机上编译。
 
 
 ### pc端获取说明<a name="section129654513263"></a>
