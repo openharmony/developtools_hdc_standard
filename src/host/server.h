@@ -39,7 +39,7 @@ public:
 
 private:
     void ClearInstanceResource();
-    void BuildDaemonVisableLine(HDaemonInfo hDaemonInfoInOut, bool fullDisplay, string &out);
+    void BuildDaemonVisableLine(HDaemonInfo hdi, bool fullDisplay, string &out);
     void BuildForwardVisableLine(bool fullOrSimble, HForwardInfo hfi, string &echo);
     void ClearMapDaemonInfo();
     bool ServerCommand(const uint32_t sessionId, const uint32_t channelId, const uint16_t command, uint8_t *bufPtr,
