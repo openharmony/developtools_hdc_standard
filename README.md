@@ -1,6 +1,6 @@
 # HDC-OpenHarmony Device Connector<a name="EN-US_TOPIC_0000001149090043"></a>
 
-- [HDC-OpenHarmony Device Connector<a name="EN-US_TOPIC_0000001149090043"></a>](#hdc-openharmony-device-connector)
+- [HDC-OpenHarmony Device Connector<a name="EN-US_TOPIC_0000001149090043"></a>](#hdc-OpenHarmony-Device-Connector)
   - [Introduction<a name="section662115419449"></a>](#introduction)
   - [Architecture<a name="section15908143623714"></a>](#architecture)
   - [Table of Contents<a name="section161941989596"></a>](#table-of-contents)
@@ -16,11 +16,11 @@ HDC (OpenHarmony Device Connector) is a command-line tool for developers to conn
 
 HDC mainly consists of three parts:
 
-1. hdc client part: the client running on the development machine, the user can request to execute the corresponding hdc command under the command terminal of the development machine (windows cmd/linux shell), running on the development machine, other terminal debugging IDEs also include hdc client .
+1. The hdc client part: the client running on the development machine, the user can request to execute the corresponding hdc command under the command terminal of the development machine (windows cmd/linux shell), running on the development machine, other terminal debugging IDEs also include hdc client .
 
 2. The hdc server part: As a background process, it also runs on the development machine. The server manages the communication between the client and the device-side daemon, including the multiplexing of connections, the sending and receiving of data communication packets, and the direct processing of individual local commands.
 
-3. The hdc daemon part: the daemon is deployed on the OpenHarmony device side as a daemon to run on demand, and is responsible for processing requests from the client side.
+3. The hdc daemon part: the daemon is deployed on the OpenHarmony device running on demand, and is responsible for processing requests from the client side.
 
 ## Table of Contents<a name="section161941989596"></a>
 
@@ -62,4 +62,4 @@ The linux version is recommended to be 64-bit above ubuntu 16.04, and other simi
 
 ## More help and docs<a name="section129654513264"></a>
 
-Please check the Chinese help file ‘README_zh.md’ or raise an issue in the gitgee community 
+Please check the Chinese description file ‘README_zh.md’ or raise an issue in the gitgee community.

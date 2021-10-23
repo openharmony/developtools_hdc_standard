@@ -119,10 +119,10 @@ int HdcUSBBase::SendToHdcStream(HSession hSession, uv_stream_t *stream, uint8_t 
             break;  // successful , but not enough
         }
         if (usbHeader->sessionId != hSession->sessionId) {
-            // just server do here, daemon 'SendUsbSoftReset' not effect
+            // Only server do it here, daemon 'SendUsbSoftReset' no use
             // hilog + ctrl^C to reproduction scene
             //
-            // Because the API of reset-USB does not support on all platforms, the last session IO data may be
+            // Because the USB-reset API does not work on all platforms, the last session IO data may be
             // recveived, we need to ignore it.
             if (hSession->serverOrDaemon && !hUSB->resetIO) {
                 WRITE_LOG(LOG_WARN, "SendToHdcStream sessionId not matched");

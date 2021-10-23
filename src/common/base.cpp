@@ -1016,12 +1016,12 @@ namespace Base {
 
     const string StringFormat(const char * const formater, va_list &vaArgs)
     {
-        std::vector<char> vecString(MAX_SIZE_IOBUF);
-        const int retSize = vsnprintf_s(vecString.data(), MAX_SIZE_IOBUF, vecString.size() - 1, formater, vaArgs);
+        std::vector<char> args(MAX_SIZE_IOBUF);
+        const int retSize = vsnprintf_s(args.data(), MAX_SIZE_IOBUF, args.size() - 1, formater, vaArgs);
         if (retSize < 0) {
             return std::string("");
         } else {
-            return std::string(vecString.data(), retSize);
+            return std::string(args.data(), retSize);
         }
     }
     // clang-format on

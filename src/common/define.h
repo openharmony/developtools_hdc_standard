@@ -43,7 +43,6 @@ constexpr uint16_t MAX_CONNECTKEY_SIZE = 32;  // usb sn/tcp ipport
 constexpr uint16_t TIME_BASE = 1000;          // time unit conversion base value
 constexpr uint16_t AID_SHELL = 2000;
 constexpr uint16_t UV_DEFAULT_INTERVAL = 250;  // ms
-constexpr uint16_t UV_WAIT_INTERVAL = 3000;    // ms
 constexpr uint16_t VER_PROTOCOL = 0x01;
 constexpr uint16_t EXTRA_ALLOC_SIZE = 2048;
 // double-word(hex)=[0]major[1][2]minor[3][4]version[5]fix(a-p)[6][7]reserve
