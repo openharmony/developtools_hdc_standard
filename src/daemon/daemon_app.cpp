@@ -77,9 +77,9 @@ bool HdcDaemonApp::CommandDispatch(const uint16_t command, uint8_t *payload, con
             break;
         }
         case CMD_APP_UNINSTALL: {
-            // This command has a command to implant the risk, but it is a controllable device, it can be ignored
-            string bufString((char *)payload, payloadSize);
-            PackageShell(false, "", bufString);  // Connection parameters to pass over the interface
+            // This maybe has a command implanting risk, since it is a controllable device, it can be ignored
+            string bufString(reinterpret_cast<char *>(payload), payloadSize);
+            PackageShell(false, "", bufString);
             break;
         }
         default:

@@ -87,7 +87,7 @@ int HdcDaemonUSB::Initial()
     WRITE_LOG(LOG_DEBUG, "HdcDaemonUSB::Initiall");
     uv_timer_init(&daemon->loopMain, &checkEP);
     checkEP.data = this;
-    uv_timer_start(&checkEP, WatchEPTimer, 0, 1 * TIME_BASE);
+    uv_timer_start(&checkEP, WatchEPTimer, 0, TIME_BASE);
     return 0;
 }
 
@@ -170,7 +170,7 @@ void HdcDaemonUSB::ResetOldSession(const uint32_t sessionId)
         return;
     }
     hSession->hUSB->resetIO = true;
-    // The Host end program is restarted, but the USB cable is still connected
+    // The Host side is restarted, but the USB cable is still connected
     WRITE_LOG(LOG_WARN, "Hostside softreset to restart daemon, old sessionId:%u", sessionId);
     daemon->PushAsyncMessage(sessionId, ASYNC_FREE_SESSION, nullptr, 0);
 }
@@ -401,7 +401,7 @@ void HdcDaemonUSB::OnUSBRead(uv_fs_t *req)
             }
             // reset packet
         } else {
-            // is AvailablePacket
+            // AvailablePacket case
             if (thisClass->DispatchToWorkThread(sessionId, bufPtr, bytesIOBytes) < 0) {
                 WRITE_LOG(LOG_FATAL, "DispatchToWorkThread failed");
                 break;
