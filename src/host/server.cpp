@@ -435,7 +435,7 @@ bool HdcServer::ServerSessionHandshake(HSession hSession, uint8_t *payload, int 
 }
 
 bool HdcServer::FetchCommand(HSession hSession, const uint32_t channelId, const uint16_t command, uint8_t *payload,
-                             int payloadSize)
+                             const int payloadSize)
 {
     bool ret = true;
     HdcServerForClient *pSfc = static_cast<HdcServerForClient *>(clsServerForClient);
