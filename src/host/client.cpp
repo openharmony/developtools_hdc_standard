@@ -70,7 +70,7 @@ bool HdcClient::StartKillServer(const char *cmd, bool startOrKill)
                 uv_kill(pid, SIGN_NUM);
             }
         }
-        HdcServer::CheckToPullUptrServer(channelHostPort.c_str());
+        HdcServer::PullupServer(channelHostPort.c_str());
     } else {
         if (isNowRunning && pid) {
             uv_kill(pid, SIGN_NUM);
@@ -80,7 +80,7 @@ bool HdcClient::StartKillServer(const char *cmd, bool startOrKill)
         if (!strstr(cmd, " -r")) {
             return true;
         }
-        HdcServer::CheckToPullUptrServer(channelHostPort.c_str());
+        HdcServer::PullupServer(channelHostPort.c_str());
     }
     return true;
 }
