@@ -29,7 +29,7 @@ public:
     bool Initial(const char *listenString);
     void AttachChannel(HSession hSession, const uint32_t channelId);
     void DeatchChannel(HSession hSession, const uint32_t channelId);
-    static bool CheckToPullUptrServer(const char *listenString);
+    static bool PullupServer(const char *listenString);
     static void UsbPreConnect(uv_timer_t *handle);
     void NotifyInstanceSessionFree(HSession hSession, bool freeOrClear);
 
@@ -39,7 +39,7 @@ public:
 
 private:
     void ClearInstanceResource();
-    void BuildDaemonVisableLine(HDaemonInfo hDaemonInfoInOut, bool fullDisplay, string &out);
+    void BuildDaemonVisableLine(HDaemonInfo hdi, bool fullDisplay, string &out);
     void BuildForwardVisableLine(bool fullOrSimble, HForwardInfo hfi, string &echo);
     void ClearMapDaemonInfo();
     bool ServerCommand(const uint32_t sessionId, const uint32_t channelId, const uint16_t command, uint8_t *bufPtr,
@@ -53,7 +53,7 @@ private:
     bool ServerSessionHandshake(HSession hSession, uint8_t *payload, int payloadSize);
     void GetDaemonMapOnlyOne(HDaemonInfo &hDaemonInfoInOut);
     void TryStopInstance();
-    static bool CheckToPullUpServerWin32(const char *path, const char *listenString);
+    static bool PullupServerWin32(const char *path, const char *listenString);
 
     uv_rwlock_t daemonAdmin;
     map<string, HDaemonInfo> mapDaemon;
