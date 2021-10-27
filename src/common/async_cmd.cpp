@@ -127,7 +127,7 @@ int AsyncCmd::StartProcess(string command)
     constexpr auto countStdIOCount = 3;
     char **ppShellArgs = nullptr;
     string shellPath = Base::GetShellPath();
-    uv_stdio_container_t stdioShellProc[3];
+    uv_stdio_container_t stdioShellProc[countStdIOCount];
     while (true) {
         uv_pipe_init(loop, &stdinPipe, 1);
         uv_pipe_init(loop, &stdoutPipe, 1);

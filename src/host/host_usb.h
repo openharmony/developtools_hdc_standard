@@ -52,11 +52,13 @@ private:
     void RestoreHdcProtocol(HUSB hUsb, const uint8_t *buf, int bufSize);
     void UpdateUSBDaemonInfo(HUSB hUSB, HSession hSession, uint8_t connStatus);
     void RegisterReadCallback(HSession hSession);
+    void ReviewUsbNodeLater(string &nodeKey);
 
     uv_idle_t usbWork;
     libusb_context *ctxUSB;
     uv_timer_t devListWatcher;
     map<string, UsbCheckStatus> mapIgnoreDevice;
+    const int intervalDevCheck = 3000;
 
 private:
 };
