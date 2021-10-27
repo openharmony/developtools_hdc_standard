@@ -238,7 +238,7 @@ hdc当前常用命令如下，未尽命令使用hdc -h或者hdc --help查看：
   - step2a： 设备管理器设备异常或无设备， 请结合板测试设备端串口下确认下usb部分设备枚举上报是否异常；
   - step2b： 设备管理器设备正常时， 1）list targets 是否正常；2）hdc_std kill 后重试是否正常；
 
-**注意：客户端和设备端版本保持一致(hdc -v,hdcd -v参数查看版本)!**
+**注意：客户端和设备端版本保持一致(hdc_std -v,hdcd -v参数查看版本)!**
 
 ## FAQ<a name="section1371113476308"></a>
 -   1. list targets无设备：
