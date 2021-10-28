@@ -20,7 +20,7 @@ namespace Hdc {
 // ############################## config #######################################
 constexpr uint8_t MINOR_TIMEOUT = 5;
 constexpr uint8_t SIZE_THREAD_POOL = 16;
-constexpr uint8_t GLOBAL_TIMEOUT = 60;
+constexpr uint8_t GLOBAL_TIMEOUT = 30;
 constexpr uint16_t DEFAULT_PORT = 8710;
 constexpr uint16_t MAX_SIZE_IOBUF = 5120;  // USB EP block max size about 10k
 constexpr bool ENABLE_IO_CHECKSUM = false;
@@ -46,7 +46,7 @@ constexpr uint16_t UV_DEFAULT_INTERVAL = 250;  // ms
 constexpr uint16_t VER_PROTOCOL = 0x01;
 constexpr uint16_t EXTRA_ALLOC_SIZE = 2048;
 // double-word(hex)=[0]major[1][2]minor[3][4]version[5]fix(a-p)[6][7]reserve
-constexpr uint32_t HDC_VERSION_NUMBER = 0x10101500;  // 1.1.1b=0x10101100
+constexpr uint32_t HDC_VERSION_NUMBER = 0x10101600;  // 1.1.1b=0x10101100
 constexpr uint32_t HDC_BUF_MAX_BYTES = 1024000000;
 
 const string WHITE_SPACES = " \t\n\r";
