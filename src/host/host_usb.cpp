@@ -131,7 +131,7 @@ bool HdcHostUSB::DetectMyNeed(libusb_device *device, string &sn)
     uv_timer_init(&hdcServer->loopMain, waitTimeDoCmd);
     waitTimeDoCmd->data = hSession;
     constexpr uint16_t PRECONNECT_INTERVAL = 3000;
-    uv_timer_start(waitTimeDoCmd, hdcServer->UsbPreConnect, GLOBAL_TIMEOUT, PRECONNECT_INTERVAL);
+    uv_timer_start(waitTimeDoCmd, hdcServer->UsbPreConnect, 0, PRECONNECT_INTERVAL);
     mapIgnoreDevice[sn] = HOST_USB_REGISTER;
     ret = true;
     delete hUSB;
@@ -167,8 +167,17 @@ void HdcHostUSB::RemoveIgnoreDevice(string &mountInfo)
 {
     if (mapIgnoreDevice.count(mountInfo)) {
         mapIgnoreDevice.erase(mountInfo);
-        WRITE_LOG(LOG_DEBUG, "Remove %s from mapIgnoreDevice", mountInfo.c_str());
     }
+}
+
+void HdcHostUSB::ReviewUsbNodeLater(string &nodeKey)
+{
+    HdcServer *hdcServer = (HdcServer *)clsMainBase;
+    // add to ignore list
+    mapIgnoreDevice[nodeKey] = HOST_USB_IGNORE;
+    int delayRemoveFromList = intervalDevCheck * MINOR_TIMEOUT;  // wait little time for daemon reinit
+    Base::DelayDo(&hdcServer->loopMain, delayRemoveFromList, 0, nodeKey, nullptr,
+                  [this](const uint8_t flag, string &msg, const void *) -> void { RemoveIgnoreDevice(msg); });
 }
 
 void HdcHostUSB::WatchDevPlugin(uv_timer_t *handle)
@@ -196,9 +205,7 @@ void HdcHostUSB::WatchDevPlugin(uv_timer_t *handle)
         }
         string sn = szTmpKey;
         if (!thisClass->DetectMyNeed(dev, sn)) {
-            // add to ignore device
-            thisClass->mapIgnoreDevice[szTmpKey] = HOST_USB_IGNORE;
-            WRITE_LOG(LOG_DEBUG, "Add %s to ignore list", szTmpKey.c_str());
+            thisClass->ReviewUsbNodeLater(szTmpKey);
         }
     }
     libusb_free_device_list(devs, 1);
@@ -206,17 +213,10 @@ void HdcHostUSB::WatchDevPlugin(uv_timer_t *handle)
 
 int HdcHostUSB::StartupUSBWork()
 {
-    //    LIBUSB_HOTPLUG_NO_FLAGS = 0,//Only the registered callback function will only be called when the plug is
-    //    inserted. LIBUSB_HOTPLUG_ENUMERATE = 1<<0,//The program load initialization before the device has been
-    //    inserted, and the registered callback function is called (execution, scanning)
+    // Because libusb(winusb backend) does not support hotplug under win32, we use list mode for all platforms
     WRITE_LOG(LOG_DEBUG, "USBHost loopfind mode");
     devListWatcher.data = this;
-#ifdef HDC_PCDEBUG
-    constexpr int interval = 500;
-#else
-    constexpr int interval = 3000;
-#endif
-    uv_timer_start(&devListWatcher, WatchDevPlugin, 0, interval);
+    uv_timer_start(&devListWatcher, WatchDevPlugin, 0, intervalDevCheck);
     // Running pendding in independent threads does not significantly improve the efficiency
     usbWork.data = ctxUSB;
     uv_idle_start(&usbWork, PenddingUSBIO);
@@ -236,7 +236,6 @@ int HdcHostUSB::CheckDescriptor(HUSB hUSB)
         WRITE_LOG(LOG_DEBUG, "CheckDescriptor libusb_get_device_descriptor failed");
         return -1;
     }
-    WRITE_LOG(LOG_DEBUG, "CheckDescriptor busid:%d devid:%d", curBus, curDev);
     // Get the serial number of the device, if there is no serial number, use the ID number to replace
     // If the device is not in time, occasionally can't get it, this is determined by the external factor, cannot be
     // changed. LIBUSB_SUCCESS
@@ -335,6 +334,7 @@ void LIBUSB_CALL HdcHostUSB::ReadUSBBulkCallback(struct libusb_transfer *transfe
     HUSB hUSB = hSession->hUSB;
     bool bOK = false;
     int childRet = 0;
+    constexpr int infinity = 0;  // ignore timeout
     while (true) {
         if (!thisClass->modRunning || (hSession->isDead && 0 == hSession->sendRef))
             break;
@@ -351,7 +351,7 @@ void LIBUSB_CALL HdcHostUSB::ReadUSBBulkCallback(struct libusb_transfer *transfe
         hUSB->lockDeviceHandle.lock();
         // loop self
         libusb_fill_bulk_transfer(transfer, hUSB->devHandle, hUSB->epDevice, hUSB->bufDevice, hUSB->sizeEpBuf,
-                                  ReadUSBBulkCallback, hSession, 0);  // no user data
+                                  ReadUSBBulkCallback, hSession, infinity);
         childRet = libusb_submit_transfer(transfer);
         hUSB->lockDeviceHandle.unlock();
         if (childRet < 0) {
@@ -377,9 +377,9 @@ void HdcHostUSB::RegisterReadCallback(HSession hSession)
     }
     hSession->hUSB->transferRecv->user_data = hSession;
     hUSB->lockDeviceHandle.lock();
+    // first bulk-read must be Okay and no timeout, otherwise failed.
     libusb_fill_bulk_transfer(hSession->hUSB->transferRecv, hUSB->devHandle, hUSB->epDevice, hUSB->bufDevice,
-                              hUSB->sizeEpBuf,                    // Note: in_buffer is where input data
-                              ReadUSBBulkCallback, hSession, 0);  // no user data
+                              hUSB->sizeEpBuf, ReadUSBBulkCallback, hSession, GLOBAL_TIMEOUT * TIME_BASE);
     int childRet = libusb_submit_transfer(hSession->hUSB->transferRecv);
     hUSB->lockDeviceHandle.unlock();
     if (childRet == 0) {
@@ -452,7 +452,6 @@ int HdcHostUSB::SendUSBRaw(HSession hSession, uint8_t *data, const int length)
     int ret = ERR_GENERIC;
     int childRet = -1;
     HUSB hUSB = hSession->hUSB;
-    constexpr int retryTimeout = GLOBAL_TIMEOUT * TIME_BASE;
     while (true) {
         if (memcpy_s(hUSB->bufHost, length, data, length) != EOK) {
             ret = ERR_BUF_COPY;
@@ -462,7 +461,7 @@ int HdcHostUSB::SendUSBRaw(HSession hSession, uint8_t *data, const int length)
         std::unique_lock<std::mutex> lock(hUSB->lockSend);
         hUSB->sendIOComplete = false;
         libusb_fill_bulk_transfer(hUSB->transferSend, hUSB->devHandle, hUSB->epHost, hUSB->bufHost, length,
-                                  WriteUSBBulkCallback, hSession, retryTimeout);
+                                  WriteUSBBulkCallback, hSession, GLOBAL_TIMEOUT * TIME_BASE);
         childRet = libusb_submit_transfer(hUSB->transferSend);
         hUSB->lockDeviceHandle.unlock();
         if (childRet < 0) {
