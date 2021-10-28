@@ -10,9 +10,6 @@
   - [使用问题自查说明<a name="section1371113476307"></a>](#使用问题自查说明)
   - [FAQ<a name="section1371113476308"></a>](#faq)
 
--   [使用问题自查说明](#section1371113476307)
--   [FAQ](#section1371113476308)
-
 ## 简介<a name="section662115419449"></a>
 
 HDC（OpenHarmony Device Connector） 是为开发人员提供的用于设备连接调试的命令行工具，pc端开发机使用命令行工具hdc_std(为方便起见，下文统称hdc)，该工具需支持部署在Windows/Linux/Mac等系统上与OpenHarmony设备（或模拟器）进行连接调试通信。PC端hdc工具需要针对以上开发机操作系统平台分别发布相应的版本，设备端hdc daemon需跟随设备镜像发布包括对模拟器进行支持。下文将介绍hdc的常用命令及使用举例。
@@ -250,6 +247,7 @@ hdc当前常用命令如下，未尽命令使用hdc -h或者hdc --help查看：
 
     ```
     同问题1同样排查步骤，另外注意在root权限下执行；
+    如果server进程起不来，请先sudo rm /tmp/*.pid 然后再使用sudo 执行list targets看看是否正常显示设备列表
     ```
 -   3. windows版本工具无法执行报错：
 
