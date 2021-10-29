@@ -254,3 +254,10 @@ hdc当前常用命令如下，未尽命令使用hdc -h或者hdc --help查看：
     ```
     1）从dailybuild或正式发布的sdk压缩包，重新解压提取工具；2）检查文件大小和版本、校验哈希值； 3）本工具是控制台命令行下执行即可，适配平台下无任何组件和驱动依赖，不需要安装，不要尝试双击运行；
     ```
+-   4. system分区推文件报错 [Fail]Error opening file: read-only file system：
+
+    ```
+    推送文件前参考执行如下命令:
+    hdc_std smode
+    hdc_std shell mount -o rw,remount /
+    ```
