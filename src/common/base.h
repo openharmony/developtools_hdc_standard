@@ -137,7 +137,7 @@ namespace Base {
     vector<uint8_t> Md5Sum(uint8_t *buf, int size);
     bool IsRoot();
     char GetPathSep();
-    bool IsRelativePath(string &path);
+    bool IsAbsolutePath(string &path);
 }  // namespace base
 }  // namespace Hdc
 

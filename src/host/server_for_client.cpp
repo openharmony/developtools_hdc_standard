@@ -278,7 +278,7 @@ void HdcServerForClient::GetTargetList(HChannel hChannel, void *formatCommandInp
     TranslateCommand::FormatCommand *formatCommand = (TranslateCommand::FormatCommand *)formatCommandInput;
     HdcServer *ptrServer = (HdcServer *)clsServer;
     uint16_t cmd = OP_GET_STRLIST;
-    if (formatCommand->paraments == "v") {
+    if (formatCommand->parameters == "v") {
         cmd = OP_GET_STRLIST_FULL;
     }
     HDaemonInfo hdi = nullptr;
@@ -312,11 +312,11 @@ bool HdcServerForClient::GetAnyTarget(HChannel hChannel)
     return ret;
 }
 
-bool HdcServerForClient::RemoveForward(HChannel hChannel, const char *paramentString)
+bool HdcServerForClient::RemoveForward(HChannel hChannel, const char *parameterString)
 {
     HdcServer *ptrServer = (HdcServer *)clsServer;
-    if (paramentString == nullptr) {  // remove all
-        HForwardInfo hfi = nullptr;   // dummy
+    if (parameterString == nullptr) {  // remove all
+        HForwardInfo hfi = nullptr;    // dummy
         string echo = ptrServer->AdminForwardMap(OP_GET_STRLIST, "", hfi);
         if (!echo.length()) {
             return false;
@@ -329,8 +329,8 @@ bool HdcServerForClient::RemoveForward(HChannel hChannel, const char *paramentSt
             }
         }
     } else {  // remove single
-        if (!CommandRemoveForward(paramentString)) {
-            EchoClient(hChannel, MSG_FAIL, "Remove forward ruler failed,ruler:%s", paramentString);
+        if (!CommandRemoveForward(parameterString)) {
+            EchoClient(hChannel, MSG_FAIL, "Remove forward ruler failed,ruler:%s", parameterString);
         }
     }
     return true;
@@ -340,7 +340,7 @@ bool HdcServerForClient::DoCommandLocal(HChannel hChannel, void *formatCommandIn
 {
     TranslateCommand::FormatCommand *formatCommand = (TranslateCommand::FormatCommand *)formatCommandInput;
     HdcServer *ptrServer = (HdcServer *)clsServer;
-    const char *paramentString = formatCommand->paraments.c_str();
+    const char *parameterString = formatCommand->parameters.c_str();
     bool ret = false;
     // Main thread command, direct Listen main thread
     switch (formatCommand->cmdFlag) {
@@ -359,11 +359,11 @@ bool HdcServerForClient::DoCommandLocal(HChannel hChannel, void *formatCommandIn
             break;
         }
         case CMD_KERNEL_TARGET_CONNECT: {
-            ret = NewConnectTry(ptrServer, hChannel, paramentString);
+            ret = NewConnectTry(ptrServer, hChannel, parameterString);
             break;
         }
         case CMD_KERNEL_TARGET_DISCONNECT: {
-            CommandRemoveSession(hChannel, paramentString);
+            CommandRemoveSession(hChannel, parameterString);
             break;
         }
         case CMD_KERNEL_SERVER_KILL: {
@@ -383,7 +383,7 @@ bool HdcServerForClient::DoCommandLocal(HChannel hChannel, void *formatCommandIn
             break;
         }
         case CMD_FORWARD_REMOVE: {
-            RemoveForward(hChannel, paramentString);
+            RemoveForward(hChannel, parameterString);
             break;
         }
         case CMD_KERNEL_ENABLE_KEEPALIVE: {
@@ -404,7 +404,7 @@ bool HdcServerForClient::TaskCommand(HChannel hChannel, void *formatCommandInput
 {
     TranslateCommand::FormatCommand *formatCommand = (TranslateCommand::FormatCommand *)formatCommandInput;
     HdcServer *ptrServer = (HdcServer *)clsServer;
-    int sizeSend = formatCommand->paraments.size();
+    int sizeSend = formatCommand->parameters.size();
     string cmdFlag;
     uint8_t sizeCmdFlag = 0;
     if (CMD_FILE_INIT == formatCommand->cmdFlag) {
@@ -426,15 +426,15 @@ bool HdcServerForClient::TaskCommand(HChannel hChannel, void *formatCommandInput
         cmdFlag = "sideload ";
         sizeCmdFlag = 9;
     }
-    if (!strncmp(formatCommand->paraments.c_str(), cmdFlag.c_str(), sizeCmdFlag)) {  // local do
+    if (!strncmp(formatCommand->parameters.c_str(), cmdFlag.c_str(), sizeCmdFlag)) {  // local do
         HSession hSession = FindAliveSession(hChannel->targetSessionId);
         if (!hSession) {
             return false;
         }
         ptrServer->DispatchTaskData(hSession, hChannel->channelId, formatCommand->cmdFlag,
-                                    (uint8_t *)formatCommand->paraments.c_str() + sizeCmdFlag, sizeSend - sizeCmdFlag);
+                                    (uint8_t *)formatCommand->parameters.c_str() + sizeCmdFlag, sizeSend - sizeCmdFlag);
     } else {  // Send to Daemon-side to do
-        SendToDaemon(hChannel, formatCommand->cmdFlag, (uint8_t *)formatCommand->paraments.c_str() + sizeCmdFlag,
+        SendToDaemon(hChannel, formatCommand->cmdFlag, (uint8_t *)formatCommand->parameters.c_str() + sizeCmdFlag,
                      sizeSend - sizeCmdFlag);
     }
     return true;
@@ -444,7 +444,7 @@ bool HdcServerForClient::DoCommandRemote(HChannel hChannel, void *formatCommandI
 {
     TranslateCommand::FormatCommand *formatCommand = (TranslateCommand::FormatCommand *)formatCommandInput;
     bool ret = false;
-    int sizeSend = formatCommand->paraments.size();
+    int sizeSend = formatCommand->parameters.size();
     string cmdFlag;
     switch (formatCommand->cmdFlag) {
         // Some simple commands only need to forward the instruction, no need to start Task
@@ -458,7 +458,7 @@ bool HdcServerForClient::DoCommandRemote(HChannel hChannel, void *formatCommandI
         case CMD_UNITY_HILOG:
         case CMD_UNITY_ROOTRUN:
         case CMD_UNITY_JPID: {
-            if (!SendToDaemon(hChannel, formatCommand->cmdFlag, (uint8_t *)formatCommand->paraments.c_str(),
+            if (!SendToDaemon(hChannel, formatCommand->cmdFlag, (uint8_t *)formatCommand->parameters.c_str(),
                               sizeSend)) {
                 break;
             }
@@ -629,7 +629,7 @@ int HdcServerForClient::ReadChannel(HChannel hChannel, uint8_t *bufPtr, const in
             return ret;
         }
     } else {
-        formatCommand.paraments = string((char *)bufPtr, bytesIO);
+        formatCommand.parameters = string((char *)bufPtr, bytesIO);
         formatCommand.cmdFlag = CMD_SHELL_DATA;
     }
     if (!DoCommand(hChannel, &formatCommand)) {

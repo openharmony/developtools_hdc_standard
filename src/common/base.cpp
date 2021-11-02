@@ -1191,15 +1191,15 @@ namespace Base {
         return false;
     }
 
-    bool IsRelativePath(string &path)
+    bool IsAbsolutePath(string &path)
     {
         bool ret = false;
 #ifdef _WIN32
         // shlwapi.h PathIsRelativeA not link in harmony project
         // c:\ or UNC path '\\hostname\share\file'
-        ret = path.find(":\\") != 1 && path.find("\\\\") != 0;
+        ret = path.find(":\\") == 1 || path.find("\\\\") == 0;
 #else
-        ret = path[0] != '/';
+        ret = path[0] == '/';
 #endif
         return ret;
     }

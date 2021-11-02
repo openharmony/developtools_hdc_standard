@@ -49,7 +49,7 @@ bool HdcFile::BeginTransfer(CtxFile *context, const string &command)
         }
         return false;
     }
-    if (!SetMasterParaments(context, command.c_str(), argc, argv)) {
+    if (!SetMasterParameters(context, command.c_str(), argc, argv)) {
         delete[]((char *)argv);
         return false;
     }
@@ -67,7 +67,7 @@ bool HdcFile::BeginTransfer(CtxFile *context, const string &command)
     return ret;
 }
 
-bool HdcFile::SetMasterParaments(CtxFile *context, const char *command, int argc, char **argv)
+bool HdcFile::SetMasterParameters(CtxFile *context, const char *command, int argc, char **argv)
 {
     int srcArgvIndex = 0;
     const string CMD_OPTION_TSTMP = "-a";

@@ -407,12 +407,7 @@ bool HdcTransferBase::CommandDispatch(const uint16_t command, uint8_t *payload, 
 
 void HdcTransferBase::ExtractRelativePath(string &cwd, string &path)
 {
-    bool absPath = false;
-#ifdef _WIN32
-    absPath = !PathIsRelativeA(path.c_str());
-#else
-    path[0] == '/' ? absPath = true : absPath = false;
-#endif
+    bool absPath = Base::IsAbsolutePath(path);
     if (!absPath) {
         path = cwd + path;
     }

@@ -32,7 +32,7 @@ private:
     void WhenTransferFinish(CtxFile *context);
     bool BeginTransfer(CtxFile *context, const string &command);
     void TransferSummary(CtxFile *context);
-    bool SetMasterParaments(CtxFile *context, const char *command, int argc, char **argv);
+    bool SetMasterParameters(CtxFile *context, const char *command, int argc, char **argv);
 };
 }  // namespace Hdc
 
