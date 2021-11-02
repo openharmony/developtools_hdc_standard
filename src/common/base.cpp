@@ -689,7 +689,7 @@ namespace Base {
             WRITE_LOG(LOG_FATAL, "Tmppath failed");
             return ERR_API_FAIL;
         }
-        if (snprintf_s(bufPath, sizeof(bufPath), sizeof(bufPath) - 1, "%s/%s.pid", buf, procname) < 0) {
+        if (snprintf_s(bufPath, sizeof(bufPath), sizeof(bufPath) - 1, "%s/.%s.pid", buf, procname) < 0) {
             return ERR_BUF_OVERFLOW;
         }
         int pid = static_cast<int>(getpid());
@@ -697,7 +697,8 @@ namespace Base {
             return ERR_BUF_OVERFLOW;
         }
         // no need to CanonicalizeSpecPath, else not work
-        int fd = open(bufPath, O_RDWR | O_CREAT, (S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH));
+        umask(0);
+        int fd = open(bufPath, O_RDWR | O_CREAT, 0666);
         if (fd < 0) {
             WRITE_LOG(LOG_FATAL, "Open mutex file \"%s\" failed!!!Errno:%d\n", buf, errno);
             return ERR_FILE_OPEN;
@@ -788,14 +789,19 @@ namespace Base {
         return (((uint64_t)ntohl(val)) << 32) + ntohl(val >> 32);
     }
 
-    string GetFullFilePath(const string &s)
-    {  // cannot use s.rfind(std::filesystem::path::preferred_separator
+    char GetPathSep()
+    {
 #ifdef _WIN32
         const char sep = '\\';
 #else
         const char sep = '/';
 #endif
-        size_t i = s.rfind(sep, s.length());
+        return sep;
+    }
+
+    string GetFullFilePath(const string &s)
+    {  // cannot use s.rfind(std::filesystem::path::preferred_separator
+        size_t i = s.rfind(GetPathSep(), s.length());
         if (i != string::npos) {
             return (s.substr(i + 1, s.length() - i));
         }

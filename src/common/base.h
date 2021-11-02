@@ -136,6 +136,7 @@ namespace Base {
     uv_os_sock_t DuplicateUvSocket(uv_tcp_t *tcp);
     vector<uint8_t> Md5Sum(uint8_t *buf, int size);
     bool IsRoot();
+    char GetPathSep();
 }  // namespace base
 }  // namespace Hdc
 

@@ -182,90 +182,95 @@ namespace TranslateCommand {
 
     // command input
     // client side:Enter string data formatting conversion to module see internal processing command
-    string String2FormatCommand(const char *input, int sizeInput, FormatCommand *outCmd)
+    string String2FormatCommand(const char *inputRaw, int sizeInputRaw, FormatCommand *outCmd)
     {
         string stringError;
-        outCmd->inputRaw = input;
-        if (!strcmp(input, CMDSTR_SOFTWARE_HELP.c_str())) {
+        string input = string(inputRaw, sizeInputRaw);
+        if (!strcmp(input.c_str(), CMDSTR_SOFTWARE_HELP.c_str())) {
             outCmd->cmdFlag = CMD_KERNEL_HELP;
             stringError = Usage();
             outCmd->bJumpDo = true;
-        } else if (!strcmp(input, CMDSTR_SOFTWARE_VERSION.c_str())) {
+        } else if (!strcmp(input.c_str(), CMDSTR_SOFTWARE_VERSION.c_str())) {
             outCmd->cmdFlag = CMD_KERNEL_HELP;
             stringError = Base::GetVersion();
             outCmd->bJumpDo = true;
-        } else if (!strcmp(input, CMDSTR_TARGET_DISCOVER.c_str())) {
+        } else if (!strcmp(input.c_str(), CMDSTR_TARGET_DISCOVER.c_str())) {
             outCmd->cmdFlag = CMD_KERNEL_TARGET_DISCOVER;
-        } else if (!strncmp(input, CMDSTR_LIST_TARGETS.c_str(), CMDSTR_LIST_TARGETS.size())) {
+        } else if (!strncmp(input.c_str(), CMDSTR_LIST_TARGETS.c_str(), CMDSTR_LIST_TARGETS.size())) {
             outCmd->cmdFlag = CMD_KERNEL_TARGET_LIST;
-            if (strstr(input, " -v")) {
+            if (strstr(input.c_str(), " -v")) {
                 outCmd->paraments = "v";
             }
-        } else if (!strcmp(input, CMDSTR_CONNECT_ANY.c_str())) {
+        } else if (!strcmp(input.c_str(), CMDSTR_CONNECT_ANY.c_str())) {
             outCmd->cmdFlag = CMD_KERNEL_TARGET_ANY;
-        } else if (!strncmp(input, CMDSTR_CONNECT_TARGET.c_str(), CMDSTR_CONNECT_TARGET.size())) {
-            outCmd->paraments = input + CMDSTR_CONNECT_TARGET.size() + 1;  // with ' '
+        } else if (!strncmp(input.c_str(), CMDSTR_CONNECT_TARGET.c_str(), CMDSTR_CONNECT_TARGET.size())) {
+            outCmd->paraments = input.c_str() + CMDSTR_CONNECT_TARGET.size() + 1;  // with ' '
             stringError = TargetConnect(outCmd);
-        } else if (!strncmp(input, (CMDSTR_SHELL + " ").c_str(), CMDSTR_SHELL.size() + 1)) {
+        } else if (!strncmp(input.c_str(), (CMDSTR_SHELL + " ").c_str(), CMDSTR_SHELL.size() + 1)) {
             outCmd->cmdFlag = CMD_UNITY_EXECUTE;
-            outCmd->paraments = input + CMDSTR_SHELL.size() + 1;
-        } else if (!strcmp(input, CMDSTR_SHELL.c_str())) {
+            outCmd->paraments = input.c_str() + CMDSTR_SHELL.size() + 1;
+        } else if (!strcmp(input.c_str(), CMDSTR_SHELL.c_str())) {
             outCmd->cmdFlag = CMD_SHELL_INIT;
-        } else if (!strncmp(input, CMDSTR_FILE_SEND.c_str(), CMDSTR_FILE_SEND.size())
-                   || !strncmp(input, CMDSTR_FILE_RECV.c_str(), CMDSTR_FILE_RECV.size())) {
+        } else if (!strncmp(input.c_str(), CMDSTR_FILE_SEND.c_str(), CMDSTR_FILE_SEND.size())
+                   || !strncmp(input.c_str(), CMDSTR_FILE_RECV.c_str(), CMDSTR_FILE_RECV.size())) {
             outCmd->cmdFlag = CMD_FILE_INIT;
-            outCmd->paraments = input + 5;  // 5: CMDSTR_FORWARD_FPORT CMDSTR_FORWARD_RPORT size
-        } else if (!strncmp(input, string(CMDSTR_FORWARD_FPORT + " ").c_str(), CMDSTR_FORWARD_FPORT.size() + 1)
-                   || !strncmp(input, string(CMDSTR_FORWARD_RPORT + " ").c_str(), CMDSTR_FORWARD_RPORT.size() + 1)) {
-            stringError = ForwardPort(input, outCmd);
-        } else if (!strcmp(input, CMDSTR_KILL_SERVER.c_str())) {
+            outCmd->paraments = input.c_str() + 5;  // 5: CMDSTR_FORWARD_FPORT CMDSTR_FORWARD_RPORT size
+        } else if (!strncmp(input.c_str(), string(CMDSTR_FORWARD_FPORT + " ").c_str(), CMDSTR_FORWARD_FPORT.size() + 1)
+                   || !strncmp(input.c_str(), string(CMDSTR_FORWARD_RPORT + " ").c_str(),
+                               CMDSTR_FORWARD_RPORT.size() + 1)) {
+            stringError = ForwardPort(input.c_str(), outCmd);
+        } else if (!strcmp(input.c_str(), CMDSTR_KILL_SERVER.c_str())) {
             outCmd->cmdFlag = CMD_KERNEL_SERVER_KILL;
-        } else if (!strcmp(input, CMDSTR_KILL_DAEMON.c_str())) {
+        } else if (!strcmp(input.c_str(), CMDSTR_KILL_DAEMON.c_str())) {
             outCmd->cmdFlag = CMD_UNITY_TERMINATE;
             outCmd->paraments = "0";
-        } else if (!strncmp(input, CMDSTR_APP_INSTALL.c_str(), CMDSTR_APP_INSTALL.size())) {
+        } else if (!strncmp(input.c_str(), CMDSTR_APP_INSTALL.c_str(), CMDSTR_APP_INSTALL.size())) {
             outCmd->cmdFlag = CMD_APP_INIT;
             outCmd->paraments = input;
-        } else if (!strncmp(input, CMDSTR_APP_UNINSTALL.c_str(), CMDSTR_APP_UNINSTALL.size())) {
+        } else if (!strncmp(input.c_str(), CMDSTR_APP_UNINSTALL.c_str(), CMDSTR_APP_UNINSTALL.size())) {
             outCmd->cmdFlag = CMD_APP_UNINSTALL;
             outCmd->paraments = input;
             if (outCmd->paraments.size() > 512 || outCmd->paraments.size() < 4) {
                 stringError = "Package's path incorrect";
                 outCmd->bJumpDo = true;
             }
-        } else if (!strcmp(input, CMDSTR_TARGET_MOUNT.c_str())) {
+        } else if (!strcmp(input.c_str(), CMDSTR_TARGET_MOUNT.c_str())) {
             outCmd->cmdFlag = CMD_UNITY_REMOUNT;
-        } else if (!strcmp(input, CMDSTR_LIST_JDWP.c_str())) {
+        } else if (!strcmp(input.c_str(), CMDSTR_LIST_JDWP.c_str())) {
             outCmd->cmdFlag = CMD_UNITY_JPID;
-        } else if (!strncmp(input, CMDSTR_TARGET_REBOOT.c_str(), CMDSTR_TARGET_REBOOT.size())) {
-            TargetReboot(input, outCmd);
-        } else if (!strncmp(input, CMDSTR_TARGET_MODE.c_str(), CMDSTR_TARGET_MODE.size())) {
-            RunMode(input, outCmd);
-        } else if (!strcmp(input, CMDSTR_CONNECT_ANY.c_str())) {
+        } else if (!strncmp(input.c_str(), CMDSTR_TARGET_REBOOT.c_str(), CMDSTR_TARGET_REBOOT.size())) {
+            TargetReboot(input.c_str(), outCmd);
+        } else if (!strncmp(input.c_str(), CMDSTR_TARGET_MODE.c_str(), CMDSTR_TARGET_MODE.size())) {
+            RunMode(input.c_str(), outCmd);
+        } else if (!strcmp(input.c_str(), CMDSTR_CONNECT_ANY.c_str())) {
             outCmd->cmdFlag = CMD_KERNEL_TARGET_ANY;
-        } else if (!strncmp(input, CMDSTR_HILOG.c_str(), CMDSTR_HILOG.size())) {
+        } else if (!strncmp(input.c_str(), CMDSTR_HILOG.c_str(), CMDSTR_HILOG.size())) {
             outCmd->cmdFlag = CMD_UNITY_HILOG;
-            if (strstr(input, " -v")) {
+            if (strstr(input.c_str(), " -v")) {
                 outCmd->paraments = "v";
             }
-        } else if (!strncmp(input, CMDSTR_STARTUP_MODE.c_str(), CMDSTR_STARTUP_MODE.size())) {
+        } else if (!strncmp(input.c_str(), CMDSTR_STARTUP_MODE.c_str(), CMDSTR_STARTUP_MODE.size())) {
             outCmd->cmdFlag = CMD_UNITY_ROOTRUN;
-            if (strstr(input, " -r")) {
+            if (strstr(input.c_str(), " -r")) {
                 outCmd->paraments = "r";
             }
-        } else if (!strncmp(input, CMDSTR_APP_SIDELOAD.c_str(), CMDSTR_APP_SIDELOAD.size())) {
-            if (strlen(input) == CMDSTR_APP_SIDELOAD.size()) {
+        } else if (!strncmp(input.c_str(), CMDSTR_APP_SIDELOAD.c_str(), CMDSTR_APP_SIDELOAD.size())) {
+            if (strlen(input.c_str()) == CMDSTR_APP_SIDELOAD.size()) {
                 stringError = "Incorrect command, please with local path";
                 outCmd->bJumpDo = true;
             }
             outCmd->cmdFlag = CMD_APP_SIDELOAD;
             outCmd->paraments = input;
-        } else if (!strncmp(input, CMDSTR_BUGREPORT.c_str(), CMDSTR_BUGREPORT.size())) {
+        } else if (!strncmp(input.c_str(), CMDSTR_BUGREPORT.c_str(), CMDSTR_BUGREPORT.size())) {
             outCmd->cmdFlag = CMD_UNITY_BUGREPORT_INIT;
             outCmd->paraments = input;
             if (outCmd->paraments.size() == CMDSTR_BUGREPORT.size()) {
                 outCmd->paraments += " ";
             }
+        }
+        // Inner command, protocol use only
+        else if (input == CMDSTR_INNER_ENABLE_KEEPALIVE) {
+            outCmd->cmdFlag = CMD_KERNEL_ENABLE_KEEPALIVE;
         } else {
             stringError = "Unknow command...";
             outCmd->bJumpDo = true;
@@ -275,12 +280,6 @@ namespace TranslateCommand {
             stringError += "\n";
         }
         return stringError;
-    };
-
-    // IDE plugin input to private command
-    int LibraryCallEntryPoint(void *hwnd, void *hinst, uint16_t callMethod, char *lpcmdStringLine, int nCmdShow)
-    {
-        return 0;
     };
 }
 }  // namespace Hdc
