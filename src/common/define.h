@@ -46,7 +46,7 @@ constexpr uint16_t UV_DEFAULT_INTERVAL = 250;  // ms
 constexpr uint16_t VER_PROTOCOL = 0x01;
 constexpr uint16_t EXTRA_ALLOC_SIZE = 2048;
 // double-word(hex)=[0]major[1][2]minor[3][4]version[5]fix(a-p)[6][7]reserve
-constexpr uint32_t HDC_VERSION_NUMBER = 0x10101600;  // 1.1.1b=0x10101100
+constexpr uint32_t HDC_VERSION_NUMBER = 0x10101700;  // 1.1.1b=0x10101100
 constexpr uint32_t HDC_BUF_MAX_BYTES = 1024000000;
 
 const string WHITE_SPACES = " \t\n\r";
@@ -88,10 +88,6 @@ const string CMDSTR_APP_INSTALL = "install";
 const string CMDSTR_APP_UNINSTALL = "uninstall";
 const string CMDSTR_APP_SIDELOAD = "sideload";
 const string CMDSTR_LIST_JDWP = "jpid";
-#ifdef _WIN32
-constexpr char PREF_SEPARATOR = '\\';
-#else
-constexpr char PREF_SEPARATOR = '/';
-#endif
+const string CMDSTR_INNER_ENABLE_KEEPALIVE = "alive";
 }  // namespace Hdc
 #endif  // HDC_DEFINE_H

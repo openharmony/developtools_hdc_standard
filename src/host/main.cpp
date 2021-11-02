@@ -79,6 +79,23 @@ int IsRegisterCommand(string &outCommand, const char *cmd, const char *cmdnext)
     return 0;
 }
 
+void AppendCwdWhenTransfer(string &outCommand)
+{
+    if (outCommand != CMDSTR_FILE_SEND && outCommand != CMDSTR_FILE_RECV && outCommand != CMDSTR_APP_INSTALL
+        && outCommand != CMDSTR_APP_SIDELOAD) {
+        return;
+    }
+    char path[PATH_MAX] = "";
+    size_t size = sizeof(path);
+    if (uv_cwd(path, &size) < 0)
+        return;
+    if (path[strlen(path) - 1] != Base::GetPathSep()) {
+        path[strlen(path)] = Base::GetPathSep();
+    }
+    outCommand += outCommand.size() ? " -cwd " : "-cwd ";
+    outCommand += path;
+}
+
 int SplitOptionAndCommand(int argc, const char **argv, string &outOption, string &outCommand)
 {
     bool foundCommand = false;
@@ -92,6 +109,7 @@ int SplitOptionAndCommand(int argc, const char **argv, string &outOption, string
                 if (resultChild == 2) {
                     ++i;
                 }
+                AppendCwdWhenTransfer(outCommand);
                 continue;
             }
         }

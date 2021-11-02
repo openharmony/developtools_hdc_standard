@@ -49,7 +49,7 @@ bool HdcFile::BeginTransfer(CtxFile *context, const string &command)
         }
         return false;
     }
-    if (!GetLocalRemotePath(context, command.c_str(), argc, argv)) {
+    if (!SetMasterParaments(context, command.c_str(), argc, argv)) {
         delete[]((char *)argv);
         return false;
     }
@@ -67,12 +67,13 @@ bool HdcFile::BeginTransfer(CtxFile *context, const string &command)
     return ret;
 }
 
-bool HdcFile::GetLocalRemotePath(CtxFile *context, const char *command, int argc, char **argv)
+bool HdcFile::SetMasterParaments(CtxFile *context, const char *command, int argc, char **argv)
 {
     int srcArgvIndex = 0;
     const string CMD_OPTION_TSTMP = "-a";
     const string CMD_OPTION_SYNC = "-sync";
     const string CMD_OPTION_ZIP = "-z";
+
     for (int i = 0; i < argc - CMD_ARG1_COUNT; i++) {
         if (argv[i] == CMD_OPTION_ZIP) {
             context->transferConfig.compressType = COMPRESS_LZ4;
@@ -83,6 +84,9 @@ bool HdcFile::GetLocalRemotePath(CtxFile *context, const char *command, int argc
         } else if (argv[i] == CMD_OPTION_TSTMP) {
             context->transferConfig.holdTimestamp = true;
             ++srcArgvIndex;
+        } else if (argv[i] == CMD_OPTION_CLIENTCWD) {
+            context->transferConfig.clientCwd = argv[i + 1];
+            srcArgvIndex += 2;
         } else if (argv[i][0] == '-') {
             LogMsg(MSG_FAIL, "Unknow file option: %s", argv[i]);
             return false;
@@ -90,6 +94,10 @@ bool HdcFile::GetLocalRemotePath(CtxFile *context, const char *command, int argc
     }
     context->remotePath = argv[argc - 1];
     context->localPath = argv[argc - 2];
+    if (taskInfo->serverOrDaemon) {
+        // master and server
+        ExtractRelativePath(context->transferConfig.clientCwd, context->localPath);
+    }
     if (!Base::CheckDirectoryOrPath(context->localPath.c_str(), true, true)) {
         LogMsg(MSG_FAIL, "Src not exist, path: %s", context->localPath.c_str());
         return false;
@@ -131,7 +139,7 @@ bool HdcFile::SlaveCheck(uint8_t *payload, const int payloadSize)
     ctxNow.master = false;
     ctxNow.fsOpenReq.data = &ctxNow;
     // check path
-    childRet = SmartSlavePath(ctxNow.localPath, stat.optionalName.c_str());
+    childRet = SmartSlavePath(stat.clientCwd, ctxNow.localPath, stat.optionalName.c_str());
     if (childRet && ctxNow.transferConfig.updateIfNew) {  // file exist and option need update
         // if is newer
         uv_fs_t fs;

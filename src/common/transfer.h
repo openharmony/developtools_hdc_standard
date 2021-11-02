@@ -23,8 +23,8 @@ public:
     // used for child class
     struct TransferConfig {
         uint64_t fileSize;
-        uint64_t atime;
-        uint64_t mtime;
+        uint64_t atime;  // ns
+        uint64_t mtime;  // ns
         string options;
         string path;
         string optionalName;
@@ -32,6 +32,9 @@ public:
         uint8_t compressType;
         bool holdTimestamp;
         string functionName;
+        string clientCwd;
+        string reserve1;
+        string reserve2;
     };
     // used for HdcTransferBase. just base class use, not public
     struct TransferPayload {
@@ -85,12 +88,14 @@ protected:
     }
     bool MatchPackageExtendName(string fileName, string extName);
     bool ResetCtx(CtxFile *context, bool full = false);
-    bool SmartSlavePath(string &localPath, const char *optName);
+    bool SmartSlavePath(string &cwd, string &localPath, const char *optName);
     void SetFileTime(CtxFile *context);
+    void ExtractRelativePath(string &cwd, string &path);
 
     CtxFile ctxNow;
     uint16_t commandBegin;
     uint16_t commandData;
+    const string CMD_OPTION_CLIENTCWD = "-cwd";
 
 private:
     // dynamic IO context
