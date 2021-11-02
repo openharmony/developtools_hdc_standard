@@ -20,7 +20,7 @@ namespace Hdc {
 namespace TranslateCommand {
     struct FormatCommand {
         uint16_t cmdFlag;
-        string paraments;
+        string parameters;
         bool bJumpDo;
     };
 

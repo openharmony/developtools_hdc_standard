@@ -224,7 +224,7 @@ bool GetCommandlineOptions(int optArgc, const char *optArgv[])
     int ch = 0;
     bool needExit = false;
     opterr = 0;
-    // get option paraments first
+    // get option parameters first
     while ((ch = getopt(optArgc, (char *const *)optArgv, "hvpfms:d:t:l:")) != -1) {
         switch (ch) {
             case 'h': {
@@ -283,7 +283,7 @@ bool GetCommandlineOptions(int optArgc, const char *optArgv[])
                 } else if (optarg[0] == 'u') {
                     g_isTCPorUSB = false;
                 } else {
-                    Base::PrintMessage("Unknow debug paraments");
+                    Base::PrintMessage("Unknow debug parameters");
                     needExit = true;
                     return needExit;
                 }
@@ -292,7 +292,7 @@ bool GetCommandlineOptions(int optArgc, const char *optArgv[])
             case '?':
                 break;
             default: {
-                Base::PrintMessage("Unknow paraments");
+                Base::PrintMessage("Unknow parameters");
                 needExit = true;
                 return needExit;
             }
@@ -307,11 +307,6 @@ bool GetCommandlineOptions(int optArgc, const char *optArgv[])
 // hdc -l4 - s ip:port list targets
 int main(int argc, const char *argv[])
 {
-    //  string s = "c:\\1123";
-    string s = "./234";
-    bool retT = Base::IsRelativePath(s);
-    return 0;
-
     string options;
     string commands;
     Hdc::SplitOptionAndCommand(argc, argv, options, commands);
