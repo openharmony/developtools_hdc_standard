@@ -392,12 +392,7 @@ int HdcHostUSB::OpenDeviceMyNeed(HUSB hUSB)
 {
     libusb_device *device = hUSB->device;
     int ret = -1;
-    // if (LIBUSB_SUCCESS != libusb_open(device, &hUSB->devHandle)) {
-    //     return -100;
-    // }
-    int nT = libusb_open(device, &hUSB->devHandle);
-    if (LIBUSB_SUCCESS != nT) {
-        WRITE_LOG(LOG_DEBUG, "libusb_open failed:%d", nT);
+    if (LIBUSB_SUCCESS != libusb_open(device, &hUSB->devHandle)) {
         return -100;
     }
     while (modRunning) {

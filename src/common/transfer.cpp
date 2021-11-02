@@ -15,9 +15,6 @@
 #include "transfer.h"
 #include "serial_struct.h"
 #include <sys/stat.h>
-#ifdef _WIN32
-#include <shlwapi.h>  //API PathIsRelativeA
-#endif
 #ifdef HARMONY_PROJECT
 #include <lz4.h>
 #endif

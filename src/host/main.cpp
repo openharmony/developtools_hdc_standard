@@ -307,6 +307,11 @@ bool GetCommandlineOptions(int optArgc, const char *optArgv[])
 // hdc -l4 - s ip:port list targets
 int main(int argc, const char *argv[])
 {
+    //  string s = "c:\\1123";
+    string s = "./234";
+    bool retT = Base::IsRelativePath(s);
+    return 0;
+
     string options;
     string commands;
     Hdc::SplitOptionAndCommand(argc, argv, options, commands);
