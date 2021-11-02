@@ -173,9 +173,9 @@ void HdcHostUSB::RemoveIgnoreDevice(string &mountInfo)
 void HdcHostUSB::ReviewUsbNodeLater(string &nodeKey)
 {
     HdcServer *hdcServer = (HdcServer *)clsMainBase;
-    // add to ignore device
+    // add to ignore list
     mapIgnoreDevice[nodeKey] = HOST_USB_IGNORE;
-    int delayRemoveFromList = intervalDevCheck * 5;  // wait little time for daemon reinit
+    int delayRemoveFromList = intervalDevCheck * MINOR_TIMEOUT;  // wait little time for daemon reinit
     Base::DelayDo(&hdcServer->loopMain, delayRemoveFromList, 0, nodeKey, nullptr,
                   [this](const uint8_t flag, string &msg, const void *) -> void { RemoveIgnoreDevice(msg); });
 }
@@ -377,7 +377,7 @@ void HdcHostUSB::RegisterReadCallback(HSession hSession)
     }
     hSession->hUSB->transferRecv->user_data = hSession;
     hUSB->lockDeviceHandle.lock();
-    // first bluk-read must be OK and not timeout, otherwise failed.
+    // first bulk-read must be Okay and no timeout, otherwise failed.
     libusb_fill_bulk_transfer(hSession->hUSB->transferRecv, hUSB->devHandle, hUSB->epDevice, hUSB->bufDevice,
                               hUSB->sizeEpBuf, ReadUSBBulkCallback, hSession, GLOBAL_TIMEOUT * TIME_BASE);
     int childRet = libusb_submit_transfer(hSession->hUSB->transferRecv);
