@@ -6,7 +6,8 @@
   - [目录<a name="section161941989596"></a>](#目录)
     - [pc端编译说明<a name="section129654513262"></a>](#pc端编译说明)
     - [pc端获取说明<a name="section129654513263"></a>](#pc端获取说明)
-    - [命令帮助<a name="section129654513264"></a>](#命令帮助)
+    - [Linux端USB设备权限说明<a name="section129654513264"></a>](#linux端usb设备权限说明)
+    - [命令帮助<a name="section129654513265"></a>](#命令帮助)
   - [使用问题自查说明<a name="section1371113476307"></a>](#使用问题自查说明)
   - [FAQ<a name="section1371113476308"></a>](#faq)
 
@@ -45,9 +46,7 @@ hdc pc端可执行文件编译步骤：
 
 2. 编译：在目标开发机上运行上面调整好的sdk编译命令， 正常编译hdc_std会输出到sdk平台相关目录下； 注意： ubuntu环境下只能编译windows/linux版本工具，mac版需要在macos开发机上编译。
 
-
 ### pc端获取说明<a name="section129654513263"></a>
-
 
 [1.下载sdk获取(建议)](#section161941989591)
 ```
@@ -64,7 +63,37 @@ hdc pc端可执行文件编译步骤：
 linux版本建议ubuntu 16.04以上 64位，其他相近版本也可；libc++.so引用错误请使用ldd/readelf等命令检查库引用 windows版本建议windows10 64位，如果低版本windows winusb库缺失，请使用zadig更新库。
 
 
-### 命令帮助<a name="section129654513264"></a>
+### Linux端USB设备权限说明<a name="section129654513264"></a>
+
+
+在Linux下在非root权限下使用hdc会出现无法找到设备的情况，此问题原因为用户USB操作权限问题，解决方法如下：
+
+1. 开启非root用户USB设备操作权限
+   该操作方法简单易行但是可能存在潜在安全问题，请根据使用场景自行评估
+   ```
+   sudo chmod -R 777 /dev/bus/usb/
+   ```
+2. 永久修改 USB 设备权限
+   1）使用lsusb命令找出USB设备的vendorID和productID
+   2）创建一个新的udev规则
+   
+   编辑UDEV加载规则，用设备的"idVendor"和"idProduct"来替换默认值。MODE="0666"表示USB设备的权限
+   GROUP代表用户组，要确保此时登录的系统用户在该用户组中
+   可用 "usermod -a -G username groupname" 将用户添加到用户组中
+   ```
+   sudo vim /etc/udev/rules.d/90-myusb.rules
+   SUBSYSTEMS=="usb", ATTRS{idVendor}=="067b", ATTRS{idProduct}=="2303", GROUP="users", MODE="0666"
+      ```
+   重启电脑或重新加载 udev 规则
+   ```
+   sudo udevadm control --reload
+   ```
+3. su 切换到root用户下运行测试程序
+   ```
+   sudo hdc_std list targets
+   ```
+
+### 命令帮助<a name="section129654513265"></a>
 
 hdc当前常用命令如下，未尽命令使用hdc -h或者hdc --help查看：
 
