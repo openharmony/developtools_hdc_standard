@@ -20,15 +20,12 @@ namespace Hdc {
 namespace TranslateCommand {
     struct FormatCommand {
         uint16_t cmdFlag;
-        string paraments;
-        string inputRaw;
+        string parameters;
         bool bJumpDo;
     };
 
-    string String2FormatCommand(const char *input, int sizeInput, FormatCommand *outCmd);
+    string String2FormatCommand(const char *inputRaw, int sizeInputRaw, FormatCommand *outCmd);
     string Usage();
-
-    int LibraryCallEntryPoint(void *hwnd, void *hinst, uint16_t callMethod, char *lpcmdStringLine, int nCmdShow);
 }
 }
 #endif

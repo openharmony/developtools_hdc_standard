@@ -227,16 +227,10 @@ void HdcForwardBase::AllocForwardBuf(uv_handle_t *handle, size_t sizeSuggested, 
     }
 }
 
-/// issue [6:50:12][0xac5d2920][D] Error ReadForwardBuf error:95 nread:-4095 file:end of file index:897090
-int g_index = 0;
 void HdcForwardBase::ReadForwardBuf(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 {
     HCtxForward ctx = (HCtxForward)stream->data;
-    g_index += nread;
-    // issue here
     if (nread < 0) {
-        WRITE_LOG(LOG_DEBUG, "Error ReadForwardBuf error:%d nread:%d file:%s index:%d", errno, nread,
-                  uv_strerror(nread), g_index);
         ctx->thisClass->FreeContext(ctx, 0, true);
         return;
     }
@@ -315,6 +309,8 @@ bool HdcForwardBase::DetechForwardType(HCtxForward ctxPoint)
     } else if (sFType == "dev") {
         ctxPoint->type = FORWARD_DEVICE;
     } else if (sFType == "localabstract") {
+        // daemon shell: /system/bin/socat unix-listen:/tmp/unix.socket -
+        // host:   hdc_std fport tcp:8080 localabstract:/tmp/unix.socket
         ctxPoint->type = FORWARD_ABSTRACT;
     } else if (sFType == "localreserved") {
         sNodeCfg = HARMONY_RESERVED_SOCKET_PREFIX + sNodeCfg;

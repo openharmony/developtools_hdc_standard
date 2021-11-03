@@ -94,7 +94,10 @@ void HdcJdwp::ReadStream(uv_stream_t *pipe, ssize_t nread, const uv_buf_t *buf)
         if (nread == UV_ENOBUFS) {  // It is definite enough, usually only 4 bytes
             WRITE_LOG(LOG_DEBUG, "HdcJdwp::ReadStream IOBuf max");
             break;
-        } else if (nread <= 0 || nread != 4) {  // 4 : 4 bytes
+        } else if (nread == 0) {
+            ret = 0;
+            break;
+        } else if (nread < 0 || nread != 4) {  // 4 : 4 bytes
             WRITE_LOG(LOG_DEBUG, "HdcJdwp::ReadStream program exit pid:%d", ctxJdwp->pid);
             break;
         }
