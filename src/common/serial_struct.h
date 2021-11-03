@@ -30,6 +30,9 @@ namespace SerialStruct {
     constexpr int fieldEight = 8;
     constexpr int fieldNine = 9;
     constexpr int fieldTen = 10;
+    constexpr int field11 = 11;
+    constexpr int field12 = 12;
+    constexpr int field13 = 13;
 
     template<> struct Descriptor<Hdc::HdcTransferBase::TransferConfig> {
         static auto type()
@@ -43,7 +46,10 @@ namespace SerialStruct {
                            Field<fieldSeven, &Hdc::HdcTransferBase::TransferConfig::updateIfNew>("updateIfNew"),
                            Field<fieldEight, &Hdc::HdcTransferBase::TransferConfig::compressType>("compressType"),
                            Field<fieldNine, &Hdc::HdcTransferBase::TransferConfig::holdTimestamp>("holdTimestamp"),
-                           Field<fieldTen, &Hdc::HdcTransferBase::TransferConfig::functionName>("functionName"));
+                           Field<fieldTen, &Hdc::HdcTransferBase::TransferConfig::functionName>("functionName"),
+                           Field<field11, &Hdc::HdcTransferBase::TransferConfig::clientCwd>("clientCwd"),
+                           Field<field12, &Hdc::HdcTransferBase::TransferConfig::reserve1>("reserve1"),
+                           Field<field13, &Hdc::HdcTransferBase::TransferConfig::reserve2>("reserve2"));
         }
     };
 

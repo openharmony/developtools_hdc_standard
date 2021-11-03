@@ -37,13 +37,19 @@ bool HdcHostApp::BeginInstall(CtxFile *context, const char *command)
     }
 
     for (int i = 0; i < argc; ++i) {
-        if (!strncmp(argv[i], "-", 1)) {
+        if (!strcmp(argv[i], CMD_OPTION_CLIENTCWD.c_str())) {
+            if (i + 1 < argc) {
+                context->transferConfig.clientCwd = argv[i + 1];
+                i += 1;  // add content index
+            }
+        } else if (!strncmp(argv[i], "-", 1)) {
             if (options.size()) {
                 options += " ";
             }
             options += argv[i];
         } else {
-            const char *path = argv[i];
+            string path = argv[i];
+            ExtractRelativePath(context->transferConfig.clientCwd, path);
             if (MatchPackageExtendName(path, ".hap")) {
                 context->taskQueue.push_back(path);
             } else {
