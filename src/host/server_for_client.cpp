@@ -432,9 +432,12 @@ bool HdcServerForClient::TaskCommand(HChannel hChannel, void *formatCommandInput
             return false;
         }
         ptrServer->DispatchTaskData(hSession, hChannel->channelId, formatCommand->cmdFlag,
-                                    (uint8_t *)formatCommand->parameters.c_str() + sizeCmdFlag, sizeSend - sizeCmdFlag);
+                                    reinterpret_cast<uint8_t *>(const_cast<char *>(formatCommand->parameters.c_str()))
+                                        + sizeCmdFlag,
+                                    sizeSend - sizeCmdFlag);
     } else {  // Send to Daemon-side to do
-        SendToDaemon(hChannel, formatCommand->cmdFlag, (uint8_t *)formatCommand->parameters.c_str() + sizeCmdFlag,
+        SendToDaemon(hChannel, formatCommand->cmdFlag,
+                     reinterpret_cast<uint8_t *>(const_cast<char *>(formatCommand->parameters.c_str())) + sizeCmdFlag,
                      sizeSend - sizeCmdFlag);
     }
     return true;
@@ -458,7 +461,8 @@ bool HdcServerForClient::DoCommandRemote(HChannel hChannel, void *formatCommandI
         case CMD_UNITY_HILOG:
         case CMD_UNITY_ROOTRUN:
         case CMD_UNITY_JPID: {
-            if (!SendToDaemon(hChannel, formatCommand->cmdFlag, (uint8_t *)formatCommand->parameters.c_str(),
+            if (!SendToDaemon(hChannel, formatCommand->cmdFlag,
+                              reinterpret_cast<uint8_t *>(const_cast<char *>(formatCommand->parameters.c_str())),
                               sizeSend)) {
                 break;
             }
@@ -629,7 +633,7 @@ int HdcServerForClient::ReadChannel(HChannel hChannel, uint8_t *bufPtr, const in
             return ret;
         }
     } else {
-        formatCommand.parameters = string((char *)bufPtr, bytesIO);
+        formatCommand.parameters = string(reinterpret_cast<char *>(bufPtr), bytesIO);
         formatCommand.cmdFlag = CMD_SHELL_DATA;
     }
     if (!DoCommand(hChannel, &formatCommand)) {

@@ -698,7 +698,7 @@ namespace Base {
         }
         // no need to CanonicalizeSpecPath, else not work
         umask(0);
-        int fd = open(bufPath, O_RDWR | O_CREAT, 0666);
+        int fd = open(bufPath, O_RDWR | O_CREAT, 0666);  // 0666:permission
         if (fd < 0) {
             WRITE_LOG(LOG_FATAL, "Open mutex file \"%s\" failed!!!Errno:%d\n", buf, errno);
             return ERR_FILE_OPEN;
