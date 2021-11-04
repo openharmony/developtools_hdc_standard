@@ -268,11 +268,11 @@ namespace TranslateCommand {
                 outCmd->parameters += " ";
             }
         }
-        // Inner command, protocol use only
+        // Inner command, protocol uses only
         else if (input == CMDSTR_INNER_ENABLE_KEEPALIVE) {
             outCmd->cmdFlag = CMD_KERNEL_ENABLE_KEEPALIVE;
         } else {
-            stringError = "Unknow command...";
+            stringError = "Unknown command...";
             outCmd->bJumpDo = true;
         }
         // nl

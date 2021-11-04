@@ -283,7 +283,7 @@ bool GetCommandlineOptions(int optArgc, const char *optArgv[])
                 } else if (optarg[0] == 'u') {
                     g_isTCPorUSB = false;
                 } else {
-                    Base::PrintMessage("Unknow debug parameters");
+                    Base::PrintMessage("Unknown debug parameters");
                     needExit = true;
                     return needExit;
                 }
@@ -292,7 +292,7 @@ bool GetCommandlineOptions(int optArgc, const char *optArgv[])
             case '?':
                 break;
             default: {
-                Base::PrintMessage("Unknow parameters");
+                Base::PrintMessage("Unknown parameters");
                 needExit = true;
                 return needExit;
             }

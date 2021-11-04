@@ -86,7 +86,7 @@ bool HdcFile::SetMasterParameters(CtxFile *context, const char *command, int arg
             ++srcArgvIndex;
         } else if (argv[i] == CMD_OPTION_CLIENTCWD) {
             context->transferConfig.clientCwd = argv[i + 1];
-            srcArgvIndex += 2;
+            srcArgvIndex += CMD_ARG1_COUNT;  // skip 2args
         } else if (argv[i][0] == '-') {
             LogMsg(MSG_FAIL, "Unknow file option: %s", argv[i]);
             return false;

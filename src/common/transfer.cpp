@@ -20,6 +20,8 @@
 #endif
 
 namespace Hdc {
+constexpr uint64_t HDC_TIME_CONVERT_BASE = 1000000000;
+
 HdcTransferBase::HdcTransferBase(HTaskInfo hTaskInfo)
     : HdcTaskBase(hTaskInfo)
 {
@@ -119,8 +121,8 @@ void HdcTransferBase::SetFileTime(CtxFile *context)
         return;
     }
     uv_fs_t fs;
-    double aTimeSec = ((long double)context->transferConfig.atime) / 1000000000.0;
-    double mTimeSec = ((long double)context->transferConfig.mtime) / 1000000000.0;
+    double aTimeSec = static_cast<long double>(context->transferConfig.atime) / HDC_TIME_CONVERT_BASE;
+    double mTimeSec = static_cast<long double>(context->transferConfig.mtime) / HDC_TIME_CONVERT_BASE;
     uv_fs_futime(nullptr, &fs, context->fsOpenReq.result, aTimeSec, mTimeSec, nullptr);
     uv_fs_req_cleanup(&fs);
 }
@@ -246,8 +248,8 @@ void HdcTransferBase::OnFileOpen(uv_fs_t *req)
         st.fileSize = fs.statbuf.st_size;
         st.optionalName = context->localName;
         if (st.holdTimestamp) {
-            st.atime = fs.statbuf.st_atim.tv_sec * 1000000000 + fs.statbuf.st_atim.tv_nsec;
-            st.mtime = fs.statbuf.st_mtim.tv_sec * 1000000000 + fs.statbuf.st_mtim.tv_nsec;
+            st.atime = fs.statbuf.st_atim.tv_sec * HDC_TIME_CONVERT_BASE + fs.statbuf.st_atim.tv_nsec;
+            st.mtime = fs.statbuf.st_mtim.tv_sec * HDC_TIME_CONVERT_BASE + fs.statbuf.st_mtim.tv_nsec;
         }
         st.path = context->remotePath;
         // update ctxNow=context child value
