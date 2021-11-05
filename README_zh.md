@@ -1,6 +1,6 @@
 # HDC-OpenHarmony设备连接器<a name="ZH-CN_TOPIC_0000001149090043"></a>
 
-- [HDC-OpenHarmony设备连接器<a name="ZH-CN_TOPIC_0000001149090043"></a>](#hdc-openharmony设备连接器)
+- [HDC-OpenHarmony设备连接器<a name="ZH-CN_TOPIC_0000001149090043"></a>](#)
   - [简介<a name="section662115419449"></a>](#简介)
   - [架构<a name="section15908143623714"></a>](#架构)
   - [目录<a name="section161941989596"></a>](#目录)
