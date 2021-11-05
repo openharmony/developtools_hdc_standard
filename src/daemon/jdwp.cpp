@@ -80,43 +80,31 @@ void HdcJdwp::FreeContext(HCtxJdwp ctx)
 
 void HdcJdwp::ReadStream(uv_stream_t *pipe, ssize_t nread, const uv_buf_t *buf)
 {
-    bool ret = false;
+    bool ret = true;
     HCtxJdwp ctxJdwp = (HCtxJdwp)pipe->data;
     HdcJdwp *thisClass = (HdcJdwp *)ctxJdwp->thisClass;
-    char temp[5];
+    char *p = ctxJdwp->buf;
     uint32_t pid = 0;
-    int offset = 0;
-    if (nread > 0) {
-        ctxJdwp->bufIndex += nread;
+
+    if (nread == UV_ENOBUFS) {  // It is definite enough, usually only 4 bytes
+        ret = false;
+        WRITE_LOG(LOG_DEBUG, "HdcJdwp::ReadStream IOBuf max");
+    } else if (nread == 0) {
+        return;
+    } else if (nread < 0 || nread != 4) {  // 4 : 4 bytes
+        ret = false;
+        WRITE_LOG(LOG_DEBUG, "HdcJdwp::ReadStream program exit pid:%d", ctxJdwp->pid);
     }
-    // read the PID as a 4-hexchar string
-    while (offset < ctxJdwp->bufIndex) {
-        if (nread == UV_ENOBUFS) {  // It is definite enough, usually only 4 bytes
-            WRITE_LOG(LOG_DEBUG, "HdcJdwp::ReadStream IOBuf max");
-            break;
-        } else if (nread == 0) {
-            ret = 0;
-            break;
-        } else if (nread < 0 || nread != 4) {  // 4 : 4 bytes
-            WRITE_LOG(LOG_DEBUG, "HdcJdwp::ReadStream program exit pid:%d", ctxJdwp->pid);
-            break;
+    if (ret) {
+        pid = atoi(p);
+        if (pid > 0) {
+            WRITE_LOG(LOG_DEBUG, "JDWP accept pid:%d", pid);
+            ctxJdwp->pid = pid;
+            thisClass->AdminContext(OP_ADD, pid, ctxJdwp);
+            ret = true;
         }
-        int errCode = memcpy_s(temp, sizeof(temp), ctxJdwp->buf + offset, 4);  // 4 : 4 bytes
-        if (errCode != EOK) {
-            break;
-        }
-        temp[4] = 0;  // 4 : pid length
-        if (sscanf_s(temp, "%04x", &pid) != 1) {
-            WRITE_LOG(LOG_WARN, "could not decode PID number: '%s'", temp);
-            break;
-        }
-        WRITE_LOG(LOG_DEBUG, "JDWP accept pid:%d", pid);
-        ctxJdwp->pid = pid;
-        thisClass->AdminContext(OP_ADD, pid, ctxJdwp);
-        offset += 4;  // 4 : 4 bytes
-        ret = true;
-        break;  // just 4bytes, now finish
     }
+    Base::ZeroArray(ctxJdwp->buf);
     if (!ret) {
         thisClass->FreeContext(ctxJdwp);
     }
@@ -138,8 +126,8 @@ void HdcJdwp::AcceptClient(uv_stream_t *server, int status)
     }
     auto funAlloc = [](uv_handle_t *handle, size_t sizeSuggested, uv_buf_t *buf) -> void {
         HCtxJdwp ctxJdwp = (HCtxJdwp)handle->data;
-        buf->base = (char *)ctxJdwp->buf + ctxJdwp->bufIndex;
-        buf->len = sizeof(ctxJdwp->buf) - ctxJdwp->bufIndex;
+        buf->base = (char *)ctxJdwp->buf ;
+        buf->len = sizeof(ctxJdwp->buf);
     };
     uv_read_start((uv_stream_t *)&ctxJdwp->pipe, funAlloc, ReadStream);
 }

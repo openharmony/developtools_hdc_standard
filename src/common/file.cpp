@@ -34,9 +34,6 @@ void HdcFile::StopTask()
     singalStop = true;
 };
 
-// Send supported below styles
-// send|recv path/filename path/filename
-// send|recv filename  path
 bool HdcFile::BeginTransfer(CtxFile *context, const string &command)
 {
     int argc = 0;
@@ -82,11 +79,15 @@ bool HdcFile::SetMasterParameters(CtxFile *context, const char *command, int arg
             context->transferConfig.updateIfNew = true;
             ++srcArgvIndex;
         } else if (argv[i] == CMD_OPTION_TSTMP) {
+            // The time zone difference may cause the display time on the PC and the
+            // device to differ by several hours
+            //
+            // ls -al --full-time
             context->transferConfig.holdTimestamp = true;
             ++srcArgvIndex;
         } else if (argv[i] == CMD_OPTION_CLIENTCWD) {
             context->transferConfig.clientCwd = argv[i + 1];
-            srcArgvIndex += CMD_ARG1_COUNT; // skip 2args
+            srcArgvIndex += CMD_ARG1_COUNT;  // skip 2args
         } else if (argv[i][0] == '-') {
             LogMsg(MSG_FAIL, "Unknow file option: %s", argv[i]);
             return false;
