@@ -46,7 +46,7 @@ uint32_t HdcClient::GetLastPID()
         WRITE_LOG(LOG_FATAL, "Tmppath failed");
         return 0;
     }
-    string path = Base::StringFormat("%s/.%s.pid", bufPath, SERVER_NAME.c_str());
+    string path = Base::StringFormat("%s%c.%s.pid", bufPath, Base::GetPathSep(), SERVER_NAME.c_str());
     Base::ReadBinFile(path.c_str(), (void **)&pidBuf, BUF_SIZE_TINY);
     int pid = atoi(pidBuf);  // pid  maybe 0
     return pid;
