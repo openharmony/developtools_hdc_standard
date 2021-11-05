@@ -689,7 +689,8 @@ namespace Base {
             WRITE_LOG(LOG_FATAL, "Tmppath failed");
             return ERR_API_FAIL;
         }
-        if (snprintf_s(bufPath, sizeof(bufPath), sizeof(bufPath) - 1, "%s/.%s.pid", buf, procname) < 0) {
+        if (snprintf_s(bufPath, sizeof(bufPath), sizeof(bufPath) - 1, "%s%c.%s.pid", buf, Base::GetPathSep(), procname)
+            < 0) {
             return ERR_BUF_OVERFLOW;
         }
         int pid = static_cast<int>(getpid());

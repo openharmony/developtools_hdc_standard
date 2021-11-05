@@ -426,18 +426,16 @@ bool HdcServerForClient::TaskCommand(HChannel hChannel, void *formatCommandInput
         cmdFlag = "sideload ";
         sizeCmdFlag = 9;
     }
+    uint8_t *payload = reinterpret_cast<uint8_t *>(const_cast<char *>(formatCommand->parameters.c_str())) + sizeCmdFlag;
     if (!strncmp(formatCommand->parameters.c_str(), cmdFlag.c_str(), sizeCmdFlag)) {  // local do
         HSession hSession = FindAliveSession(hChannel->targetSessionId);
         if (!hSession) {
             return false;
         }
         ptrServer->DispatchTaskData(hSession, hChannel->channelId, formatCommand->cmdFlag,
-            reinterpret_cast<uint8_t *>(const_cast<char *>(formatCommand->parameters.c_str())) + sizeCmdFlag,
-            sizeSend - sizeCmdFlag);
+            payload, sizeSend - sizeCmdFlag);
     } else {  // Send to Daemon-side to do
-        SendToDaemon(hChannel, formatCommand->cmdFlag,
-            reinterpret_cast<uint8_t *>(const_cast<char *>(formatCommand->parameters.c_str())) + sizeCmdFlag,
-            sizeSend - sizeCmdFlag);
+        SendToDaemon(hChannel, formatCommand->cmdFlag, payload, sizeSend - sizeCmdFlag);
     }
     return true;
 }
