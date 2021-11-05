@@ -35,9 +35,7 @@ private:
         uv_pipe_t pipe;
         HdcJdwp *thisClass;
         bool finish;
-        uint8_t buf[16];  // read read 4 bytes ascii
-        uint8_t bufIndex;
-
+        char buf[sizeof(uint32_t)];
         uint8_t dummy;
         uv_tcp_t jvmTCP;
     };
