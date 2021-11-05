@@ -69,7 +69,7 @@ linux版本建议ubuntu 16.04以上 64位，其他相近版本也可；libc++.so
 在Linux下在非root权限下使用hdc会出现无法找到设备的情况，此问题原因为用户USB操作权限问题，解决方法如下：
 
 1. 开启非root用户USB设备操作权限
-   该操作方法简单易行但是可能存在潜在安全问题，请根据使用场景自行评估
+   该操作方法简单易行，但是可能存在潜在安全问题，请根据使用场景自行评估
    ```
    sudo chmod -R 777 /dev/bus/usb/
    ```
@@ -131,7 +131,7 @@ hdc当前常用命令如下，未尽命令使用hdc -h或者hdc --help查看：
 </tr>
 <tr id="row139301957122519"><td class="cellrowborder" valign="top" width="50%" headers="mcps1.2.3.1.1 "><p id="p8424164318423"><a name="p8424164318423"></a><a name="p8424164318423"></a>target mount</p>
 </td>
-<td class="cellrowborder" valign="top" width="50%" headers="mcps1.2.3.1.2 "><p id="p13424154324215"><a name="p13424154324215"></a><a name="p13424154324215"></a><span>以读写模式挂载/system等分区</span></p>
+<td class="cellrowborder" valign="top" width="50%" headers="mcps1.2.3.1.2 "><p id="p13424154324215"><a name="p13424154324215"></a><a name="p13424154324215"></a><span>以读写模式挂载/vendor、/data等分区，因为安全性问题，需要挂在根目录或者/system分区</br>请单独使用'hdc_std shell mount -o rw,remount /'等命令</span></p>
 <p id="p23801376351"><a name="p23801376351"></a><a name="p23801376351"></a>举例： hdc target mount</p>
 </td>
 </tr>
