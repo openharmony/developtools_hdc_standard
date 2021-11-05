@@ -471,12 +471,9 @@ bool HdcServer::FetchCommand(HSession hSession, const uint32_t channelId, const 
         case CMD_KERNEL_CHANNEL_CLOSE: {
             WRITE_LOG(LOG_DEBUG, "CMD_KERNEL_CHANNEL_CLOSE channelid:%d", channelId);
             ClearOwnTasks(hSession, channelId);
-            auto funcChannleClose = [](uv_handle_t *handle) -> void {
-                HChannel hChannel = (HChannel)handle->data;
-                HdcServerForClient *sfc = static_cast<HdcServerForClient *>(hChannel->clsChannel);
-                sfc->FreeChannel(hChannel->channelId);
-            };
-            Base::TryCloseHandle((uv_handle_t *)&hChannel->hChildWorkTCP, funcChannleClose);
+            // Forcibly closing the tcp handle here may result in incomplete data reception on the client side
+            HdcServerForClient *sfc = static_cast<HdcServerForClient *>(hChannel->clsChannel);
+            sfc->FreeChannel(hChannel->channelId);
             if (*payload) {
                 --(*payload);
                 Send(hSession->sessionId, channelId, CMD_KERNEL_CHANNEL_CLOSE, payload, 1);
