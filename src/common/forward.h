@@ -93,6 +93,7 @@ private:
     bool SetupFilePoint(HCtxForward ctxPoint);
     bool ForwardCommandDispatch(const uint16_t command, uint8_t *payload, const int payloadSize);
     bool CommandForwardCheckResult(HCtxForward ctx, uint8_t *payload);
+    bool LocalAbstractConnect(uv_pipe_t *pipe, string &sNodeCfg);
 
     map<uint32_t, HCtxForward> mapCtxPoint;
     string taskCommand;
