@@ -474,7 +474,7 @@ bool HdcServer::FetchCommand(HSession hSession, const uint32_t channelId, const 
             // Forcibly closing the tcp handle here may result in incomplete data reception on the client side
             HdcServerForClient *sfc = static_cast<HdcServerForClient *>(hChannel->clsChannel);
             sfc->FreeChannel(hChannel->channelId);
-            if (*payload) {
+            if (*payload == 1) {
                 --(*payload);
                 Send(hSession->sessionId, channelId, CMD_KERNEL_CHANNEL_CLOSE, payload, 1);
             }
