@@ -244,7 +244,7 @@ bool HdcDaemon::FetchCommand(HSession hSession, const uint32_t channelId, const 
         }
         case CMD_KERNEL_CHANNEL_CLOSE: {  // Daemon is only cleaning up the Channel task
             ClearOwnTasks(hSession, channelId);
-            if (*payload) {
+            if (*payload == 1) {
                 --(*payload);
                 Send(hSession->sessionId, channelId, CMD_KERNEL_CHANNEL_CLOSE, payload, 1);
             }
@@ -293,7 +293,7 @@ bool HdcDaemon::ServerCommand(const uint32_t sessionId, const uint32_t channelId
 void HdcDaemon::JdwpNewFileDescriptor(const uint8_t *buf, const int bytesIO)
 {
     uint32_t pid = *(uint32_t *)(buf + 1);
-    uint32_t fd = *(uint32_t *)(buf + 5); // 5 : fd offset
+    uint32_t fd = *(uint32_t *)(buf + 5);  // 5 : fd offset
     ((HdcJdwp *)clsJdwp)->SendJdwpNewFD(pid, fd);
 };
 }  // namespace Hdc
