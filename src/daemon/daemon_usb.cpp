@@ -249,7 +249,7 @@ int HdcDaemonUSB::SendUSBIOSync(HSession hSession, HUSB hMainUSB, const uint8_t 
                 WRITE_LOG(LOG_DEBUG, "BulkinWrite write EINTR, try again");
                 continue;
             } else {
-                WRITE_LOG(LOG_DEBUG, "BulkinWrite write fatal errno %d", err);
+                WRITE_LOG(LOG_FATAL, "BulkinWrite write fatal errno %d", err);
                 isAlive = false;
             }
             break;
