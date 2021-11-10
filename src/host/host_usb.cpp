@@ -423,14 +423,6 @@ void LIBUSB_CALL HdcHostUSB::WriteUSBBulkCallback(struct libusb_transfer *transf
     USBHead *usbHead = reinterpret_cast<USBHead *>(transfer->buffer);
     HSession hSession = reinterpret_cast<HSession>(transfer->user_data);
     HdcSessionBase *server = reinterpret_cast<HdcSessionBase *>(hSession->classInstance);
-    uint16_t zeroMask = hSession->hUSB->wMaxPacketSize - 1;
-    if (transfer->length != 0 && zeroMask != 0 && (transfer->length & zeroMask) == 0) {
-        // Zero packet
-        transfer->length = 0;
-        if (libusb_submit_transfer(transfer) == 0) {
-            return;
-        }
-    }
     if (usbHead->option & USB_OPTION_TAIL) {
         --hSession->sendRef;
     }
