@@ -79,6 +79,23 @@ int IsRegisterCommand(string &outCommand, const char *cmd, const char *cmdnext)
     return 0;
 }
 
+void AppendCwdWhenTransfer(string &outCommand)
+{
+    if (outCommand != CMDSTR_FILE_SEND && outCommand != CMDSTR_FILE_RECV && outCommand != CMDSTR_APP_INSTALL
+        && outCommand != CMDSTR_APP_SIDELOAD) {
+        return;
+    }
+    char path[PATH_MAX] = "";
+    size_t size = sizeof(path);
+    if (uv_cwd(path, &size) < 0)
+        return;
+    if (path[strlen(path) - 1] != Base::GetPathSep()) {
+        path[strlen(path)] = Base::GetPathSep();
+    }
+    outCommand += outCommand.size() ? " -cwd " : "-cwd ";
+    outCommand += path;
+}
+
 int SplitOptionAndCommand(int argc, const char **argv, string &outOption, string &outCommand)
 {
     bool foundCommand = false;
@@ -92,6 +109,7 @@ int SplitOptionAndCommand(int argc, const char **argv, string &outOption, string
                 if (resultChild == 2) {
                     ++i;
                 }
+                AppendCwdWhenTransfer(outCommand);
                 continue;
             }
         }
@@ -157,7 +175,7 @@ int RunClientMode(string &commands, string &serverListenString, string &connectK
     if (isPullServer && serverListenString == DEFAULT_SERVER_ADDR
         && Base::ProgramMutex(SERVER_NAME.c_str(), true) == 0) {
         // default pullup, just default listenstr.If want to customer listen-string, please use 'hdc -m -s lanip:port'
-        HdcServer::CheckToPullUptrServer(DEFAULT_SERVER_ADDR.c_str());
+        HdcServer::PullupServer(DEFAULT_SERVER_ADDR.c_str());
         uv_sleep(300);  // give time to start serverForClient,at least 200ms
     }
     client.Initial(connectKey);
@@ -206,7 +224,7 @@ bool GetCommandlineOptions(int optArgc, const char *optArgv[])
     int ch = 0;
     bool needExit = false;
     opterr = 0;
-    // get option paraments first
+    // get option parameters first
     while ((ch = getopt(optArgc, (char *const *)optArgv, "hvpfms:d:t:l:")) != -1) {
         switch (ch) {
             case 'h': {
@@ -265,7 +283,7 @@ bool GetCommandlineOptions(int optArgc, const char *optArgv[])
                 } else if (optarg[0] == 'u') {
                     g_isTCPorUSB = false;
                 } else {
-                    Base::PrintMessage("Unknow debug paraments");
+                    Base::PrintMessage("Unknown debug parameters");
                     needExit = true;
                     return needExit;
                 }
@@ -274,7 +292,7 @@ bool GetCommandlineOptions(int optArgc, const char *optArgv[])
             case '?':
                 break;
             default: {
-                Base::PrintMessage("Unknow paraments");
+                Base::PrintMessage("Unknown parameters");
                 needExit = true;
                 return needExit;
             }

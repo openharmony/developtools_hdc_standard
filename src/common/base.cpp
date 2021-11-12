@@ -195,8 +195,7 @@ namespace Base {
             WRITE_LOG(LOG_WARN, "SetTcpOptions nullptr Ptr");
             return;
         }
-        int timeout = GLOBAL_TIMEOUT;
-        uv_tcp_keepalive(tcpHandle, 1, timeout / 2);
+        uv_tcp_keepalive(tcpHandle, 1, GLOBAL_TIMEOUT);
         // if MAX_SIZE_IOBUF==5k,bufMaxSize at least 40k. It must be set to io 8 times is more appropriate,
         // otherwise asynchronous IO is too fast, a lot of IO is wasted on IOloop, transmission speed will decrease
         int bufMaxSize = GetMaxBufSize() * maxBufFactor;
@@ -575,7 +574,7 @@ namespace Base {
 #endif
 #else
         string sKey = key;
-        string sBuf = "getparam " + sKey;
+        string sBuf = "param get " + sKey;
         RunPipeComand(sBuf.c_str(), value, sizeOutBuf, true);
 #endif
         value[sizeOutBuf - 1] = '\0';
@@ -690,7 +689,8 @@ namespace Base {
             WRITE_LOG(LOG_FATAL, "Tmppath failed");
             return ERR_API_FAIL;
         }
-        if (snprintf_s(bufPath, sizeof(bufPath), sizeof(bufPath) - 1, "%s/%s.pid", buf, procname) < 0) {
+        if (snprintf_s(bufPath, sizeof(bufPath), sizeof(bufPath) - 1, "%s%c.%s.pid", buf, Base::GetPathSep(), procname)
+            < 0) {
             return ERR_BUF_OVERFLOW;
         }
         int pid = static_cast<int>(getpid());
@@ -698,7 +698,8 @@ namespace Base {
             return ERR_BUF_OVERFLOW;
         }
         // no need to CanonicalizeSpecPath, else not work
-        int fd = open(bufPath, O_RDWR | O_CREAT, (S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH));
+        umask(0);
+        int fd = open(bufPath, O_RDWR | O_CREAT, 0666);  // 0666:permission
         if (fd < 0) {
             WRITE_LOG(LOG_FATAL, "Open mutex file \"%s\" failed!!!Errno:%d\n", buf, errno);
             return ERR_FILE_OPEN;
@@ -789,14 +790,19 @@ namespace Base {
         return (((uint64_t)ntohl(val)) << 32) + ntohl(val >> 32);
     }
 
-    string GetFullFilePath(const string &s)
-    {  // cannot use s.rfind(std::filesystem::path::preferred_separator
+    char GetPathSep()
+    {
 #ifdef _WIN32
         const char sep = '\\';
 #else
         const char sep = '/';
 #endif
-        size_t i = s.rfind(sep, s.length());
+        return sep;
+    }
+
+    string GetFullFilePath(const string &s)
+    {  // cannot use s.rfind(std::filesystem::path::preferred_separator
+        size_t i = s.rfind(GetPathSep(), s.length());
         if (i != string::npos) {
             return (s.substr(i + 1, s.length() - i));
         }
@@ -1166,8 +1172,9 @@ namespace Base {
     vector<uint8_t> Md5Sum(uint8_t *buf, int size)
     {
         vector<uint8_t> ret;
-        if (buf != nullptr && size > 0) {  // dummy for security temp
-            ret.push_back(0);
+        uint8_t md5Hash[MD5_DIGEST_LENGTH] = { 0 };
+        if (EVP_Digest(buf, size, md5Hash, NULL, EVP_md5(), NULL)) {
+            ret.insert(ret.begin(), md5Hash, md5Hash + sizeof(md5Hash));
         }
         return ret;
     }
@@ -1183,6 +1190,19 @@ namespace Base {
         }
 #endif
         return false;
+    }
+
+    bool IsAbsolutePath(string &path)
+    {
+        bool ret = false;
+#ifdef _WIN32
+        // shlwapi.h PathIsRelativeA not link in harmony project
+        // c:\ or UNC path '\\hostname\share\file'
+        ret = path.find(":\\") == 1 || path.find("\\\\") == 0;
+#else
+        ret = path[0] == '/';
+#endif
+        return ret;
     }
 }
 }  // namespace Hdc

@@ -227,16 +227,10 @@ void HdcForwardBase::AllocForwardBuf(uv_handle_t *handle, size_t sizeSuggested, 
     }
 }
 
-/// issue [6:50:12][0xac5d2920][D] Error ReadForwardBuf error:95 nread:-4095 file:end of file index:897090
-int g_index = 0;
 void HdcForwardBase::ReadForwardBuf(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 {
     HCtxForward ctx = (HCtxForward)stream->data;
-    g_index += nread;
-    // issue here
     if (nread < 0) {
-        WRITE_LOG(LOG_DEBUG, "Error ReadForwardBuf error:%d nread:%d file:%s index:%d", errno, nread,
-                  uv_strerror(nread), g_index);
         ctx->thisClass->FreeContext(ctx, 0, true);
         return;
     }
@@ -315,6 +309,9 @@ bool HdcForwardBase::DetechForwardType(HCtxForward ctxPoint)
     } else if (sFType == "dev") {
         ctxPoint->type = FORWARD_DEVICE;
     } else if (sFType == "localabstract") {
+        // daemon shell: /system/bin/socat abstract-listen:linux-abstract -
+        // daemon shell: /system/bin/socat - abstract-connect:linux-abstract
+        // host:   hdc_std fport tcp:8080 localabstract:linux-abstract
         ctxPoint->type = FORWARD_ABSTRACT;
     } else if (sFType == "localreserved") {
         sNodeCfg = HARMONY_RESERVED_SOCKET_PREFIX + sNodeCfg;
@@ -377,6 +374,41 @@ bool HdcForwardBase::SetupDevicePoint(HCtxForward ctxPoint)
     return true;
 }
 
+bool HdcForwardBase::LocalAbstractConnect(uv_pipe_t *pipe, string &sNodeCfg)
+{
+    bool abstractRet = false;
+#ifndef _WIN32
+    int s = 0;
+    do {
+        if ((s = socket(AF_LOCAL, SOCK_STREAM, 0)) < 0) {
+            break;
+        }
+        fcntl(s, F_SETFD, FD_CLOEXEC);
+        struct sockaddr_un addr;
+        Base::ZeroStruct(addr);
+        int addrLen = sNodeCfg.size() + offsetof(struct sockaddr_un, sun_path) + 1;
+        addr.sun_family = AF_LOCAL;
+        addr.sun_path[0] = 0;
+
+        if (memcpy_s(addr.sun_path + 1, sizeof(addr.sun_path) - 1, sNodeCfg.c_str(), sNodeCfg.size()) != EOK) {
+            break;
+        };
+        // local connect, ignore timeout
+        if (connect(s, (struct sockaddr *)&addr, addrLen) < 0) {
+            break;
+        }
+        if (uv_pipe_open(pipe, s)) {
+            break;
+        }
+        abstractRet = true;
+    } while (false);
+    if (!abstractRet && s > 0) {
+        close(s);
+    }
+#endif
+    return abstractRet;
+}
+
 bool HdcForwardBase::SetupFilePoint(HCtxForward ctxPoint)
 {
     string &sNodeCfg = ctxPoint->localArgs[1];
@@ -397,7 +429,16 @@ bool HdcForwardBase::SetupFilePoint(HCtxForward ctxPoint)
     } else {
         uv_connect_t *connect = new uv_connect_t();
         connect->data = ctxPoint;
-        uv_pipe_connect(connect, &ctxPoint->pipe, sNodeCfg.c_str(), ConnectTarget);
+        if (ctxPoint->type == FORWARD_ABSTRACT) {
+            bool abstractRet = LocalAbstractConnect(&ctxPoint->pipe, sNodeCfg);
+            SetupPointContinue(ctxPoint, abstractRet ? 0 : -1);
+            if (!abstractRet) {
+                ctxPoint->lastError = "LocalAbstractConnect failed";
+                return false;
+            }
+        } else {
+            uv_pipe_connect(connect, &ctxPoint->pipe, sNodeCfg.c_str(), ConnectTarget);
+        }
     }
     return true;
 }

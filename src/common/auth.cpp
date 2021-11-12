@@ -20,7 +20,7 @@
 #include <openssl/sha.h>
 
 using namespace Hdc;
-#define BIGNUMTOBIT    32
+#define BIGNUMTOBIT 32
 
 namespace HdcAuth {
 // ---------------------------------------Cheat compiler---------------------------------------------------------
@@ -188,7 +188,7 @@ bool GenerateKey(const char *file)
         BN_set_word(exponent, RSA_F4);
         RSA_generate_key_ex(rsa, 2048, exponent, nullptr);
         EVP_PKEY_set1_RSA(publicKey, rsa);
-        old_mask = umask(077); // 077:permission
+        old_mask = umask(077);  // 077:permission
 
         fKey = fopen(file, "w");
         if (!fKey) {
@@ -248,15 +248,13 @@ int GetUserKeyPath(string &path)
     const char hdcKeyFile[] = "hdckey";
     char buf[BUF_SIZE_DEFAULT];
     size_t len = BUF_SIZE_DEFAULT;
-    char sep[2] = "";
-    sep[0] = PREF_SEPARATOR;
     // $home
     if (uv_os_homedir(buf, &len) < 0)
         return false;
     path = string(buf) + string(sep) + string(harmoneyPath) + string(sep);
     if (stat(path.c_str(), &status)) {
         uv_fs_t req;
-        uv_fs_mkdir(nullptr, &req, path.c_str(), 0750, nullptr); // 0750:permission
+        uv_fs_mkdir(nullptr, &req, path.c_str(), 0750, nullptr);  // 0750:permission
         uv_fs_req_cleanup(&req);
         if (req.result < 0) {
             WRITE_LOG(LOG_DEBUG, "Cannot mkdir '%s'", path.c_str());
