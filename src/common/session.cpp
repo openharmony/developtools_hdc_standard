@@ -313,7 +313,8 @@ int HdcSessionBase::MallocSessionByConnectType(HSession hSession)
             }
             hSession->hUSB = hUSB;
 #ifdef HDC_HOST
-            int max = Base::GetUsbffsMaxBulkSize();
+            constexpr auto maxBufFactor = 1.5;
+            int max = Base::GetMaxBufSize() * maxBufFactor + sizeof(USBHead);
             hUSB->sizeEpBuf = max;
             hUSB->bufDevice = new uint8_t[max]();
             hUSB->bufHost = new uint8_t[max]();

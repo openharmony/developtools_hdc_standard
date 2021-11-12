@@ -424,7 +424,7 @@ int HdcDaemonUSB::LoopUSBRead(HUSB hUSB)
     int ret = -1;
     HdcDaemon *daemon = reinterpret_cast<HdcDaemon *>(clsMainBase);
     // must > available size, or it will be incorrect
-    int readMax = Base::GetUsbffsMaxBulkSize();
+    int readMax = Base::GetMaxBufSize() + sizeof(USBHead) + EXTRA_ALLOC_SIZE;
     auto ctxIo = new CtxUvFileCommonIo();
     auto buf = new uint8_t[readMax]();
     uv_fs_t *req = nullptr;
