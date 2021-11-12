@@ -444,6 +444,7 @@ int HdcHostUSB::SendUSBRaw(HSession hSession, uint8_t *data, const int length)
     int ret = ERR_GENERIC;
     int childRet = -1;
     HUSB hUSB = hSession->hUSB;
+    hUSB->sendIOComplete = false;
     while (true) {
         if (memcpy_s(hUSB->bufHost, length, data, length) != EOK) {
             ret = ERR_BUF_COPY;
@@ -451,7 +452,6 @@ int HdcHostUSB::SendUSBRaw(HSession hSession, uint8_t *data, const int length)
         }
         hUSB->lockDeviceHandle.lock();
         std::unique_lock<std::mutex> lock(hUSB->lockSend);
-        hUSB->sendIOComplete = false;
         libusb_fill_bulk_transfer(hUSB->transferSend, hUSB->devHandle, hUSB->epHost, hUSB->bufHost, length,
                                   WriteUSBBulkCallback, hSession, GLOBAL_TIMEOUT * TIME_BASE);
         childRet = libusb_submit_transfer(hUSB->transferSend);
@@ -466,6 +466,7 @@ int HdcHostUSB::SendUSBRaw(HSession hSession, uint8_t *data, const int length)
     }
     if (ret < 0) {
         --hSession->sendRef;
+        hSession->hUSB->sendIOComplete = true;
         if (hUSB->transferRecv != nullptr) {
             libusb_cancel_transfer(hUSB->transferRecv);
         }
