@@ -183,14 +183,9 @@ namespace Base {
         return tmpString;
     }
 
-    int GetMaxBufSize()
-    {
-        return MAX_SIZE_IOBUF;
-    }
-
     void SetTcpOptions(uv_tcp_t *tcpHandle)
     {
-        constexpr int maxBufFactor = 10;
+        constexpr int maxBufFactor = 8;
         if (!tcpHandle) {
             WRITE_LOG(LOG_WARN, "SetTcpOptions nullptr Ptr");
             return;
@@ -205,7 +200,7 @@ namespace Base {
 
     void ReallocBuf(uint8_t **origBuf, int *nOrigSize, const int indexUsedBuf, int sizeWanted)
     {
-        sizeWanted = GetMaxBufSize();
+        sizeWanted = GetMaxBufSize() * 8;  // socket-option buf size
         int remainLen = *nOrigSize - indexUsedBuf;
         // init:0, left less than expected
         if (!*nOrigSize || (remainLen < sizeWanted && (*nOrigSize + sizeWanted < sizeWanted * 2))) {
@@ -1022,8 +1017,8 @@ namespace Base {
 
     const string StringFormat(const char * const formater, va_list &vaArgs)
     {
-        std::vector<char> args(MAX_SIZE_IOBUF);
-        const int retSize = vsnprintf_s(args.data(), MAX_SIZE_IOBUF, args.size() - 1, formater, vaArgs);
+        std::vector<char> args(GetMaxBufSize());
+        const int retSize = vsnprintf_s(args.data(), GetMaxBufSize(), args.size() - 1, formater, vaArgs);
         if (retSize < 0) {
             return std::string("");
         } else {

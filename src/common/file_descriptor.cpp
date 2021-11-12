@@ -98,7 +98,7 @@ void HdcFileDescriptor::OnFileIO(uv_fs_t *req)
 int HdcFileDescriptor::LoopRead()
 {
     uv_buf_t iov;
-    int readMax = Base::GetMaxBufSize() * 1.2;
+    int readMax = Base::GetMaxBufSize() * 5;
     auto contextIO = new CtxFileIO();
     auto buf = new uint8_t[readMax]();
     if (!contextIO || !buf) {

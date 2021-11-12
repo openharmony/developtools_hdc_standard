@@ -186,16 +186,16 @@ int HdcDaemonUSB::AvailablePacket(uint8_t *ioBuf, uint32_t *sessionId)
             ret = ERR_BUF_CHECK;
             break;
         }
-        if (usbPayloadHeader->dataSize > MAX_SIZE_IOBUF * maxBufFactor + sizeof(USBHead)) {
+        if (ntohs(usbPayloadHeader->dataSize) > Base::GetMaxBufSize() * maxBufFactor + sizeof(USBHead)) {
             ret = ERR_BUF_SIZE;
             break;
         }
         if ((usbPayloadHeader->option & USB_OPTION_RESET)) {
-            ResetOldSession(usbPayloadHeader->sessionId);
+            ResetOldSession(ntohl(usbPayloadHeader->sessionId));
             ret = ERR_IO_SOFT_RESET;
             break;
         }
-        *sessionId = usbPayloadHeader->sessionId;
+        *sessionId = ntohl(usbPayloadHeader->sessionId);
         break;
     }
     return ret;
@@ -242,6 +242,7 @@ int HdcDaemonUSB::SendUSBIOSync(HSession hSession, HUSB hMainUSB, const uint8_t 
     int ret = ERR_IO_FAIL;
     int offset = 0;
     while (modRunning && isAlive && !hSession->isDead && !hSession->hUSB->resetIO) {
+        //  WRITE_LOG(LOG_DEBUG, "BulkinWrite write.length:%d", length);
         childRet = write(bulkIn, (uint8_t *)data + offset, length - offset);
         if (childRet <= 0) {
             int err = errno;
@@ -266,11 +267,7 @@ int HdcDaemonUSB::SendUSBIOSync(HSession hSession, HUSB hMainUSB, const uint8_t 
                   "BulkinWrite write failed, nsize:%d really:%d modRunning:%d isAlive:%d SessionDead:%d usbReset:%d",
                   length, offset, modRunning, isAlive, hSession->isDead, hSession->hUSB->resetIO);
     }
-    USBHead *pUSBHead = (USBHead *)data;
-    if ((pUSBHead->option & USB_OPTION_TAIL) || ret < 0) {
-        // tail or failed, dec Ref
-        hSession->sendRef--;
-    }
+    hSession->sendRef--;
     return ret;
 }
 
@@ -427,7 +424,7 @@ int HdcDaemonUSB::LoopUSBRead(HUSB hUSB)
     int ret = -1;
     HdcDaemon *daemon = reinterpret_cast<HdcDaemon *>(clsMainBase);
     // must > available size, or it will be incorrect
-    int readMax = Base::GetMaxBufSize() + sizeof(USBHead) + EXTRA_ALLOC_SIZE;
+    int readMax = Base::GetUsbffsMaxBulkSize();
     auto ctxIo = new CtxUvFileCommonIo();
     auto buf = new uint8_t[readMax]();
     uv_fs_t *req = nullptr;

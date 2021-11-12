@@ -73,7 +73,7 @@ void HdcHostUSB::SendUsbSoftReset(HUSB hUSB, uint32_t sessionId)
 
     USBHead &usbPayloadHeader = ctxReset->usbPayloadHeader;
     usbPayloadHeader.option = USB_OPTION_RESET;
-    usbPayloadHeader.sessionId = sessionId;
+    usbPayloadHeader.sessionId = htonl(sessionId);
     if (memcpy_s(usbPayloadHeader.flag, sizeof(usbPayloadHeader.flag), PACKET_FLAG.c_str(),
                  sizeof(usbPayloadHeader.flag))
         != EOK) {
@@ -420,12 +420,9 @@ int HdcHostUSB::OpenDeviceMyNeed(HUSB hUSB)
 // at main thread
 void LIBUSB_CALL HdcHostUSB::WriteUSBBulkCallback(struct libusb_transfer *transfer)
 {
-    USBHead *usbHead = reinterpret_cast<USBHead *>(transfer->buffer);
     HSession hSession = reinterpret_cast<HSession>(transfer->user_data);
     HdcSessionBase *server = reinterpret_cast<HdcSessionBase *>(hSession->classInstance);
-    if (usbHead->option & USB_OPTION_TAIL) {
-        --hSession->sendRef;
-    }
+    --hSession->sendRef;
     if (LIBUSB_TRANSFER_COMPLETED != transfer->status || (hSession->isDead && 0 == hSession->sendRef)) {
         WRITE_LOG(LOG_FATAL, "SendUSBRaw status:%d", transfer->status);
         if (hSession->hUSB->transferRecv != nullptr) {
@@ -444,14 +441,14 @@ int HdcHostUSB::SendUSBRaw(HSession hSession, uint8_t *data, const int length)
     int ret = ERR_GENERIC;
     int childRet = -1;
     HUSB hUSB = hSession->hUSB;
+    hUSB->sendIOComplete = false;
     while (true) {
-        if (memcpy_s(hUSB->bufHost, length, data, length) != EOK) {
+        if (memcpy_s(hUSB->bufHost, hUSB->sizeEpBuf, data, length) != EOK) {
             ret = ERR_BUF_COPY;
             break;
         }
         hUSB->lockDeviceHandle.lock();
         std::unique_lock<std::mutex> lock(hUSB->lockSend);
-        hUSB->sendIOComplete = false;
         libusb_fill_bulk_transfer(hUSB->transferSend, hUSB->devHandle, hUSB->epHost, hUSB->bufHost, length,
                                   WriteUSBBulkCallback, hSession, GLOBAL_TIMEOUT * TIME_BASE);
         childRet = libusb_submit_transfer(hUSB->transferSend);
@@ -466,6 +463,7 @@ int HdcHostUSB::SendUSBRaw(HSession hSession, uint8_t *data, const int length)
     }
     if (ret < 0) {
         --hSession->sendRef;
+        hSession->hUSB->sendIOComplete = true;
         if (hUSB->transferRecv != nullptr) {
             libusb_cancel_transfer(hUSB->transferRecv);
         }
