@@ -432,8 +432,8 @@ bool HdcServerForClient::TaskCommand(HChannel hChannel, void *formatCommandInput
         if (!hSession) {
             return false;
         }
-        ptrServer->DispatchTaskData(hSession, hChannel->channelId, formatCommand->cmdFlag,
-            payload, sizeSend - sizeCmdFlag);
+        ptrServer->DispatchTaskData(hSession, hChannel->channelId, formatCommand->cmdFlag, payload,
+                                    sizeSend - sizeCmdFlag);
     } else {  // Send to Daemon-side to do
         SendToDaemon(hChannel, formatCommand->cmdFlag, payload, sizeSend - sizeCmdFlag);
     }
@@ -459,7 +459,8 @@ bool HdcServerForClient::DoCommandRemote(HChannel hChannel, void *formatCommandI
         case CMD_UNITY_ROOTRUN:
         case CMD_UNITY_JPID: {
             if (!SendToDaemon(hChannel, formatCommand->cmdFlag,
-                reinterpret_cast<uint8_t *>(const_cast<char *>(formatCommand->parameters.c_str())), sizeSend)) {
+                              reinterpret_cast<uint8_t *>(const_cast<char *>(formatCommand->parameters.c_str())),
+                              sizeSend)) {
                 break;
             }
             ret = true;
