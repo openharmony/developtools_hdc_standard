@@ -116,6 +116,7 @@ int HdcUSBBase::SendToHdcStream(HSession hSession, uv_stream_t *stream, uint8_t 
     while (bufRecv.size() > sizeof(USBHead)) {
         USBHead *usbHeader = (USBHead *)bufRecv.data();
         if (memcmp(usbHeader->flag, PACKET_FLAG.c_str(), PACKET_FLAG.size())) {
+            WRITE_LOG(LOG_FATAL, "Error usb packet");
             ret = ERR_BUF_CHECK;
             break;
         }
