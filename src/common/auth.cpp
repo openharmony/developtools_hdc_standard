@@ -251,7 +251,7 @@ int GetUserKeyPath(string &path)
     // $home
     if (uv_os_homedir(buf, &len) < 0)
         return false;
-    path = string(buf) + string(sep) + string(harmoneyPath) + string(sep);
+    path = string(buf) + Base::GetPathSep() + string(harmoneyPath) + Base::GetPathSep();
     if (stat(path.c_str(), &status)) {
         uv_fs_t req;
         uv_fs_mkdir(nullptr, &req, path.c_str(), 0750, nullptr);  // 0750:permission
