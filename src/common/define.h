@@ -47,11 +47,12 @@ constexpr uint16_t UV_DEFAULT_INTERVAL = 250;  // ms
 constexpr uint16_t VER_PROTOCOL = 0x01;
 constexpr uint16_t EXTRA_ALLOC_SIZE = 2048;
 // double-word(hex)=[0]major[1][2]minor[3][4]version[5]fix(a-p)[6][7]reserve
-constexpr uint32_t HDC_VERSION_NUMBER = 0x10101900;  // 1.1.1b=0x10101100
+constexpr uint32_t HDC_VERSION_NUMBER = 0x10101800;  // 1.1.1b=0x10101100
 constexpr uint32_t HDC_BUF_MAX_BYTES = 1024000000;
 
 const string WHITE_SPACES = " \t\n\r";
 const string UT_TMP_PATH = "/tmp/hdc-ut";
+const string LOG_FILE_NAME = "hdc.log";
 const string SERVER_NAME = "HDCServer";
 const string STRING_EMPTY = "";
 const string HANDSHAKE_MESSAGE = "OHOS HDC";  // sep not char '-', not more than 11 bytes
