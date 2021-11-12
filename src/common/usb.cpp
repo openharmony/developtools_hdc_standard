@@ -61,12 +61,16 @@ int HdcUSBBase::SendUSBBlock(HSession hSession, uint8_t *data, const int length)
 {
     //  Format:USBPacket1 payload1...USBPacketn payloadn；
     //  [USBHead1(PayloadHead1+Payload1)]+[USBHead2(Payload2)]+...+[USBHeadN(PayloadN)]
-    int maxIOSize = Base::GetMaxBufSize();
+    //
+    // I hope the size is GetUsbffsMaxBulkSize, but after exceeding 12k, if the split-package is too large, libusb will
+    // report an error when send callback. I don't know why...
+    constexpr int maxIOSize = 12000;
     int sizeUSBPacketHead = sizeof(USBHead);
     int singleSize = maxIOSize - sizeUSBPacketHead;
     int iMod = length % singleSize;
     int iCount = (length - iMod) / singleSize + 1;
     int offset = 0;
+    int dataSize = 0;
     int i = 0;  // It doesn't matter of 0 or 1, start from 1 to send it according to the serial number.
     uint8_t *ioBuf = new uint8_t[maxIOSize]();
     if (!ioBuf) {
@@ -79,20 +83,22 @@ int HdcUSBBase::SendUSBBlock(HSession hSession, uint8_t *data, const int length)
             offset = ERR_BUF_COPY;
             break;
         }
-        pUSBHead->sessionId = hSession->sessionId;
+        pUSBHead->sessionId = htonl(hSession->sessionId);
         if (i != iCount - 1) {
-            pUSBHead->dataSize = static_cast<uint16_t>(singleSize);
+            dataSize = singleSize;
         } else {
-            pUSBHead->dataSize = static_cast<uint16_t>(iMod);
+            dataSize = iMod;
             pUSBHead->option = pUSBHead->option | USB_OPTION_TAIL;
         }
+        pUSBHead->dataSize = htons(static_cast<uint16_t>(dataSize));
         uint8_t *payload = ioBuf + sizeUSBPacketHead;
-        if (EOK != memcpy_s(payload, maxIOSize - sizeUSBPacketHead, (uint8_t *)data + offset, pUSBHead->dataSize)) {
+        if (EOK != memcpy_s(payload, maxIOSize - sizeUSBPacketHead, (uint8_t *)data + offset, dataSize)) {
             offset = ERR_BUF_COPY;
             break;
         }
-        offset += pUSBHead->dataSize;
-        if (SendUSBRaw(hSession, ioBuf, sizeUSBPacketHead + pUSBHead->dataSize) <= 0) {
+        offset += dataSize;
+        ++hSession->sendRef;
+        if (SendUSBRaw(hSession, ioBuf, sizeUSBPacketHead + dataSize) <= 0) {
             offset = ERR_IO_FAIL;
             break;
         }
@@ -110,12 +116,14 @@ int HdcUSBBase::SendToHdcStream(HSession hSession, uv_stream_t *stream, uint8_t 
     while (bufRecv.size() > sizeof(USBHead)) {
         USBHead *usbHeader = (USBHead *)bufRecv.data();
         if (memcmp(usbHeader->flag, PACKET_FLAG.c_str(), PACKET_FLAG.size())) {
-            WRITE_LOG(LOG_FATAL, "Error usb packet");
             ret = ERR_BUF_CHECK;
             break;
         }
+        usbHeader->sessionId = ntohl(usbHeader->sessionId);
+        usbHeader->dataSize = ntohs(usbHeader->dataSize);
         if (bufRecv.size() < sizeof(USBHead) + usbHeader->dataSize) {
-            WRITE_LOG(LOG_DEBUG, "SendToHdcStream not enough");
+            WRITE_LOG(LOG_DEBUG, "SendToHdcStream not enough dataSize:%d bufRecvSize:%d", usbHeader->dataSize,
+                      bufRecv.size());
             break;  // successful , but not enough
         }
         if (usbHeader->sessionId != hSession->sessionId) {
@@ -133,7 +141,8 @@ int HdcUSBBase::SendToHdcStream(HSession hSession, uv_stream_t *stream, uint8_t 
             // usb data to logic
             if (Base::SendToStream(stream, bufRecv.data() + sizeof(USBHead), usbHeader->dataSize) < 0) {
                 ret = ERR_IO_FAIL;
-                WRITE_LOG(LOG_FATAL, "Error usb send to stream");
+                WRITE_LOG(LOG_FATAL, "Error usb send to stream dataSize:%d bufRecvSize:%d", usbHeader->dataSize,
+                          bufRecv.size());
                 break;
             }
         }

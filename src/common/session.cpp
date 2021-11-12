@@ -313,13 +313,14 @@ int HdcSessionBase::MallocSessionByConnectType(HSession hSession)
             }
             hSession->hUSB = hUSB;
 #ifdef HDC_HOST
-            constexpr auto maxBufFactor = 1.5;
-            int max = Base::GetMaxBufSize() * maxBufFactor + sizeof(USBHead);
+            int max = Base::GetUsbffsMaxBulkSize();
             hUSB->sizeEpBuf = max;
             hUSB->bufDevice = new uint8_t[max]();
             hUSB->bufHost = new uint8_t[max]();
             hUSB->transferRecv = libusb_alloc_transfer(0);
             hUSB->transferSend = libusb_alloc_transfer(0);
+            hUSB->recvIOComplete = true;
+            hUSB->sendIOComplete = true;
 #else
 #endif
             break;
@@ -589,7 +590,6 @@ int HdcSessionBase::SendByProtocol(HSession hSession, uint8_t *bufPtr, const int
         return ERR_SESSION_NOFOUND;
     }
     int ret = 0;
-    ++hSession->sendRef;
     switch (hSession->connType) {
         case CONN_TCP: {
             if (hSession->hWorkThread == uv_thread_self()) {
@@ -601,6 +601,9 @@ int HdcSessionBase::SendByProtocol(HSession hSession, uint8_t *bufPtr, const int
             } else {
                 WRITE_LOG(LOG_FATAL, "SendByProtocol uncontrol send");
                 ret = ERR_API_FAIL;
+            }
+            if (ret > 0) {
+                ++hSession->sendRef;
             }
             break;
         }
@@ -720,6 +723,7 @@ int HdcSessionBase::FetchIOBuf(HSession hSession, uint8_t *ioBuf, int read)
     int indexBuf = 0;
     int childRet = 0;
     if (read < 0) {
+        WRITE_LOG(LOG_FATAL, "HdcSessionBase read io failed,%s", uv_strerror(read));
         return ERR_IO_FAIL;
     }
     hSession->availTailIndex += read;
