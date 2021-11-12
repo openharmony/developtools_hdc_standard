@@ -113,6 +113,7 @@ enum HdcCommand {
     CMD_KERNEL_TARGET_DISCONNECT,
     CMD_KERNEL_ECHO,
     CMD_KERNEL_ECHO_RAW,
+    CMD_KERNEL_ENABLE_KEEPALIVE,
     // One-pass simple commands
     CMD_UNITY_EXECUTE = 1000,
     CMD_UNITY_REMOUNT,
@@ -290,6 +291,7 @@ struct HdcChannel {
     bool serverOrClient;  // client's channel/ server's channel
     bool childCleared;
     bool interactiveShellMode;  // Is shell interactive mode
+    bool keepAlive;             // channel will not auto-close by server
     std::atomic<uint16_t> sendRef;
     uint32_t targetSessionId;
     // child work

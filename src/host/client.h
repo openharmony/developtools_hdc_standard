@@ -32,7 +32,7 @@ private:
     static void AllocStdbuf(uv_handle_t *handle, size_t sizeWanted, uv_buf_t *buf);
     static void ReadStd(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf);
     static void CommandWorker(uv_timer_t *handle);
-    int ConnectServerForClient(const char *stringIP, uint16_t port);
+    int ConnectServerForClient(const char *ip, uint16_t port);
     int ReadChannel(HChannel hChannel, uint8_t *buf, const int bytesIO);
     int PreHandshake(HChannel hChannel, const uint8_t *buf);
     string AutoConnectKey(string &doCommand, const string &preConnectKey) const;

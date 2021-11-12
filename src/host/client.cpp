@@ -46,7 +46,7 @@ uint32_t HdcClient::GetLastPID()
         WRITE_LOG(LOG_FATAL, "Tmppath failed");
         return 0;
     }
-    string path = Base::StringFormat("%s/%s.pid", bufPath, SERVER_NAME.c_str());
+    string path = Base::StringFormat("%s%c.%s.pid", bufPath, Base::GetPathSep(), SERVER_NAME.c_str());
     Base::ReadBinFile(path.c_str(), (void **)&pidBuf, BUF_SIZE_TINY);
     int pid = atoi(pidBuf);  // pid  maybe 0
     return pid;
@@ -70,7 +70,7 @@ bool HdcClient::StartKillServer(const char *cmd, bool startOrKill)
                 uv_kill(pid, SIGN_NUM);
             }
         }
-        HdcServer::CheckToPullUptrServer(channelHostPort.c_str());
+        HdcServer::PullupServer(channelHostPort.c_str());
     } else {
         if (isNowRunning && pid) {
             uv_kill(pid, SIGN_NUM);
@@ -80,7 +80,7 @@ bool HdcClient::StartKillServer(const char *cmd, bool startOrKill)
         if (!strstr(cmd, " -r")) {
             return true;
         }
-        HdcServer::CheckToPullUptrServer(channelHostPort.c_str());
+        HdcServer::PullupServer(channelHostPort.c_str());
     }
     return true;
 }
@@ -319,6 +319,11 @@ int HdcClient::PreHandshake(HChannel hChannel, const uint8_t *buf)
     }
     Send(hChannel->channelId, reinterpret_cast<uint8_t *>(hShake), sizeof(ChannelHandShake));
     hChannel->handshakeOK = true;
+#ifdef HDC_CHANNEL_KEEP_ALIVE
+    // Evaluation method, non long-term support
+    Send(hChannel->channelId, reinterpret_cast<uint8_t *>(CMDSTR_INNER_ENABLE_KEEPALIVE.c_str()),
+         CMDSTR_INNER_ENABLE_KEEPALIVE.size());
+#endif
     return RET_SUCCESS;
 }
 
