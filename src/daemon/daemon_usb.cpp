@@ -242,7 +242,6 @@ int HdcDaemonUSB::SendUSBIOSync(HSession hSession, HUSB hMainUSB, const uint8_t 
     int ret = ERR_IO_FAIL;
     int offset = 0;
     while (modRunning && isAlive && !hSession->isDead && !hSession->hUSB->resetIO) {
-        //  WRITE_LOG(LOG_DEBUG, "BulkinWrite write.length:%d", length);
         childRet = write(bulkIn, (uint8_t *)data + offset, length - offset);
         if (childRet <= 0) {
             int err = errno;
