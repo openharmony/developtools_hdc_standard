@@ -313,8 +313,7 @@ int HdcSessionBase::MallocSessionByConnectType(HSession hSession)
             }
             hSession->hUSB = hUSB;
 #ifdef HDC_HOST
-            constexpr auto maxBufFactor = 1.5;
-            int max = Base::GetMaxBufSize() * maxBufFactor + sizeof(USBHead);
+            int max = Base::GetUsbffsMaxBulkSize();
             hUSB->sizeEpBuf = max;
             hUSB->bufDevice = new uint8_t[max]();
             hUSB->bufHost = new uint8_t[max]();
@@ -754,6 +753,8 @@ int HdcSessionBase::FetchIOBuf(HSession hSession, uint8_t *ioBuf, int read)
 
 void HdcSessionBase::AllocCallback(uv_handle_t *handle, size_t sizeWanted, uv_buf_t *buf)
 {
+    // sizeWanted == libuv staic value 65535
+    sizeWanted = Base::GetMaxBufSize();
     HSession context = (HSession)handle->data;
     Base::ReallocBuf(&context->ioBuf, &context->bufSize, context->availTailIndex, sizeWanted);
     buf->base = (char *)context->ioBuf + context->availTailIndex;

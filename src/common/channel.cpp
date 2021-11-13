@@ -277,9 +277,6 @@ void HdcChannelBase::Send(const uint32_t channelId, uint8_t *bufPtr, const int s
 
 void HdcChannelBase::AllocCallback(uv_handle_t *handle, size_t sizeWanted, uv_buf_t *buf)
 {
-    if (sizeWanted <= 0) {
-        return;
-    }
     HChannel context = (HChannel)handle->data;
     Base::ReallocBuf(&context->ioBuf, &context->bufSize, context->availTailIndex, sizeWanted);
     buf->base = (char *)context->ioBuf + context->availTailIndex;

@@ -22,7 +22,8 @@ constexpr uint8_t MINOR_TIMEOUT = 5;
 constexpr uint8_t SIZE_THREAD_POOL = 16;
 constexpr uint8_t GLOBAL_TIMEOUT = 30;
 constexpr uint16_t DEFAULT_PORT = 8710;
-constexpr uint16_t MAX_SIZE_IOBUF = 5120;  // USB EP block max size about 10k, USBFFS_BULKSIZE 16384
+// USB EP block max size. Should be less than USBFFS_BULKSIZE, limit < 12k now
+constexpr uint16_t MAX_SIZE_IOBUF = 10240;
 constexpr uint16_t USBFFS_BULKSIZE_MAX = 16384;
 constexpr bool ENABLE_IO_CHECKSUM = false;
 const string DEFAULT_SERVER_ADDR = "127.0.0.1:8710";
