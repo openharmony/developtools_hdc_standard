@@ -81,7 +81,7 @@ bool HdcServer::Initial(const char *listenString)
     return true;
 }
 
-bool HdcServer::CheckToPullUpServerWin32(const char *path, const char *listenString)
+bool HdcServer::PullupServerWin32(const char *path, const char *listenString)
 {
 #ifdef _WIN32
     char buf[BUF_SIZE_SMALL] = "";
@@ -116,7 +116,7 @@ bool HdcServer::CheckToPullUpServerWin32(const char *path, const char *listenStr
 }
 
 // Only detects that the default call is in the loop address, the other tubes are not
-bool HdcServer::CheckToPullUptrServer(const char *listenString)
+bool HdcServer::PullupServer(const char *listenString)
 {
     char path[BUF_SIZE_SMALL] = "";
     size_t nPathSize = sizeof(path);
@@ -127,7 +127,7 @@ bool HdcServer::CheckToPullUptrServer(const char *listenString)
     }
 
 #ifdef _WIN32
-    if (!CheckToPullUpServerWin32(path, listenString)) {
+    if (!PullupServerWin32(path, listenString)) {
         return false;
     }
 #else
@@ -435,7 +435,7 @@ bool HdcServer::ServerSessionHandshake(HSession hSession, uint8_t *payload, int 
 }
 
 bool HdcServer::FetchCommand(HSession hSession, const uint32_t channelId, const uint16_t command, uint8_t *payload,
-                             int payloadSize)
+                             const int payloadSize)
 {
     bool ret = true;
     HdcServerForClient *pSfc = static_cast<HdcServerForClient *>(clsServerForClient);
@@ -471,13 +471,10 @@ bool HdcServer::FetchCommand(HSession hSession, const uint32_t channelId, const 
         case CMD_KERNEL_CHANNEL_CLOSE: {
             WRITE_LOG(LOG_DEBUG, "CMD_KERNEL_CHANNEL_CLOSE channelid:%d", channelId);
             ClearOwnTasks(hSession, channelId);
-            auto funcChannleClose = [](uv_handle_t *handle) -> void {
-                HChannel hChannel = (HChannel)handle->data;
-                HdcServerForClient *sfc = static_cast<HdcServerForClient *>(hChannel->clsChannel);
-                sfc->FreeChannel(hChannel->channelId);
-            };
-            Base::TryCloseHandle((uv_handle_t *)&hChannel->hChildWorkTCP, funcChannleClose);
-            if (*payload) {
+            // Forcibly closing the tcp handle here may result in incomplete data reception on the client side
+            HdcServerForClient *sfc = static_cast<HdcServerForClient *>(hChannel->clsChannel);
+            sfc->FreeChannel(hChannel->channelId);
+            if (*payload == 1) {
                 --(*payload);
                 Send(hSession->sessionId, channelId, CMD_KERNEL_CHANNEL_CLOSE, payload, 1);
             }

@@ -20,6 +20,8 @@
 #endif
 
 namespace Hdc {
+constexpr uint64_t HDC_TIME_CONVERT_BASE = 1000000000;
+
 HdcTransferBase::HdcTransferBase(HTaskInfo hTaskInfo)
     : HdcTaskBase(hTaskInfo)
 {
@@ -47,6 +49,7 @@ bool HdcTransferBase::ResetCtx(CtxFile *context, bool full)
         context->remotePath = "";
         context->transferBegin = 0;
         context->taskQueue.clear();
+        Base::ZeroStruct(ctxNow.transferConfig);
     }
     return true;
 }
@@ -111,17 +114,16 @@ void HdcTransferBase::OnFileClose(uv_fs_t *req)
 
 void HdcTransferBase::SetFileTime(CtxFile *context)
 {
-    if (context->transferConfig.holdTimestamp) {
+    if (!context->transferConfig.holdTimestamp) {
         return;
     }
     if (!context->transferConfig.mtime) {
         return;
     }
     uv_fs_t fs;
-    // clang-format off
-    uv_fs_futime(nullptr, &fs, context->fsOpenReq.result, context->transferConfig.atime,
-                 context->transferConfig.mtime, nullptr);
-    // clang-format on
+    double aTimeSec = static_cast<long double>(context->transferConfig.atime) / HDC_TIME_CONVERT_BASE;
+    double mTimeSec = static_cast<long double>(context->transferConfig.mtime) / HDC_TIME_CONVERT_BASE;
+    uv_fs_futime(nullptr, &fs, context->fsOpenReq.result, aTimeSec, mTimeSec, nullptr);
     uv_fs_req_cleanup(&fs);
 }
 
@@ -245,8 +247,10 @@ void HdcTransferBase::OnFileOpen(uv_fs_t *req)
         TransferConfig &st = context->transferConfig;
         st.fileSize = fs.statbuf.st_size;
         st.optionalName = context->localName;
-        st.atime = fs.statbuf.st_atim.tv_sec;
-        st.mtime = fs.statbuf.st_mtim.tv_sec;
+        if (st.holdTimestamp) {
+            st.atime = fs.statbuf.st_atim.tv_sec * HDC_TIME_CONVERT_BASE + fs.statbuf.st_atim.tv_nsec;
+            st.mtime = fs.statbuf.st_mtim.tv_sec * HDC_TIME_CONVERT_BASE + fs.statbuf.st_mtim.tv_nsec;
+        }
         st.path = context->remotePath;
         // update ctxNow=context child value
         context->fileSize = st.fileSize;
@@ -311,8 +315,12 @@ int HdcTransferBase::GetSubFiles(const char *path, string filter, vector<string>
 
 // https://en.cppreference.com/w/cpp/filesystem/is_directory
 // return true if file exist， false if file not exist
-bool HdcTransferBase::SmartSlavePath(string &localPath, const char *optName)
+bool HdcTransferBase::SmartSlavePath(string &cwd, string &localPath, const char *optName)
 {
+    if (taskInfo->serverOrDaemon) {
+        // slave and server
+        ExtractRelativePath(cwd, localPath);
+    }
     if (Base::CheckDirectoryOrPath(localPath.c_str(), true, false)) {
         return true;
     }
@@ -320,7 +328,7 @@ bool HdcTransferBase::SmartSlavePath(string &localPath, const char *optName)
     int r = uv_fs_lstat(nullptr, &req, localPath.c_str(), nullptr);
     uv_fs_req_cleanup(&req);
     if (r == 0 && req.statbuf.st_mode & S_IFDIR) {  // is dir
-        localPath = Base::StringFormat("%s%c%s", localPath.c_str(), PREF_SEPARATOR, optName);
+        localPath = Base::StringFormat("%s%c%s", localPath.c_str(), Base::GetPathSep(), optName);
     }
     return false;
 }
@@ -397,5 +405,13 @@ bool HdcTransferBase::CommandDispatch(const uint16_t command, uint8_t *payload, 
         break;
     }
     return ret;
+}
+
+void HdcTransferBase::ExtractRelativePath(string &cwd, string &path)
+{
+    bool absPath = Base::IsAbsolutePath(path);
+    if (!absPath) {
+        path = cwd + path;
+    }
 }
 }  // namespace Hdc

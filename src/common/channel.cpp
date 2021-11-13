@@ -101,6 +101,7 @@ void HdcChannelBase::ReadStream(uv_stream_t *tcp, ssize_t nread, const uv_buf_t 
 {
     int size = 0;
     int indexBuf = 0;
+    int childRet = 0;
     bool needExit = false;
     HChannel hChannel = (HChannel)tcp->data;
     HdcChannelBase *thisClass = (HdcChannelBase *)hChannel->clsChannel;
@@ -129,9 +130,12 @@ void HdcChannelBase::ReadStream(uv_stream_t *tcp, ssize_t nread, const uv_buf_t 
         if (hChannel->availTailIndex - DWORD_SERIALIZE_SIZE < size) {
             break;
         }
-        if (thisClass->ReadChannel(hChannel, (uint8_t *)hChannel->ioBuf + DWORD_SERIALIZE_SIZE + indexBuf, size) < 0) {
-            needExit = true;
-            break;
+        childRet = thisClass->ReadChannel(hChannel, (uint8_t *)hChannel->ioBuf + DWORD_SERIALIZE_SIZE + indexBuf, size);
+        if (childRet < 0) {
+            if (!hChannel->keepAlive) {
+                needExit = true;
+                break;
+            }
         }
         // update io
         hChannel->availTailIndex -= (DWORD_SERIALIZE_SIZE + size);
