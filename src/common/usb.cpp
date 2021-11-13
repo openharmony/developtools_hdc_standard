@@ -61,7 +61,10 @@ int HdcUSBBase::SendUSBBlock(HSession hSession, uint8_t *data, const int length)
 {
     //  Format:USBPacket1 payload1...USBPacketn payloadn；
     //  [USBHead1(PayloadHead1+Payload1)]+[USBHead2(Payload2)]+...+[USBHeadN(PayloadN)]
-    int maxIOSize = Base::GetMaxBufSize();
+    //
+    // I hope the size is GetUsbffsMaxBulkSize, but after exceeding 12k, if the split-package is too large, libusb will
+    // report an error when send callback. I don't know why...
+    constexpr int maxIOSize = 12000;  // must < 12k now
     int sizeUSBPacketHead = sizeof(USBHead);
     int singleSize = maxIOSize - sizeUSBPacketHead;
     int iMod = length % singleSize;
