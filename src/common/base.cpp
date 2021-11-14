@@ -193,7 +193,7 @@ namespace Base {
         uv_tcp_keepalive(tcpHandle, 1, GLOBAL_TIMEOUT);
         // if MAX_SIZE_IOBUF==5k,bufMaxSize at least 40k. It must be set to io 8 times is more appropriate,
         // otherwise asynchronous IO is too fast, a lot of IO is wasted on IOloop, transmission speed will decrease
-        int bufMaxSize = GetMaxBufSize();
+        int bufMaxSize = MAX_SIZE_SOCKETPAIR;
         uv_recv_buffer_size((uv_handle_t *)tcpHandle, &bufMaxSize);
         uv_send_buffer_size((uv_handle_t *)tcpHandle, &bufMaxSize);
     }
