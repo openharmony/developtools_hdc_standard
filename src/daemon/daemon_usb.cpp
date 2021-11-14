@@ -73,14 +73,10 @@ string HdcDaemonUSB::GetDevPath(const std::string &path)
     return res;
 }
 
-int HdcDaemonUSB::GetMaxPacketSize(int ffs_fd)
+int HdcDaemonUSB::GetMaxPacketSize(int fdFfs)
 {
-    usb_endpoint_descriptor desc;
-    if (ioctl(ffs_fd, FUNCTIONFS_ENDPOINT_DESC, reinterpret_cast<unsigned long>(&desc))) {
-        return MAX_PACKET_SIZE_HISPEED;
-    } else {
-        return desc.wMaxPacketSize;
-    }
+    // no ioctl support, todo dynamic get
+    return MAX_PACKET_SIZE_HISPEED;
 }
 
 int HdcDaemonUSB::Initial()
@@ -251,7 +247,7 @@ int HdcDaemonUSB::SendUSBIOSync(HSession hSession, HUSB hMainUSB, const uint8_t 
     int bulkIn = hMainUSB->bulkIn;
     int childRet = 0;
     int ret = ERR_IO_FAIL;
-    uint32_t offset = 0;
+    int offset = 0;
     while (modRunning && isAlive && !hSession->isDead && !hSession->hUSB->resetIO) {
         childRet = write(bulkIn, (uint8_t *)data + offset, length - offset);
         if (childRet < 0) {
