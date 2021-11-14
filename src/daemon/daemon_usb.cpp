@@ -73,6 +73,16 @@ string HdcDaemonUSB::GetDevPath(const std::string &path)
     return res;
 }
 
+int HdcDaemonUSB::GetMaxPacketSize(int ffs_fd)
+{
+    usb_endpoint_descriptor desc;
+    if (ioctl(ffs_fd, FUNCTIONFS_ENDPOINT_DESC, reinterpret_cast<unsigned long>(&desc))) {
+        return MAX_PACKET_SIZE_HISPEED;
+    } else {
+        return desc.wMaxPacketSize;
+    }
+}
+
 int HdcDaemonUSB::Initial()
 {
     // after Linux-3.8，kernel switch to the USB Function FS
@@ -132,6 +142,7 @@ int HdcDaemonUSB::ConnectEPPoint(HUSB hUSB)
         fcntl(controlEp, F_SETFD, FD_CLOEXEC);
         fcntl(hUSB->bulkOut, F_SETFD, FD_CLOEXEC);
         fcntl(hUSB->bulkIn, F_SETFD, FD_CLOEXEC);
+        hUSB->wMaxPacketSizeSend = GetMaxPacketSize(hUSB->bulkIn);
 
         WRITE_LOG(LOG_DEBUG, "New bulk in\\out open bulkout:%d bulkin:%d", hUSB->bulkOut, hUSB->bulkIn);
         hUSB->bufRecv.clear();
@@ -240,13 +251,13 @@ int HdcDaemonUSB::SendUSBIOSync(HSession hSession, HUSB hMainUSB, const uint8_t 
     int bulkIn = hMainUSB->bulkIn;
     int childRet = 0;
     int ret = ERR_IO_FAIL;
-    int offset = 0;
+    uint32_t offset = 0;
     while (modRunning && isAlive && !hSession->isDead && !hSession->hUSB->resetIO) {
         childRet = write(bulkIn, (uint8_t *)data + offset, length - offset);
-        if (childRet <= 0) {
+        if (childRet < 0) {
             int err = errno;
             if (err == EINTR) {
-                WRITE_LOG(LOG_DEBUG, "BulkinWrite write EINTR, try again");
+                WRITE_LOG(LOG_DEBUG, "BulkinWrite write EINTR, try again, offset:%u", offset);
                 continue;
             } else {
                 WRITE_LOG(LOG_FATAL, "BulkinWrite write fatal errno %d", err);
@@ -266,7 +277,9 @@ int HdcDaemonUSB::SendUSBIOSync(HSession hSession, HUSB hMainUSB, const uint8_t 
                   "BulkinWrite write failed, nsize:%d really:%d modRunning:%d isAlive:%d SessionDead:%d usbReset:%d",
                   length, offset, modRunning, isAlive, hSession->isDead, hSession->hUSB->resetIO);
     }
-    hSession->sendRef--;
+    if (length != 0) {
+        hSession->ref--;
+    }
     return ret;
 }
 
@@ -332,6 +345,7 @@ int HdcDaemonUSB::DispatchToWorkThread(const uint32_t sessionId, uint8_t *readBu
     // payloadn-[USBHead1(PayloadHead1+Payload1)]+[USBHead2(Payload2)]+...+[USBHeadN(PayloadN)]
     HSession hChildSession = nullptr;
     HdcDaemon *daemon = reinterpret_cast<HdcDaemon *>(clsMainBase);
+    int childRet = RET_SUCCESS;
     hChildSession = daemon->AdminSession(OP_QUERY, sessionId, nullptr);
     if (!hChildSession) {
         hChildSession = PrepareNewSession(sessionId, readBuf, readBytes);
@@ -342,12 +356,11 @@ int HdcDaemonUSB::DispatchToWorkThread(const uint32_t sessionId, uint8_t *readBu
     if (hChildSession->childCleared) {
         return ERR_SESSION_DEAD;
     }
-    if (SendToHdcStream(hChildSession, reinterpret_cast<uv_stream_t *>(&hChildSession->dataPipe[STREAM_MAIN]), readBuf,
-                        readBytes)
-        != RET_SUCCESS) {
+    uv_stream_t *stream = reinterpret_cast<uv_stream_t *>(&hChildSession->dataPipe[STREAM_MAIN]);
+    if ((childRet = SendToHdcStream(hChildSession, stream, readBuf, readBytes)) < 0) {
         return ERR_IO_FAIL;
     }
-    return readBytes;
+    return childRet;
 }
 
 bool HdcDaemonUSB::JumpAntiquePacket(const uint8_t &buf, ssize_t bytes) const
@@ -396,14 +409,15 @@ void HdcDaemonUSB::OnUSBRead(uv_fs_t *req)
                 break;
             }
             // reset packet
+            childRet = 0;  // need max size
         } else {
             // AvailablePacket case
-            if (thisClass->DispatchToWorkThread(sessionId, bufPtr, bytesIOBytes) < 0) {
+            if ((childRet = thisClass->DispatchToWorkThread(sessionId, bufPtr, bytesIOBytes)) < 0) {
                 WRITE_LOG(LOG_FATAL, "DispatchToWorkThread failed");
                 break;
             }
         }
-        if (thisClass->LoopUSBRead(hUSB) < 0) {
+        if (thisClass->LoopUSBRead(hUSB, childRet == 0 ? Base::GetUsbffsMaxBulkSize() : childRet) < 0) {
             WRITE_LOG(LOG_FATAL, "LoopUSBRead failed");
             break;
         }
@@ -418,21 +432,19 @@ void HdcDaemonUSB::OnUSBRead(uv_fs_t *req)
     delete ctxIo;
 }
 
-int HdcDaemonUSB::LoopUSBRead(HUSB hUSB)
+int HdcDaemonUSB::LoopUSBRead(HUSB hUSB, int readMaxWanted)
 {
     int ret = -1;
     HdcDaemon *daemon = reinterpret_cast<HdcDaemon *>(clsMainBase);
-    // must > available size, or it will be incorrect
-    int readMax = Base::GetUsbffsMaxBulkSize();
     auto ctxIo = new CtxUvFileCommonIo();
-    auto buf = new uint8_t[readMax]();
+    auto buf = new uint8_t[readMaxWanted]();
     uv_fs_t *req = nullptr;
     uv_buf_t iov;
     if (ctxIo == nullptr || buf == nullptr) {
         goto FAILED;
     }
     ctxIo->buf = buf;
-    ctxIo->bufSize = readMax;
+    ctxIo->bufSize = readMaxWanted;
     ctxIo->data = hUSB;
     ctxIo->thisClass = this;
     req = &ctxIo->req;

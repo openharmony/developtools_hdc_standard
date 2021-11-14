@@ -42,6 +42,7 @@ enum OperateID {
     OP_ADD,
     OP_REMOVE,
     OP_QUERY,
+    OP_QUERY_REF,  // crossthread query, manually reduce ref
     OP_GET_STRLIST,
     OP_GET_STRLIST_FULL,
     OP_GET_ANY,
@@ -92,6 +93,7 @@ enum RetErrCode {
 enum AsyncEvent {
     ASYNC_STOP_MAINLOOP = 0,
     ASYNC_FREE_SESSION,
+    ASYNC_FREE_CHANNEL,
 };
 enum InnerCtrlCommand {
     SP_START_SESSION = 0,
@@ -213,7 +215,6 @@ struct HdcUSB {
     uint8_t devId;
     uint8_t busId;
     int32_t sizeEpBuf;
-    uint16_t wMaxPacketSize;
     string serialNumber;
     string usbMountPoint;
     uint8_t *bufDevice;
@@ -233,6 +234,7 @@ struct HdcUSB {
     int bulkOut;  // EP1 device recv
     int bulkIn;   // EP2 device send
 #endif
+    uint16_t wMaxPacketSizeSend;
     vector<uint8_t> bufRecv;
     bool resetIO;  // if true, must break write and read,default false
 };
@@ -245,9 +247,9 @@ struct HdcSession {
     string connectKey;
     uint8_t connType;  // ConnType
     uint32_t sessionId;
-    std::atomic<uint16_t> sendRef;
-    uint8_t uvRef;       // libuv handle ref -- just main thread now
-    uint8_t uvChildRef;  // libuv handle ref -- just main thread now
+    std::atomic<uint16_t> ref;
+    uint8_t uvHandleRef;  // libuv handle ref -- just main thread now
+    uint8_t uvChildRef;   // libuv handle ref -- just main thread now
     bool childCleared;
     map<uint32_t, HTaskInfo> *mapTask;
     // class ptr
@@ -286,14 +288,14 @@ struct HdcChannel {
     string connectKey;
     uv_tcp_t hWorkTCP;  // work channel for client, forward channel for server
     uv_thread_t hWorkThread;
-    uint8_t uvRef = 0;  // libuv handle ref -- just main thread now
+    uint8_t uvHandleRef = 0;  // libuv handle ref -- just main thread now
     bool handshakeOK;
     bool isDead;
     bool serverOrClient;  // client's channel/ server's channel
     bool childCleared;
     bool interactiveShellMode;  // Is shell interactive mode
     bool keepAlive;             // channel will not auto-close by server
-    std::atomic<uint16_t> sendRef;
+    std::atomic<uint16_t> ref;
     uint32_t targetSessionId;
     // child work
     uv_tcp_t hChildWorkTCP;  // work channel for server, no use in client

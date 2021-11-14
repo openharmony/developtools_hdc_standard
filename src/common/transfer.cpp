@@ -200,7 +200,9 @@ void HdcTransferBase::OnFileIO(uv_fs_t *req)
             }
             if (context->indexIO < context->fileSize) {
                 // read continue until result >0, let single file packet +packet header less than GetMaxBufSize()
-                thisClass->SimpleFileIO(context, context->indexIO, nullptr, Base::GetMaxBufSize());
+                // Each file packet shall be completed in one IO as far as possible, which is more efficient
+                constexpr auto maxBufFactor = 0.9;
+                thisClass->SimpleFileIO(context, context->indexIO, nullptr, Base::GetMaxBufSize() * maxBufFactor);
             }
         } else if (req->fs_type == UV_FS_WRITE) {  // write
             if (context->indexIO >= context->fileSize) {

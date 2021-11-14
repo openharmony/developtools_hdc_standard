@@ -536,9 +536,9 @@ int HdcServerForClient::BindChannelToSession(HChannel hChannel, uint8_t *bufPtr,
     }
     uv_close_cb funcWorkTcpClose = [](uv_handle_t *handle) -> void {
         HChannel hChannel = (HChannel)handle->data;
-        --hChannel->sendRef;
+        --hChannel->ref;
     };
-    ++hChannel->sendRef;
+    ++hChannel->ref;
     if (!isClosing) {
         uv_close((uv_handle_t *)&hChannel->hWorkTCP, funcWorkTcpClose);
     }

@@ -22,8 +22,8 @@ constexpr uint8_t MINOR_TIMEOUT = 5;
 constexpr uint8_t SIZE_THREAD_POOL = 16;
 constexpr uint8_t GLOBAL_TIMEOUT = 30;
 constexpr uint16_t DEFAULT_PORT = 8710;
-// USB EP block max size. Should be less than USBFFS_BULKSIZE, limit < 12k now
-constexpr uint16_t MAX_SIZE_IOBUF = 10240;
+constexpr uint16_t MAX_SIZE_IOBUF = 15360;  // 15360
+constexpr uint16_t MAX_SIZE_SOCKETPAIR = MAX_SIZE_IOBUF * 4;
 constexpr uint16_t USBFFS_BULKSIZE_MAX = 16384;
 constexpr bool ENABLE_IO_CHECKSUM = false;
 const string DEFAULT_SERVER_ADDR = "127.0.0.1:8710";
@@ -47,6 +47,7 @@ constexpr uint16_t AID_SHELL = 2000;
 constexpr uint16_t UV_DEFAULT_INTERVAL = 250;  // ms
 constexpr uint16_t VER_PROTOCOL = 0x01;
 constexpr uint16_t EXTRA_ALLOC_SIZE = 2048;
+constexpr uint16_t MAX_PACKET_SIZE_HISPEED = 512;
 // double-word(hex)=[0]major[1][2]minor[3][4]version[5]fix(a-p)[6][7]reserve
 constexpr uint32_t HDC_VERSION_NUMBER = 0x10101a00;  // 1.1.1b=0x10101100
 constexpr uint32_t HDC_BUF_MAX_BYTES = 1024000000;

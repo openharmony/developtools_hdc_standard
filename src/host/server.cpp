@@ -438,14 +438,14 @@ bool HdcServer::FetchCommand(HSession hSession, const uint32_t channelId, const 
                              const int payloadSize)
 {
     bool ret = true;
-    HdcServerForClient *pSfc = static_cast<HdcServerForClient *>(clsServerForClient);
-    // When you first initialize, ChannelID may be 0
-    HChannel hChannel = pSfc->AdminChannel(OP_QUERY, channelId, nullptr);
+    HdcServerForClient *sfc = static_cast<HdcServerForClient *>(clsServerForClient);
     if (CMD_KERNEL_HANDSHAKE == command) {
         ret = ServerSessionHandshake(hSession, payload, payloadSize);
         WRITE_LOG(LOG_DEBUG, "Session handshake %s", ret ? "successful" : "failed");
         return ret;
     }
+    // When you first initialize, ChannelID may be 0
+    HChannel hChannel = sfc->AdminChannel(OP_QUERY_REF, channelId, nullptr);
     if (!hChannel) {
         if (command == CMD_KERNEL_CHANNEL_CLOSE) {
             // Daemon close channel and want to notify server close channel also, but it may has been
@@ -458,22 +458,22 @@ bool HdcServer::FetchCommand(HSession hSession, const uint32_t channelId, const 
     }
     switch (command) {
         case CMD_KERNEL_ECHO_RAW: {  // Native shell data output
-            pSfc->EchoClientRaw(channelId, payload, payloadSize);
+            sfc->EchoClientRaw(channelId, payload, payloadSize);
             break;
         }
         case CMD_KERNEL_ECHO: {
             MessageLevel level = (MessageLevel)*payload;
             string s(reinterpret_cast<char *>(payload + 1), payloadSize - 1);
-            pSfc->EchoClient(hChannel, level, s.c_str());
+            sfc->EchoClient(hChannel, level, s.c_str());
             WRITE_LOG(LOG_DEBUG, "CMD_KERNEL_ECHO size:%d", payloadSize - 1);
             break;
         }
         case CMD_KERNEL_CHANNEL_CLOSE: {
             WRITE_LOG(LOG_DEBUG, "CMD_KERNEL_CHANNEL_CLOSE channelid:%d", channelId);
-            ClearOwnTasks(hSession, channelId);
             // Forcibly closing the tcp handle here may result in incomplete data reception on the client side
-            HdcServerForClient *sfc = static_cast<HdcServerForClient *>(hChannel->clsChannel);
-            sfc->FreeChannel(hChannel->channelId);
+            ClearOwnTasks(hSession, channelId);
+            // crossthread free
+            sfc->PushAsyncMessage(channelId, ASYNC_FREE_CHANNEL, nullptr, 0);
             if (*payload == 1) {
                 --(*payload);
                 Send(hSession->sessionId, channelId, CMD_KERNEL_CHANNEL_CLOSE, payload, 1);
@@ -495,12 +495,14 @@ bool HdcServer::FetchCommand(HSession hSession, const uint32_t channelId, const 
         default: {
             HSession hSession = AdminSession(OP_QUERY, hChannel->targetSessionId, nullptr);
             if (!hSession) {
-                return false;
+                ret = false;
+                break;
             }
-            ret = DispatchTaskData(hSession, hChannel->channelId, command, payload, payloadSize);
+            ret = DispatchTaskData(hSession, channelId, command, payload, payloadSize);
             break;
         }
     }
+    --hChannel->ref;
     return ret;
 }
 
@@ -652,9 +654,9 @@ int HdcServer::CreateConnect(const string &connectKey)
 
 void HdcServer::AttachChannel(HSession hSession, const uint32_t channelId)
 {
+    int ret = 0;
     HdcServerForClient *hSfc = static_cast<HdcServerForClient *>(clsServerForClient);
     HChannel hChannel = hSfc->AdminChannel(OP_QUERY, channelId, nullptr);
-    int ret = 0;
     if (!hChannel) {
         return;
     }
@@ -674,6 +676,7 @@ void HdcServer::AttachChannel(HSession hSession, const uint32_t channelId)
 void HdcServer::DeatchChannel(HSession hSession, const uint32_t channelId)
 {
     HdcServerForClient *hSfc = static_cast<HdcServerForClient *>(clsServerForClient);
+    // childCleared has not set, no need OP_QUERY_REF
     HChannel hChannel = hSfc->AdminChannel(OP_QUERY, channelId, nullptr);
     if (!hChannel) {
         return;
