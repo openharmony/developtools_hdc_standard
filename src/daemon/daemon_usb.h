@@ -48,7 +48,7 @@ private:
     int SendUSBIOSync(HSession hSession, HUSB hMainUSB, const uint8_t *data, const int length);
     int CloseBulkEp(bool bulkInOut, int bulkFd, uv_loop_t *loop);
     void ResetOldSession(const uint32_t sessionId);
-    int GetMaxPacketSize(int ffs_fd);
+    int GetMaxPacketSize(int fdFfs);
 
     HdcUSB usbHandle;
     string basePath;                // usb device's base path
