@@ -320,8 +320,6 @@ int HdcSessionBase::MallocSessionByConnectType(HSession hSession)
             hUSB->bufHost = new uint8_t[max]();
             hUSB->transferRecv = libusb_alloc_transfer(0);
             hUSB->transferSend = libusb_alloc_transfer(0);
-            hUSB->recvIOComplete = true;
-            hUSB->sendIOComplete = true;
 #else
 #endif
             break;
