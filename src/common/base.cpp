@@ -1216,6 +1216,15 @@ namespace Base {
         return res;
     }
 
+    void RemoveLogFile()
+    {
+        uv_fs_t stUvFsReq;
+        uv_loop_t loop;
+        uv_loop_init(&loop);
+        string path = GetTmpDir() + LOG_FILE_NAME;
+        uv_fs_unlink(&loop, &stUvFsReq, path.c_str(), nullptr);
+    }
+
     bool IsRoot()
     {
 #ifdef _WIN32
