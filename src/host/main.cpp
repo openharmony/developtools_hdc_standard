@@ -320,7 +320,8 @@ int main(int argc, const char *argv[])
         return 0;
     }
     if (g_isServerMode) {
-        // -m server.Run alone in the background, no -s will be listen loopback address,
+        // -m server.Run alone in the background, no -s will be listen loopback address
+        Hdc::Base::RemoveLogFile();
         Base::SetLogLevel(g_logLevel); // default level LOG_LEVEL_FULL
         Hdc::RunServerMode(g_serverListenString);
     } else if (g_isPcDebugRun) {
