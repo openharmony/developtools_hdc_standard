@@ -161,7 +161,7 @@ enum HdcCommand {
 enum UsbProtocolOption {
     USB_OPTION_TAIL = 1,
     USB_OPTION_RESET = 2,
-    USB_OPTION_RESERVE4 = 4,
+    USB_OPTION_DUMMY = 4,
     USB_OPTION_RESERVE8 = 8,
     USB_OPTION_RESERVE16 = 16,
 };

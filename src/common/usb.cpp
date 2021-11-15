@@ -55,6 +55,19 @@ bool HdcUSBBase::ReadyForWorkThread(HSession hSession)
     return true;
 };
 
+vector<uint8_t> HdcUSBBase::DummyPacket(uint32_t sessionId)
+{
+    vector<uint8_t> dummy;
+    USBHead head;
+    head.sessionId = htonl(sessionId);
+    head.flag[0] = 'H';
+    head.flag[1] = 'W';
+    head.option = USB_OPTION_DUMMY;
+    head.dataSize = 0;
+    dummy.insert(dummy.end(), (uint8_t *)&head, (uint8_t *)&head + sizeof(USBHead));
+    return dummy;
+}
+
 // USB big data stream, block transmission, mainly to prevent accidental data packets from writing through EP port,
 // inserting the send queue causes the program to crash
 int HdcUSBBase::SendUSBBlock(HSession hSession, uint8_t *data, const int length)
@@ -104,11 +117,11 @@ int HdcUSBBase::SendUSBBlock(HSession hSession, uint8_t *data, const int length)
             offset = ERR_IO_FAIL;
             break;
         }
-        if (!hSession->serverOrDaemon && (childRet % hSession->hUSB->wMaxPacketSizeSend == 0)) {
+        if (childRet % hSession->hUSB->wMaxPacketSizeSend == 0) {
             // Just daemon enable zero length packet.
             // win32 send ZLP will block winusb driver and LIBUSB_TRANSFER_ADD_ZERO_PACKET not effect
-            uint8_t dummy = 0;
-            SendUSBRaw(hSession, &dummy, 0);
+            auto dummy = DummyPacket(hSession->sessionId);
+            SendUSBRaw(hSession, dummy.data(), dummy.size());
         }
     }
     delete[] ioBuf;
@@ -154,8 +167,13 @@ int HdcUSBBase::SendToHdcStream(HSession hSession, uv_stream_t *stream, uint8_t 
                 hUSB->resetIO = true;
             }
         } else {
+            bool isZlp = false;
+            if (usbHeader->option & USB_OPTION_DUMMY) {
+                // soft ZLP
+                isZlp = true;
+            }
             // usb data to logic
-            if (Base::SendToStream(stream, bufRecv.data() + sizeof(USBHead), usbHeader->dataSize) < 0) {
+            if (!isZlp && Base::SendToStream(stream, bufRecv.data() + sizeof(USBHead), usbHeader->dataSize) < 0) {
                 ret = ERR_IO_FAIL;
                 WRITE_LOG(LOG_FATAL, "Error usb send to stream dataSize:%d bufRecvSize:%d", usbHeader->dataSize,
                           bufRecv.size());
