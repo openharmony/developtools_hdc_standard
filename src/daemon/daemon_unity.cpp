@@ -190,7 +190,7 @@ bool HdcDaemonUnity::RebootDevice(const string &cmd)
     if (cmd == "recovery") {
         reason = "updater";
     } else if (cmd == "bootloader") {
-        reason = "NoArgument";
+        reason = "updater";
     }
     return DoReboot(reason.c_str());
 #endif
