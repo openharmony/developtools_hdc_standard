@@ -67,9 +67,11 @@ private:
     void ClearChannels();
     void FreeChannelContinue(HChannel hChannel);
     bool SetChannelTCPString(const string &addrString);
+    uint32_t GetChannelPseudoUid();
 
     uv_rwlock_t lockMapChannel;  // protect mapChannel
     map<uint32_t, HChannel> mapChannel;
+    uv_thread_t hChannelBasenMainThread;
 };
 }  // namespace Hdc
 

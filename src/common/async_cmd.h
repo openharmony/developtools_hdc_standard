@@ -40,25 +40,17 @@ public:
     bool ReadyForRelease() const;
 
 private:
-    int StartProcess(string command = STRING_EMPTY);
-    // uv_read_cb callback 1st parameter can't be changed, const can't be added
-    static void ChildReadCallback(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf);
-    // uv_exit_cb callback 1st parameter can't be changed, const can't be added
-    static void ExitCallback(uv_process_t *req, int64_t exitStatus, int tersignal);
+    static bool FinishShellProc(const void *context, const bool result, const string exitMsg);
+    static bool ChildReadCallback(const void *context, uint8_t *buf, const int size);
+    int Popen(string command, bool readWrite, int &pid);
 
-    uv_loop_t *loop;
-    // loop is given to uv_spawn, which can't be const
-    uv_pipe_t stdinPipe;
-    uv_pipe_t stdoutPipe;
-    uv_pipe_t stderrPipe;
-    uv_process_t proc;
-    uv_process_options_t procOptions;
-    CmdResultCallback resultCallback;
-    string cmdResult;
-    bool running;
-    bool hasStop = false;
     uint32_t options = 0;
-    uint8_t uvRef = 0;
+    int fd = 0;
+    int pid;
+    HdcFileDescriptor *childShell = nullptr;
+    uint32_t refCount = 0;
+    CmdResultCallback resultCallback;
+    uv_loop_t *loop;
 };
 }  // namespace Hdc
 #endif

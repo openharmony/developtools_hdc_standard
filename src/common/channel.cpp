@@ -19,6 +19,7 @@ HdcChannelBase::HdcChannelBase(const bool serverOrClient, const string &addrStri
     SetChannelTCPString(addrString);
     isServerOrClient = serverOrClient;
     loopMain = loopMainIn;
+    hChannelBasenMainThread = uv_thread_self();
     uv_rwlock_init(&mainAsync);
     uv_async_init(loopMain, &asyncMainLoop, MainAsyncCallback);
     uv_rwlock_init(&lockMapChannel);
@@ -287,13 +288,23 @@ void HdcChannelBase::AllocCallback(uv_handle_t *handle, size_t sizeWanted, uv_bu
     }
 }
 
+uint32_t HdcChannelBase::GetChannelPseudoUid()
+{
+    uint32_t uid = 0;
+    HChannel hInput = nullptr;
+    do {
+        uid = static_cast<uint32_t>(Base::GetRandom());
+    } while ((hInput = AdminChannel(OP_QUERY, uid, nullptr)) != nullptr);
+    return uid;
+}
+
 uint32_t HdcChannelBase::MallocChannel(HChannel *hOutChannel)
 {
     auto hChannel = new HdcChannel();
     if (!hChannel) {
         return 0;
     }
-    uint32_t channelId = Base::GetRuntimeMSec();
+    uint32_t channelId = GetChannelPseudoUid();
     if (isServerOrClient) {
         hChannel->serverOrClient = isServerOrClient;
         ++channelId;  // Use different value for serverForClient&client in per process
@@ -380,24 +391,19 @@ void HdcChannelBase::FreeChannelOpeate(uv_timer_t *handle)
 
 void HdcChannelBase::FreeChannel(const uint32_t channelId)
 {
-    HChannel hChannel = AdminChannel(OP_QUERY_REF, channelId, nullptr);
-    if (!hChannel) {
+    if (hChannelBasenMainThread != uv_thread_self()) {
+        PushAsyncMessage(channelId, ASYNC_FREE_CHANNEL, nullptr, 0);
         return;
     }
-    WRITE_LOG(LOG_DEBUG, "Begin to free channel, channelid:%u", channelId);
+    HChannel hChannel = AdminChannel(OP_QUERY, channelId, nullptr);
     do {
-        // Two cases: alloc in main thread, or work thread
-        if (hChannel->hWorkThread != uv_thread_self()) {
-            PushAsyncMessage(hChannel->channelId, ASYNC_FREE_CHANNEL, nullptr, 0);
+        if (!hChannel || hChannel->isDead) {
             break;
         }
-        if (hChannel->isDead) {
-            break;
-        }
+        WRITE_LOG(LOG_DEBUG, "Begin to free channel, channelid:%u", channelId);
         Base::TimerUvTask(loopMain, hChannel, FreeChannelOpeate, MINOR_TIMEOUT);  // do immediately
         hChannel->isDead = true;
     } while (false);
-    --hChannel->ref;
 }
 
 HChannel HdcChannelBase::AdminChannel(const uint8_t op, const uint32_t channelId, HChannel hInput)

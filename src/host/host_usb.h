@@ -48,7 +48,7 @@ private:
     bool ReadyForWorkThread(HSession hSession);
     bool FindDeviceByID(HUSB hUSB, const char *usbMountPoint, libusb_context *ctxUSB);
     bool DetectMyNeed(libusb_device *device, string &sn);
-    void SendUsbSoftReset(HUSB hUSB, uint32_t sessionId);
+    void SendUsbSoftReset(HSession hSession, uint32_t sessionIdOld);
     void RestoreHdcProtocol(HUSB hUsb, const uint8_t *buf, int bufSize);
     void UpdateUSBDaemonInfo(HUSB hUSB, HSession hSession, uint8_t connStatus);
     void RegisterReadCallback(HSession hSession);

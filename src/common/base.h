@@ -144,9 +144,9 @@ namespace Base {
     {
         return MAX_SIZE_IOBUF;
     }
-    inline int GetUsbffsMaxBulkSize()
+    inline int GetUsbffsBulkSize()
     {
-        return USBFFS_BULKSIZE_MAX;
+        return MAX_USBFFS_BULK;
     }
 }  // namespace base
 }  // namespace Hdc

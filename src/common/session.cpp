@@ -29,6 +29,7 @@ HdcSessionBase::HdcSessionBase(bool serverOrDaemonIn)
     serverOrDaemon = serverOrDaemonIn;
     ctxUSB = nullptr;
     wantRestart = false;
+    hSessioBasenMainThread = uv_thread_self();
 
 #ifdef HDC_HOST
     if (serverOrDaemon) {
@@ -314,7 +315,7 @@ int HdcSessionBase::MallocSessionByConnectType(HSession hSession)
             hSession->hUSB = hUSB;
             hSession->hUSB->wMaxPacketSizeSend = MAX_PACKET_SIZE_HISPEED;
 #ifdef HDC_HOST
-            int max = Base::GetUsbffsMaxBulkSize();
+            int max = Base::GetUsbffsBulkSize();
             hUSB->sizeEpBuf = max;
             hUSB->bufDevice = new uint8_t[max]();
             hUSB->bufHost = new uint8_t[max]();
@@ -337,7 +338,7 @@ int HdcSessionBase::MallocSessionByConnectType(HSession hSession)
 uint32_t HdcSessionBase::GetSessionPseudoUid()
 {
     uint32_t uid = 0;
-    Hdc::HSession hInput = nullptr;
+    HSession hInput = nullptr;
     do {
         uid = static_cast<uint32_t>(Base::GetRandom());
     } while ((hInput = AdminSession(OP_QUERY, uid, nullptr)) != nullptr);
@@ -481,6 +482,7 @@ void HdcSessionBase::FreeSessionOpeate(uv_timer_t *handle)
     HSession hSession = (HSession)handle->data;
     HdcSessionBase *thisClass = (HdcSessionBase *)hSession->classInstance;
     if (hSession->ref > 0) {
+        WRITE_LOG(LOG_DEBUG, "ref:%u", uint32_t(hSession->ref));
         return;
     }
 #ifdef HDC_HOST
@@ -516,25 +518,21 @@ void HdcSessionBase::FreeSessionOpeate(uv_timer_t *handle)
 
 void HdcSessionBase::FreeSession(const uint32_t sessionId)
 {
-    HSession hSession = AdminSession(OP_QUERY_REF, sessionId, nullptr);
-    if (!hSession) {
+    if (hSessioBasenMainThread != uv_thread_self()) {
+        PushAsyncMessage(sessionId, ASYNC_FREE_SESSION, nullptr, 0);
         return;
     }
+    HSession hSession = AdminSession(OP_QUERY, sessionId, nullptr);
     WRITE_LOG(LOG_DEBUG, "Begin to free session, sessionid:%u", sessionId);
     do {
-        if (hSession->hWorkThread != uv_thread_self()) {
-            PushAsyncMessage(hSession->sessionId, ASYNC_FREE_SESSION, nullptr, 0);
-            return;
-        }
-        if (hSession->isDead) {
-            return;
+        if (!hSession || hSession->isDead) {
+            break;
         }
         hSession->isDead = true;
         Base::TimerUvTask(&loopMain, hSession, FreeSessionOpeate);
         NotifyInstanceSessionFree(hSession, false);
-        WRITE_LOG(LOG_DEBUG, "FreeSession sessionId:%u ref:%u", hSession->sessionId, uint16_t(hSession->ref));
+        WRITE_LOG(LOG_DEBUG, "FreeSession sessionId:%u ref:%u", hSession->sessionId, uint32_t(hSession->ref));
     } while (false);
-    --hSession->ref;
 }
 
 HSession HdcSessionBase::AdminSession(const uint8_t op, const uint32_t sessionId, HSession hInput)
