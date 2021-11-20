@@ -656,7 +656,7 @@ void HdcServer::AttachChannel(HSession hSession, const uint32_t channelId)
 {
     int ret = 0;
     HdcServerForClient *hSfc = static_cast<HdcServerForClient *>(clsServerForClient);
-    HChannel hChannel = hSfc->AdminChannel(OP_QUERY, channelId, nullptr);
+    HChannel hChannel = hSfc->AdminChannel(OP_QUERY_REF, channelId, nullptr);
     if (!hChannel) {
         return;
     }
@@ -667,10 +667,12 @@ void HdcServer::AttachChannel(HSession hSession, const uint32_t channelId)
         WRITE_LOG(LOG_DEBUG, "Hdcserver AttachChannel uv_tcp_open failed %s, channelid:%d fdChildWorkTCP:%d",
                   uv_err_name(ret), hChannel->channelId, hChannel->fdChildWorkTCP);
         Base::TryCloseHandle((uv_handle_t *)&hChannel->hChildWorkTCP);
+        --hChannel->ref;
         return;
     }
     Base::SetTcpOptions((uv_tcp_t *)&hChannel->hChildWorkTCP);
     uv_read_start((uv_stream_t *)&hChannel->hChildWorkTCP, hSfc->AllocCallback, hSfc->ReadStream);
+    --hChannel->ref;
 };
 
 void HdcServer::DeatchChannel(HSession hSession, const uint32_t channelId)

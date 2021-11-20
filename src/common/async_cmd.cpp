@@ -13,20 +13,11 @@
  * limitations under the License.
  */
 #include "async_cmd.h"
-#define PIPE_READ 0
-#define PIPE_WRITE 1
 
 namespace Hdc {
 // Do not add thread-specific init op in the following methods as it's running in child thread.
 AsyncCmd::AsyncCmd()
 {
-    Base::ZeroStruct(stdinPipe);
-    Base::ZeroStruct(stdoutPipe);
-    Base::ZeroStruct(stderrPipe);
-    Base::ZeroStruct(proc);
-    Base::ZeroStruct(procOptions);
-    running = false;
-    loop = nullptr;
 }
 
 AsyncCmd::~AsyncCmd()
@@ -36,154 +27,115 @@ AsyncCmd::~AsyncCmd()
 
 bool AsyncCmd::ReadyForRelease() const
 {
-    return !running;
+    if (childShell != nullptr && !childShell->ReadyForRelease()) {
+        return false;
+    }
+    if (refCount != 0) {
+        return false;
+    }
+    if (childShell != nullptr) {
+        delete childShell;
+    }
+    if (fd > 0) {
+        close(fd);
+    }
+    return true;
 }
 
-// manual stop will not trigger ExitCallback, we call it
 void AsyncCmd::DoRelease()
 {
-    if (hasStop || !running) {
-        return;
-    }
-    hasStop = true;  // must set here to deny repeate release
-    uv_process_kill(&proc, SIGKILL);
     WRITE_LOG(LOG_DEBUG, "AsyncCmd::DoRelease finish");
-}
-
-void AsyncCmd::ChildReadCallback(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
-{
-    AsyncCmd *thisClass = (AsyncCmd *)stream->data;
-    if (nread <= 0) {  // stdout and stderr
-        WRITE_LOG(LOG_DEBUG, "Read ShellChildProcess failed %s", uv_err_name(nread));
-    } else {
-        if (thisClass->options & OPTION_READBACK_OUT) {
-            thisClass->cmdResult = buf->base;
-            if (!thisClass->resultCallback(false, 0, thisClass->cmdResult)) {
-                uv_process_kill(&thisClass->proc, SIGKILL);
-                uv_read_stop(stream);
-            }
-            thisClass->cmdResult = STRING_EMPTY;
-        } else {  // output all when finish
-            thisClass->cmdResult += buf->base;
-        }
+    if (childShell != nullptr) {
+        childShell->StopWork(false, nullptr);
     }
-    delete[] buf->base;
-}
-
-void AsyncCmd::ExitCallback(uv_process_t *req, int64_t exitStatus, int tersignal)
-{
-    auto funcReqClose = [](uv_handle_t *handle) -> void {
-        AsyncCmd *thisClass = (AsyncCmd *)handle->data;
-        if (--thisClass->uvRef == 0) {
-            thisClass->running = false;
-        }
-    };
-    AsyncCmd *thisClass = (AsyncCmd *)req->data;
-    thisClass->hasStop = true;  // callback maybe call dorelease, so deny repeate ExitCallback
-
-    thisClass->resultCallback(true, exitStatus, thisClass->cmdResult);
-    WRITE_LOG(LOG_DEBUG, "AsyncCmd::ExitCallback");
-    thisClass->uvRef = 4;
-    Base::TryCloseHandle((uv_handle_t *)&thisClass->stdinPipe, true, funcReqClose);
-    Base::TryCloseHandle((uv_handle_t *)&thisClass->stdoutPipe, true, funcReqClose);
-    Base::TryCloseHandle((uv_handle_t *)&thisClass->stderrPipe, true, funcReqClose);
-    Base::TryCloseHandle((uv_handle_t *)req, true, funcReqClose);
-    thisClass->cmdResult = STRING_EMPTY;
+    if (pid > 0) {
+        uv_kill(pid, SIGTERM);
+    }
 }
 
 bool AsyncCmd::Initial(uv_loop_t *loopIn, const CmdResultCallback callback, uint32_t optionsIn)
 {
-    if (running) {
-        return false;
-    }
+#if defined _WIN32 || defined HDC_HOST
+    WRITE_LOG(LOG_FATAL, "Not support for win32-host");
+    return false;
+#endif
     loop = loopIn;
     resultCallback = callback;
     options = optionsIn;
     return true;
 }
 
+bool AsyncCmd::FinishShellProc(const void *context, const bool result, const string exitMsg)
+{
+    WRITE_LOG(LOG_DEBUG, "FinishShellProc finish");
+    AsyncCmd *thisClass = (AsyncCmd *)context;
+    thisClass->resultCallback(true, result, exitMsg);
+    --thisClass->refCount;
+    return true;
+};
+
+bool AsyncCmd::ChildReadCallback(const void *context, uint8_t *buf, const int size)
+{
+    AsyncCmd *thisClass = (AsyncCmd *)context;
+    string s((char *)buf, size);
+    return thisClass->resultCallback(false, 0, s);
+};
+
+int AsyncCmd::Popen(string command, bool readWrite, int &pid)
+{
+#ifdef _WIN32
+    return ERR_NO_SUPPORT;
+#else
+    constexpr uint8_t PIPE_READ = 0;
+    constexpr uint8_t PIPE_WRITE = 1;
+    pid_t childPid;
+    int fd[2];
+    pipe(fd);
+
+    if ((childPid = fork()) == -1) {
+        return ERR_GENERIC;
+    }
+    if (childPid == 0) {
+        if (readWrite) {
+            close(fd[PIPE_READ]);
+            dup2(fd[PIPE_WRITE], STDOUT_FILENO);
+            dup2(fd[PIPE_WRITE], STDERR_FILENO);
+        } else {
+            close(fd[PIPE_WRITE]);
+            dup2(fd[PIPE_READ], STDIN_FILENO);
+        }
+        setpgid(childPid, childPid);
+        string shellPath = Base::GetShellPath();
+        execl(shellPath.c_str(), shellPath.c_str(), "-c", command.c_str(), NULL);
+        exit(0);
+    } else {
+        if (readWrite) {
+            close(fd[PIPE_WRITE]);
+        } else {
+            close(fd[PIPE_READ]);
+        }
+    }
+    pid = childPid;
+    if (readWrite) {
+        return fd[PIPE_READ];
+    } else {
+        return fd[PIPE_WRITE];
+    }
+#endif
+}
+
 bool AsyncCmd::ExecuteCommand(const string &command)
 {
     string cmd = command;
     Base::Trim(cmd, "\"");
-    if (!(options & OPTION_COMMAND_ONETIME)) {
-        if (StartProcess() < 0) {
-            return false;
-        }
-        if (options & OPTION_APPEND_NEWLINE) {
-            cmd += "\n";
-        }
-        Base::SendToStream((uv_stream_t *)&stdinPipe, (uint8_t *)cmd.c_str(), cmd.size() + 1);
-    } else {
-        if (StartProcess(cmd) < 0) {
-            return false;
-        }
+    if ((fd = Popen(cmd, true, pid)) < 0) {
+        return false;
     }
+    childShell = new HdcFileDescriptor(loop, fd, this, ChildReadCallback, FinishShellProc);
+    if (!childShell->StartWork()) {
+        return false;
+    }
+    ++refCount;
     return true;
-}
-
-int AsyncCmd::StartProcess(string command)
-{
-    constexpr auto countStdIOCount = 3;
-    char **ppShellArgs = nullptr;
-    string shellPath = Base::GetShellPath();
-    uv_stdio_container_t stdioShellProc[countStdIOCount];
-    while (true) {
-        uv_pipe_init(loop, &stdinPipe, 1);
-        uv_pipe_init(loop, &stdoutPipe, 1);
-        uv_pipe_init(loop, &stderrPipe, 1);
-        stdinPipe.data = this;
-        stdoutPipe.data = this;
-        stderrPipe.data = this;
-        procOptions.stdio = stdioShellProc;
-        procOptions.stdio[STDIN_FILENO].flags = (uv_stdio_flags)(UV_CREATE_PIPE | UV_READABLE_PIPE);
-        procOptions.stdio[STDIN_FILENO].data.stream = (uv_stream_t *)&stdinPipe;
-        procOptions.stdio[STDOUT_FILENO].flags = (uv_stdio_flags)(UV_CREATE_PIPE | UV_WRITABLE_PIPE);
-        procOptions.stdio[STDOUT_FILENO].data.stream = (uv_stream_t *)&stdoutPipe;
-        procOptions.stdio[STDERR_FILENO].flags = (uv_stdio_flags)(UV_CREATE_PIPE | UV_WRITABLE_PIPE);
-        procOptions.stdio[STDERR_FILENO].data.stream = (uv_stream_t *)&stderrPipe;
-        procOptions.stdio_count = countStdIOCount;
-        procOptions.file = shellPath.c_str();
-        procOptions.exit_cb = ExitCallback;
-
-        if (command.size() > 0) {
-            constexpr auto args = 4;
-            ppShellArgs = new char *[args];
-            const string shellCommandFlag = "-c";
-            ppShellArgs[0] = (char *)shellPath.c_str();
-            ppShellArgs[1] = (char *)shellCommandFlag.c_str();
-            ppShellArgs[args - CMD_ARG1_COUNT] = (char *)command.c_str();
-            ppShellArgs[args - 1] = nullptr;
-        } else {
-            ppShellArgs = new char *[CMD_ARG1_COUNT];
-            ppShellArgs[0] = (char *)shellPath.c_str();
-            ppShellArgs[1] = nullptr;
-        }
-        procOptions.args = ppShellArgs;
-        proc.data = this;
-
-        if (uv_spawn(loop, &proc, &procOptions)) {
-            WRITE_LOG(LOG_FATAL, "Spawn shell process failed");
-            break;
-        }
-        if (uv_read_start((uv_stream_t *)&stdoutPipe, Base::AllocBufferCallback, ChildReadCallback)) {
-            break;
-        }
-        if (uv_read_start((uv_stream_t *)&stderrPipe, Base::AllocBufferCallback, ChildReadCallback)) {
-            break;
-        }
-        running = true;
-        break;
-    }
-    if (ppShellArgs) {
-        delete[] ppShellArgs;
-    }
-    if (!running) {
-        // failed
-        resultCallback(true, -1, "Start process failed");
-        return -1;
-    } else {
-        return 0;
-    }
 }
 }  // namespace Hdc

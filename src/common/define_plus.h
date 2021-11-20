@@ -55,6 +55,7 @@ enum OperateID {
 enum RetErrCode {
     RET_SUCCESS = 0,
     ERR_GENERIC = -1,
+    ERR_NO_SUPPORT,
     ERR_BUF_SIZE = -10000,
     ERR_BUF_ALLOC,
     ERR_BUF_OVERFLOW,
@@ -159,9 +160,9 @@ enum HdcCommand {
 };
 
 enum UsbProtocolOption {
-    USB_OPTION_TAIL = 1,
+    USB_OPTION_HEADER = 1,
     USB_OPTION_RESET = 2,
-    USB_OPTION_DUMMY = 4,
+    USB_OPTION_RESERVE4 = 4,
     USB_OPTION_RESERVE8 = 8,
     USB_OPTION_RESERVE16 = 16,
 };
@@ -173,7 +174,7 @@ struct USBHead {
     uint8_t flag[2];
     uint8_t option;
     uint32_t sessionId;
-    uint16_t dataSize;
+    uint32_t dataSize;
 };
 
 struct AsyncParam {
@@ -214,13 +215,11 @@ struct HdcUSB {
     uint8_t epHost;
     uint8_t devId;
     uint8_t busId;
-    int32_t sizeEpBuf;
+    uint16_t sizeEpBuf;
     string serialNumber;
     string usbMountPoint;
     uint8_t *bufDevice;
     uint8_t *bufHost;
-
-    mutex lockDeviceHandle;
     libusb_transfer *transferRecv;
     bool recvIOComplete;
 
@@ -234,8 +233,9 @@ struct HdcUSB {
     int bulkOut;  // EP1 device recv
     int bulkIn;   // EP2 device send
 #endif
+    mutex lockDeviceHandle;
     uint16_t wMaxPacketSizeSend;
-    vector<uint8_t> bufRecv;
+    uint32_t bulkinDataSize;
     bool resetIO;  // if true, must break write and read,default false
 };
 using HUSB = struct HdcUSB *;
@@ -247,7 +247,7 @@ struct HdcSession {
     string connectKey;
     uint8_t connType;  // ConnType
     uint32_t sessionId;
-    std::atomic<uint16_t> ref;
+    std::atomic<uint32_t> ref;
     uint8_t uvHandleRef;  // libuv handle ref -- just main thread now
     uint8_t uvChildRef;   // libuv handle ref -- just main thread now
     bool childCleared;
@@ -295,7 +295,7 @@ struct HdcChannel {
     bool childCleared;
     bool interactiveShellMode;  // Is shell interactive mode
     bool keepAlive;             // channel will not auto-close by server
-    std::atomic<uint16_t> ref;
+    std::atomic<uint32_t> ref;
     uint32_t targetSessionId;
     // child work
     uv_tcp_t hChildWorkTCP;  // work channel for server, no use in client

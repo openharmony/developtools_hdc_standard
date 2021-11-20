@@ -199,10 +199,8 @@ void HdcTransferBase::OnFileIO(uv_fs_t *req)
                 break;
             }
             if (context->indexIO < context->fileSize) {
-                // read continue until result >0, let single file packet +packet header less than GetMaxBufSize()
-                // Each file packet shall be completed in one IO as far as possible, which is more efficient
-                constexpr auto maxBufFactor = 0.9;
-                thisClass->SimpleFileIO(context, context->indexIO, nullptr, Base::GetMaxBufSize() * maxBufFactor);
+                thisClass->SimpleFileIO(context, context->indexIO, nullptr,
+                                        Base::GetMaxBufSize() * thisClass->maxTransferBufFactor);
             }
         } else if (req->fs_type == UV_FS_WRITE) {  // write
             if (context->indexIO >= context->fileSize) {
@@ -385,12 +383,10 @@ bool HdcTransferBase::CommandDispatch(const uint16_t command, uint8_t *payload, 
     while (true) {
         if (command == commandBegin) {
             CtxFile *context = &ctxNow;
-            SimpleFileIO(context, context->indexIO, nullptr, Base::GetMaxBufSize());
+            SimpleFileIO(context, context->indexIO, nullptr, Base::GetMaxBufSize() * maxTransferBufFactor);
             context->transferBegin = Base::GetRuntimeMSec();
         } else if (command == commandData) {
-            // The size of the actual HOST end may be larger than maxbuf
-            constexpr auto doubleSize = 2;
-            if (payloadSize > Base::GetMaxBufSize() * doubleSize || payloadSize < 0) {
+            if ((uint32_t)payloadSize > HDC_BUF_MAX_BYTES || payloadSize < 0) {
                 ret = false;
                 break;
             }
