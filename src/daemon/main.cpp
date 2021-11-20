@@ -164,6 +164,7 @@ int main(int argc, const char *argv[])
         return 0;
     }
     if (argc == 1 || (argc == CMD_ARG1_COUNT && (!strcmp(argv[1], "-forkchild") || !strcmp(argv[1], "-b")))) {
+        Hdc::Base::RemoveLogFile();
         Base::SetLogLevel(LOG_LEVEL_FULL);
         ForkChildCheck(argc, argv);
     } else {

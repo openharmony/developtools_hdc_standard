@@ -1208,6 +1208,12 @@ namespace Base {
         return res;
     }
 
+    void RemoveLogFile()
+    {
+        string path = GetTmpDir() + LOG_FILE_NAME;
+        unlink(path.c_str());
+    }
+
     bool IsRoot()
     {
 #ifdef _WIN32
