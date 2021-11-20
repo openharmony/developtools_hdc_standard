@@ -135,6 +135,7 @@ namespace Base {
     string GetFileNameAny(string &path);
     string GetCwd();
     string GetTmpDir();
+    void RemoveLogFile();
     uv_os_sock_t DuplicateUvSocket(uv_tcp_t *tcp);
     vector<uint8_t> Md5Sum(uint8_t *buf, int size);
     bool IsRoot();
