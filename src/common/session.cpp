@@ -29,7 +29,7 @@ HdcSessionBase::HdcSessionBase(bool serverOrDaemonIn)
     serverOrDaemon = serverOrDaemonIn;
     ctxUSB = nullptr;
     wantRestart = false;
-    hSessioBasenMainThread = uv_thread_self();
+    threadSessionMain = uv_thread_self();
 
 #ifdef HDC_HOST
     if (serverOrDaemon) {
@@ -518,7 +518,7 @@ void HdcSessionBase::FreeSessionOpeate(uv_timer_t *handle)
 
 void HdcSessionBase::FreeSession(const uint32_t sessionId)
 {
-    if (hSessioBasenMainThread != uv_thread_self()) {
+    if (threadSessionMain != uv_thread_self()) {
         PushAsyncMessage(sessionId, ASYNC_FREE_SESSION, nullptr, 0);
         return;
     }
@@ -713,13 +713,14 @@ int HdcSessionBase::OnRead(HSession hSession, uint8_t *bufPtr, const int bufLen)
 {
     int ret = ERR_GENERIC;
     if (memcmp(bufPtr, PACKET_FLAG.c_str(), PACKET_FLAG.size())) {
+        WRITE_LOG(LOG_FATAL, "PACKET_FLAG incorrect");
         return ERR_BUF_CHECK;
     }
     struct PayloadHead *payloadHead = (struct PayloadHead *)bufPtr;
     int tobeReadLen = ntohl(payloadHead->dataSize) + ntohs(payloadHead->headSize);
     int packetHeadSize = sizeof(struct PayloadHead);
     if (tobeReadLen <= 0 || (uint32_t)tobeReadLen > HDC_BUF_MAX_BYTES) {
-        // max 1G
+        WRITE_LOG(LOG_FATAL, "Packet size incorrect");
         return ERR_BUF_CHECK;
     }
     if (bufLen - packetHeadSize < tobeReadLen) {

@@ -342,6 +342,7 @@ void LIBUSB_CALL HdcHostUSB::ReadUSBBulkCallback(struct libusb_transfer *transfe
 {
     HSession hSession = (HSession)transfer->user_data;
     HdcHostUSB *thisClass = (HdcHostUSB *)hSession->classModule;
+    HdcServer *pServer = (HdcServer *)thisClass->clsMainBase;
     HUSB hUSB = hSession->hUSB;
     bool bOK = false;
     int childRet = 0;

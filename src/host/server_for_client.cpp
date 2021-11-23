@@ -116,12 +116,12 @@ void HdcServerForClient::EchoClient(HChannel hChannel, MessageLevel level, const
     if (log.back() != '\n') {
         log += "\r\n";
     }
-    Send(hChannel->channelId, (uint8_t *)log.c_str(), log.size());
+    SendChannel(hChannel, (uint8_t *)log.c_str(), log.size());
 }
 
-void HdcServerForClient::EchoClientRaw(const uint32_t channelId, uint8_t *payload, const int payloadSize)
+void HdcServerForClient::EchoClientRaw(const HChannel hChannel, uint8_t *payload, const int payloadSize)
 {
-    Send(channelId, payload, payloadSize);
+    SendChannel(hChannel, payload, payloadSize);
 }
 
 bool HdcServerForClient::SendToDaemon(HChannel hChannel, const uint16_t commandFlag, uint8_t *bufPtr, const int bufSize)

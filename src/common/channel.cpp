@@ -19,7 +19,7 @@ HdcChannelBase::HdcChannelBase(const bool serverOrClient, const string &addrStri
     SetChannelTCPString(addrString);
     isServerOrClient = serverOrClient;
     loopMain = loopMainIn;
-    hChannelBasenMainThread = uv_thread_self();
+    threadChanneMain = uv_thread_self();
     uv_rwlock_init(&mainAsync);
     uv_async_init(loopMain, &asyncMainLoop, MainAsyncCallback);
     uv_rwlock_init(&lockMapChannel);
@@ -246,17 +246,10 @@ void HdcChannelBase::PushAsyncMessage(const uint32_t channelId, const uint8_t me
     uv_async_send(&asyncMainLoop);
 }
 
-// client to server, or vice versa
-// works only in current working thread
-void HdcChannelBase::Send(const uint32_t channelId, uint8_t *bufPtr, const int size)
+void HdcChannelBase::SendChannel(HChannel hChannel, uint8_t *bufPtr, const int size)
 {
     uv_stream_t *sendStream = nullptr;
     int sizeNewBuf = size + DWORD_SERIALIZE_SIZE;
-    HChannel hChannel = (HChannel)AdminChannel(OP_QUERY, channelId, nullptr);
-    if (!hChannel || hChannel->isDead) {
-        return;
-    }
-
     auto data = new uint8_t[sizeNewBuf]();
     if (!data) {
         return;
@@ -275,6 +268,22 @@ void HdcChannelBase::Send(const uint32_t channelId, uint8_t *bufPtr, const int s
         ++hChannel->ref;
         Base::SendToStreamEx(sendStream, data, sizeNewBuf, nullptr, (void *)WriteCallback, data);
     }
+}
+
+// works only in current working thread
+void HdcChannelBase::Send(const uint32_t channelId, uint8_t *bufPtr, const int size)
+{
+    HChannel hChannel = (HChannel)AdminChannel(OP_QUERY_REF, channelId, nullptr);
+    if (!hChannel) {
+        return;
+    }
+    do {
+        if (hChannel->isDead) {
+            break;
+        }
+        SendChannel(hChannel, bufPtr, size);
+    } while (false);
+    --hChannel->ref;
 }
 
 void HdcChannelBase::AllocCallback(uv_handle_t *handle, size_t sizeWanted, uv_buf_t *buf)
@@ -317,7 +326,7 @@ uint32_t HdcChannelBase::MallocChannel(HChannel *hOutChannel)
     hChannel->channelId = channelId;
     AdminChannel(OP_ADD, channelId, hChannel);
     *hOutChannel = hChannel;
-    WRITE_LOG(LOG_DEBUG, "Mallocchannel:%d", channelId);
+    WRITE_LOG(LOG_DEBUG, "Mallocchannel:%u", channelId);
     return channelId;
 }
 
@@ -331,7 +340,7 @@ void HdcChannelBase::FreeChannelFinally(uv_idle_t *handle)
     }
     thisClass->NotifyInstanceChannelFree(hChannel);
     thisClass->AdminChannel(OP_REMOVE, hChannel->channelId, nullptr);
-    WRITE_LOG(LOG_DEBUG, "!!!FreeChannelFinally channelId:%d finish", hChannel->channelId);
+    WRITE_LOG(LOG_DEBUG, "!!!FreeChannelFinally channelId:%u finish", hChannel->channelId);
     if (!hChannel->serverOrClient) {
         uv_stop(thisClass->loopMain);
     }
@@ -391,7 +400,7 @@ void HdcChannelBase::FreeChannelOpeate(uv_timer_t *handle)
 
 void HdcChannelBase::FreeChannel(const uint32_t channelId)
 {
-    if (hChannelBasenMainThread != uv_thread_self()) {
+    if (threadChanneMain != uv_thread_self()) {
         PushAsyncMessage(channelId, ASYNC_FREE_CHANNEL, nullptr, 0);
         return;
     }

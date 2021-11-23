@@ -248,7 +248,7 @@ int HdcDaemonUSB::SendUSBIOSync(HSession hSession, HUSB hMainUSB, const uint8_t 
     int offset = 0;
     while (modRunning && isAlive && !hSession->isDead && !hSession->hUSB->resetIO) {
         childRet = write(bulkIn, (uint8_t *)data + offset, length - offset);
-        if (childRet < 0) {
+        if (childRet <= 0) {
             int err = errno;
             if (err == EINTR) {
                 WRITE_LOG(LOG_DEBUG, "BulkinWrite write EINTR, try again, offset:%u", offset);
@@ -350,7 +350,7 @@ int HdcDaemonUSB::DispatchToWorkThread(uint32_t sessionId, uint8_t *readBuf, int
         }
     }
 
-    if (hChildSession->childCleared) {
+    if (hChildSession->childCleared || hChildSession->isDead) {
         return ERR_SESSION_DEAD;
     }
     uv_stream_t *stream = reinterpret_cast<uv_stream_t *>(&hChildSession->dataPipe[STREAM_MAIN]);
@@ -391,6 +391,7 @@ void HdcDaemonUSB::OnUSBRead(uv_fs_t *req)
             break;
         } else if (bytesIOBytes == 0) {
             // zero packet
+            WRITE_LOG(LOG_WARN, "Zero packet received");
             ret = true;
             break;
         }
@@ -432,7 +433,7 @@ void HdcDaemonUSB::OnUSBRead(uv_fs_t *req)
 
 int HdcDaemonUSB::LoopUSBRead(HUSB hUSB, int readMaxWanted)
 {
-    int ret = -1;
+    int ret = ERR_GENERIC;
     HdcDaemon *daemon = reinterpret_cast<HdcDaemon *>(clsMainBase);
     auto ctxIo = new CtxUvFileCommonIo();
     auto buf = new uint8_t[readMaxWanted]();
@@ -462,7 +463,7 @@ FAILED:
     if (buf != nullptr) {
         delete[] buf;
     }
-    return -1;
+    return ERR_GENERIC;
 }
 
 // Because USB can connect to only one host，daemonUSB is only one Session by default

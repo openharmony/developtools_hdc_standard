@@ -43,7 +43,7 @@ private:
     virtual void SendUsbSoftReset(HSession hSession, uint32_t sessionIdOld) {};
     static void ReadUSB(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf);
     vector<uint8_t> BuildPacketHeader(uint32_t sessionId, uint8_t option, uint32_t dataSize);
-    int SpecialPacket(HSession hSession, uint8_t *appendData, int dataSize);
+    int CheckPacketOption(HSession hSession, uint8_t *appendData, int dataSize);
     void PreSendUsbSoftReset(HSession hSession, uint32_t sessionIdOld);
 };
 }  // namespace Hdc

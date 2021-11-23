@@ -434,6 +434,7 @@ bool HdcServer::ServerSessionHandshake(HSession hSession, uint8_t *payload, int 
     return true;
 }
 
+// call in child thread
 bool HdcServer::FetchCommand(HSession hSession, const uint32_t channelId, const uint16_t command, uint8_t *payload,
                              const int payloadSize)
 {
@@ -453,12 +454,17 @@ bool HdcServer::FetchCommand(HSession hSession, const uint32_t channelId, const 
         } else {
             // Client may be ctrl+c and Server remove channel. notify server async
         }
-        Send(hSession->sessionId, channelId, CMD_KERNEL_CHANNEL_CLOSE, payload, 1);
-        return true;
+        uint8_t flag = 0;
+        Send(hSession->sessionId, channelId, CMD_KERNEL_CHANNEL_CLOSE, &flag, 1);
+        return ret;
+    }
+    if (hChannel->isDead) {
+        --hChannel->ref;
+        return ret;
     }
     switch (command) {
         case CMD_KERNEL_ECHO_RAW: {  // Native shell data output
-            sfc->EchoClientRaw(channelId, payload, payloadSize);
+            sfc->EchoClientRaw(hChannel, payload, payloadSize);
             break;
         }
         case CMD_KERNEL_ECHO: {
@@ -469,12 +475,12 @@ bool HdcServer::FetchCommand(HSession hSession, const uint32_t channelId, const 
             break;
         }
         case CMD_KERNEL_CHANNEL_CLOSE: {
-            WRITE_LOG(LOG_DEBUG, "CMD_KERNEL_CHANNEL_CLOSE channelid:%d", channelId);
+            WRITE_LOG(LOG_DEBUG, "CMD_KERNEL_CHANNEL_CLOSE channelid:%u", channelId);
             // Forcibly closing the tcp handle here may result in incomplete data reception on the client side
             ClearOwnTasks(hSession, channelId);
             // crossthread free
             sfc->PushAsyncMessage(channelId, ASYNC_FREE_CHANNEL, nullptr, 0);
-            if (*payload == 1) {
+            if (*payload != 0) {
                 --(*payload);
                 Send(hSession->sessionId, channelId, CMD_KERNEL_CHANNEL_CLOSE, payload, 1);
             }
@@ -684,22 +690,22 @@ void HdcServer::DeatchChannel(HSession hSession, const uint32_t channelId)
         return;
     }
     if (hChannel->childCleared) {
-        WRITE_LOG(LOG_DEBUG, "Childchannel has already freed, cid:%d", channelId);
+        WRITE_LOG(LOG_DEBUG, "Childchannel has already freed, cid:%u", channelId);
         return;
     }
-    uint8_t count = 1;
+    uint8_t count = 0;
     Send(hSession->sessionId, hChannel->channelId, CMD_KERNEL_CHANNEL_CLOSE, &count, 1);
     if (uv_is_closing((const uv_handle_t *)&hChannel->hChildWorkTCP)) {
         Base::DoNextLoop(&hSession->childLoop, hChannel, [](const uint8_t flag, string &msg, const void *data) {
             HChannel hChannel = (HChannel)data;
             hChannel->childCleared = true;
-            WRITE_LOG(LOG_DEBUG, "Childchannel free direct, cid:%d", hChannel->channelId);
+            WRITE_LOG(LOG_DEBUG, "Childchannel free direct, cid:%u", hChannel->channelId);
         });
     } else {
         Base::TryCloseHandle((uv_handle_t *)&hChannel->hChildWorkTCP, [](uv_handle_t *handle) -> void {
             HChannel hChannel = (HChannel)handle->data;
             hChannel->childCleared = true;
-            WRITE_LOG(LOG_DEBUG, "Childchannel free callback, cid:%d", hChannel->channelId);
+            WRITE_LOG(LOG_DEBUG, "Childchannel free callback, cid:%u", hChannel->channelId);
         });
     }
 };
