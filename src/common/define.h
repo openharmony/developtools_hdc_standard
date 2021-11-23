@@ -49,7 +49,7 @@ constexpr uint16_t VER_PROTOCOL = 0x01;
 constexpr uint16_t EXTRA_ALLOC_SIZE = 2048;
 constexpr uint16_t MAX_PACKET_SIZE_HISPEED = 512;
 // double-word(hex)=[0]major[1][2]minor[3][4]version[5]fix(a-p)[6][7]reserve
-constexpr uint32_t HDC_VERSION_NUMBER = 0x10101b00;  // 1.1.1b=0x10101100
+constexpr uint32_t HDC_VERSION_NUMBER = 0x10101900;  // 1.1.1b=0x10101100
 constexpr uint32_t HDC_BUF_MAX_BYTES = INT_MAX;
 
 const string WHITE_SPACES = " \t\n\r";

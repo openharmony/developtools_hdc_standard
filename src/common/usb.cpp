@@ -74,13 +74,16 @@ vector<uint8_t> HdcUSBBase::BuildPacketHeader(uint32_t sessionId, uint8_t option
 int HdcUSBBase::SendUSBBlock(HSession hSession, uint8_t *data, const int length)
 {
     int childRet = 0;
+    int ret = ERR_IO_FAIL;
     auto header = BuildPacketHeader(hSession->sessionId, USB_OPTION_HEADER, length);
     hSession->hUSB->lockDeviceHandle.lock();
     do {
         if ((childRet = SendUSBRaw(hSession, header.data(), header.size())) <= 0) {
+            WRITE_LOG(LOG_FATAL, "SendUSBRaw index failed");
             break;
         }
         if ((childRet = SendUSBRaw(hSession, data, length)) <= 0) {
+            WRITE_LOG(LOG_FATAL, "SendUSBRaw body failed");
             break;
         }
         if (childRet > 0 && (childRet % hSession->hUSB->wMaxPacketSizeSend == 0)) {
@@ -88,13 +91,14 @@ int HdcUSBBase::SendUSBBlock(HSession hSession, uint8_t *data, const int length)
             // so, we send dummy packet to prevent zero packet generate
             auto dummy = BuildPacketHeader(hSession->sessionId, 0, 0);
             if ((childRet = SendUSBRaw(hSession, dummy.data(), dummy.size())) < 0) {
+                WRITE_LOG(LOG_FATAL, "SendUSBRaw dummy failed");
                 break;
             }
         }
-        childRet = length;
+        ret = length;
     } while (false);
     hSession->hUSB->lockDeviceHandle.unlock();
-    return childRet;
+    return ret;
 }
 
 bool HdcUSBBase::IsUsbPacketHeader(uint8_t *ioBuf, int ioBytes)
@@ -137,7 +141,7 @@ void HdcUSBBase::PreSendUsbSoftReset(HSession hSession, uint32_t sessionIdOld)
     }
 }
 
-int HdcUSBBase::SpecialPacket(HSession hSession, uint8_t *appendData, int dataSize)
+int HdcUSBBase::CheckPacketOption(HSession hSession, uint8_t *appendData, int dataSize)
 {
     HUSB hUSB = hSession->hUSB;
     // special short packet
@@ -167,7 +171,7 @@ int HdcUSBBase::SendToHdcStream(HSession hSession, uv_stream_t *stream, uint8_t 
     int childRet = 0;
     HUSB hUSB = hSession->hUSB;
     if (IsUsbPacketHeader(appendData, dataSize)) {
-        return SpecialPacket(hSession, appendData, dataSize);
+        return CheckPacketOption(hSession, appendData, dataSize);
     }
     if (hUSB->bulkinDataSize <= (uint32_t)childRet) {
         // last session data

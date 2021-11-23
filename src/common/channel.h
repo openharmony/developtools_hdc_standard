@@ -44,6 +44,7 @@ protected:
     }
     virtual void NotifyInstanceChannelFree(HChannel hChannel) {};
     void Send(const uint32_t channelId, uint8_t *bufPtr, const int size);
+    void SendChannel(HChannel hChannel, uint8_t *bufPtr, const int size);
     virtual bool ChannelSendSessionCtrlMsg(vector<uint8_t> &ctrlMsg, uint32_t sessionId)
     {
         return true;  // just server use
@@ -71,7 +72,7 @@ private:
 
     uv_rwlock_t lockMapChannel;  // protect mapChannel
     map<uint32_t, HChannel> mapChannel;
-    uv_thread_t hChannelBasenMainThread;
+    uv_thread_t threadChanneMain;
 };
 }  // namespace Hdc
 
