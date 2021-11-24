@@ -49,6 +49,7 @@ private:
     int CloseBulkEp(bool bulkInOut, int bulkFd, uv_loop_t *loop);
     void ResetOldSession(uint32_t sessionId);
     int GetMaxPacketSize(int fdFfs);
+    int UsbToHdcProtocol(uv_stream_t *stream, uint8_t *appendData, int dataSize);
 
     HdcUSB usbHandle;
     string basePath;                // usb device's base path

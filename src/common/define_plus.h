@@ -224,7 +224,6 @@ struct HdcUSB {
     bool recvIOComplete;
 
     mutex lockSend;
-    condition_variable cvTransferSend;
     libusb_transfer *transferSend;
     bool sendIOComplete;
 #else

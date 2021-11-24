@@ -326,6 +326,11 @@ HSession HdcDaemonUSB::PrepareNewSession(uint32_t sessionId, uint8_t *pRecvBuf, 
     return hChildSession;
 }
 
+int HdcDaemonUSB::UsbToHdcProtocol(uv_stream_t *stream, uint8_t *appendData, int dataSize)
+{
+    return Base::SendToStream(stream, appendData, dataSize);
+}
+
 int HdcDaemonUSB::DispatchToWorkThread(uint32_t sessionId, uint8_t *readBuf, int readBytes)
 {
     // Format:USBPacket1 payload1...USBPacketn
