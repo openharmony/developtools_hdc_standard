@@ -49,7 +49,6 @@ bool HdcTransferBase::ResetCtx(CtxFile *context, bool full)
         context->remotePath = "";
         context->transferBegin = 0;
         context->taskQueue.clear();
-        Base::ZeroStruct(ctxNow.transferConfig);
     }
     return true;
 }

@@ -22,19 +22,15 @@ public:
     AsyncCmd();
     virtual ~AsyncCmd();
     enum AsyncCmdOption {
-        OPTION_APPEND_NEWLINE = 1,
-        OPTION_COMMAND_ONETIME = 2,
-        OPTION_READBACK_OUT = 4,
+        OPTION_COMMAND_ONETIME = 1,
+        USB_OPTION_RESERVE2 = 2,
+        USB_OPTION_RESERVE4 = 4,
         USB_OPTION_RESERVE8 = 8,
     };
     // 1)is finish 2)exitStatus 3)resultString(maybe empty)
     using CmdResultCallback = std::function<bool(bool, int64_t, const string)>;
-    static uint32_t GetDefaultOption()
-    {
-        return OPTION_APPEND_NEWLINE | OPTION_COMMAND_ONETIME;
-    }
     // uv_loop_t loop is given to uv_spawn, which can't be const
-    bool Initial(uv_loop_t *loopIn, const CmdResultCallback callback, uint32_t optionsIn = GetDefaultOption());
+    bool Initial(uv_loop_t *loopIn, const CmdResultCallback callback, uint32_t optionsIn = 0);
     void DoRelease();  // Release process resources
     bool ExecuteCommand(const string &command);
     bool ReadyForRelease() const;
@@ -51,6 +47,7 @@ private:
     uint32_t refCount = 0;
     CmdResultCallback resultCallback;
     uv_loop_t *loop;
+    string cmdResult;
 };
 }  // namespace Hdc
 #endif

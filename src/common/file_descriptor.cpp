@@ -92,7 +92,7 @@ void HdcFileDescriptor::OnFileIO(uv_fs_t *req)
 
     --thisClass->refIO;
     if (bFinish) {
-        thisClass->callbackFinish(thisClass->callerContext, fetalFinish, "OnRead finish");
+        thisClass->callbackFinish(thisClass->callerContext, fetalFinish, STRING_EMPTY);
         thisClass->workContinue = false;
     }
 }

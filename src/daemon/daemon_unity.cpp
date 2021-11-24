@@ -77,8 +77,7 @@ int HdcDaemonUnity::ExecuteShell(const char *shellCommand)
         AsyncCmd::CmdResultCallback funcResultOutput;
         funcResultOutput = std::bind(&HdcDaemonUnity::AsyncCmdOut, this, std::placeholders::_1, std::placeholders::_2,
                                      std::placeholders::_3);
-        if (!asyncCommand.Initial(loopTask, funcResultOutput,
-                                  asyncCommand.GetDefaultOption() | asyncCommand.OPTION_READBACK_OUT)) {
+        if (!asyncCommand.Initial(loopTask, funcResultOutput)) {
             break;
         }
         asyncCommand.ExecuteCommand(shellCommand);
