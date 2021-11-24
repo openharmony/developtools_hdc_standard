@@ -127,7 +127,7 @@ void HdcDaemonApp::PackageShell(bool installOrUninstall, const char *options, co
     } else {
         mode = APPMOD_UNINSTALL;
     }
-    asyncCommand.Initial(loopTask, funcAppModFinish);
+    asyncCommand.Initial(loopTask, funcAppModFinish, AsyncCmd::OPTION_COMMAND_ONETIME);
     asyncCommand.ExecuteCommand(doBuf);
 }
 
