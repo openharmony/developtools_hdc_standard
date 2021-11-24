@@ -24,7 +24,6 @@ HdcHostUSB::HdcHostUSB(const bool serverOrDaemonIn, void *ptrMainBase, void *ctx
         return;
     }
     HdcServer *pServer = (HdcServer *)ptrMainBase;
-    uv_idle_init(&pServer->loopMain, &usbWork);
     ctxUSB = (libusb_context *)ctxUSBin;
     uv_timer_init(&pServer->loopMain, &devListWatcher);
 }
@@ -42,7 +41,6 @@ void HdcHostUSB::Stop()
     if (!ctxUSB) {
         return;
     }
-    Base::TryCloseHandle((uv_handle_t *)&usbWork);
     Base::TryCloseHandle((uv_handle_t *)&devListWatcher);
     modRunning = false;
 }
@@ -141,18 +139,6 @@ bool HdcHostUSB::DetectMyNeed(libusb_device *device, string &sn)
     return ret;
 }
 
-// sub-thread all called
-void HdcHostUSB::PenddingUSBIO(uv_idle_t *handle)
-{
-    libusb_context *ctxUSB = (libusb_context *)handle->data;
-    // every plug,handle，libusb_handle_events
-    struct timeval zerotime;
-    int nComplete = 0;
-    zerotime.tv_sec = 0;
-    zerotime.tv_usec = 1;  // if == 0,windows will be high CPU load
-    libusb_handle_events_timeout_completed(ctxUSB, &zerotime, &nComplete);
-}
-
 void HdcHostUSB::KickoutZombie(HSession hSession)
 {
     HdcServer *ptrConnect = (HdcServer *)hSession->classInstance;
@@ -214,6 +200,18 @@ void HdcHostUSB::WatchDevPlugin(uv_timer_t *handle)
     libusb_free_device_list(devs, 1);
 }
 
+void HdcHostUSB::UsbWorkThread(void *arg)
+{
+    HdcHostUSB *thisClass = (HdcHostUSB *)arg;
+    constexpr uint8_t USB_HANDLE_TIMEOUT = 30;  // second
+    while (thisClass->modRunning) {
+        struct timeval zerotime;
+        zerotime.tv_sec = USB_HANDLE_TIMEOUT;
+        zerotime.tv_usec = 0;  // if == 0,windows will be high CPU load
+        libusb_handle_events_timeout(thisClass->ctxUSB, &zerotime);
+    }
+}
+
 int HdcHostUSB::StartupUSBWork()
 {
     // Because libusb(winusb backend) does not support hotplug under win32, we use list mode for all platforms
@@ -221,8 +219,7 @@ int HdcHostUSB::StartupUSBWork()
     devListWatcher.data = this;
     uv_timer_start(&devListWatcher, WatchDevPlugin, 0, intervalDevCheck);
     // Running pendding in independent threads does not significantly improve the efficiency
-    usbWork.data = ctxUSB;
-    uv_idle_start(&usbWork, PenddingUSBIO);
+    uv_thread_create(&threadUsbWork, UsbWorkThread, this);
     return 0;
 }
 
@@ -338,15 +335,61 @@ void HdcHostUSB::CancelUsbLoopRead(HUSB hUSB)
     }
 }
 
+// 3rd write child-hdc-workthread
+// no use uvwrite, raw write to socketpair's fd
+int HdcHostUSB::UsbToHdcProtocol(uv_stream_t *stream, uint8_t *appendData, int dataSize)
+{
+    HSession hSession = (HSession)stream->data;
+    int fd = hSession->dataFd[STREAM_MAIN];
+    fd_set fdSet;
+    struct timeval timeout = { 3, 0 };
+    FD_ZERO(&fdSet);
+    FD_SET(fd, &fdSet);
+    int index = 0;
+    int childRet = 0;
+
+    while (index < dataSize) {
+        if (select(fd + 1, NULL, &fdSet, NULL, &timeout) <= 0) {
+            break;
+        }
+        childRet = send(fd, (const char *)appendData + index, dataSize - index, 0);
+        if (childRet < 0) {
+            break;
+        }
+        index += childRet;
+    }
+    if (index != dataSize) {
+        return ERR_IO_FAIL;
+    }
+    return index;
+}
+
+bool HdcHostUSB::SubmitUsbWorkthread(HSession hSession, libusb_transfer *transfer, const int nextReadSize,
+                                     const int timeout)
+{
+    HUSB hUSB = hSession->hUSB;
+    ++hSession->ref;
+    libusb_fill_bulk_transfer(transfer, hUSB->devHandle, hUSB->epDevice, hUSB->bufDevice, nextReadSize,
+                              ReadUSBBulkCallback, hSession, timeout);
+    int childRet = libusb_submit_transfer(transfer);
+    if (childRet < 0) {
+        --hSession->ref;
+        WRITE_LOG(LOG_FATAL, "libusb_submit_transfer failed, err:%d", childRet);
+        return false;
+    }
+    return true;
+}
+
+// at usb 3rd thread
 void LIBUSB_CALL HdcHostUSB::ReadUSBBulkCallback(struct libusb_transfer *transfer)
 {
     HSession hSession = (HSession)transfer->user_data;
     HdcHostUSB *thisClass = (HdcHostUSB *)hSession->classModule;
-    HdcServer *pServer = (HdcServer *)thisClass->clsMainBase;
     HUSB hUSB = hSession->hUSB;
     bool bOK = false;
     int childRet = 0;
     constexpr int infinity = 0;  // ignore timeout
+    --hSession->ref;
     while (true) {
         if (!thisClass->modRunning || (hSession->isDead && 0 == hSession->ref))
             break;
@@ -362,11 +405,7 @@ void LIBUSB_CALL HdcHostUSB::ReadUSBBulkCallback(struct libusb_transfer *transfe
         }
         // loop self
         int nextReadSize = childRet == 0 ? hUSB->wMaxPacketSizeSend : std::min(childRet, Base::GetUsbffsBulkSize());
-        libusb_fill_bulk_transfer(transfer, hUSB->devHandle, hUSB->epDevice, hUSB->bufDevice, nextReadSize,
-                                  ReadUSBBulkCallback, hSession, infinity);
-        childRet = libusb_submit_transfer(transfer);
-        if (childRet < 0) {
-            WRITE_LOG(LOG_FATAL, "libusb_submit_transfer failed, err:%d", childRet);
+        if (!thisClass->SubmitUsbWorkthread(hSession, transfer, nextReadSize, infinity)) {
             break;
         }
         bOK = true;
@@ -387,10 +426,8 @@ void HdcHostUSB::RegisterReadCallback(HSession hSession)
         return;
     }
     hSession->hUSB->transferRecv->user_data = hSession;
-    libusb_fill_bulk_transfer(hSession->hUSB->transferRecv, hUSB->devHandle, hUSB->epDevice, hUSB->bufDevice,
-                              hUSB->wMaxPacketSizeSend, ReadUSBBulkCallback, hSession, GLOBAL_TIMEOUT * TIME_BASE);
-    int childRet = libusb_submit_transfer(hSession->hUSB->transferRecv);
-    if (childRet == 0) {
+    if (SubmitUsbWorkthread(hSession, hUSB->transferRecv, hUSB->wMaxPacketSizeSend, GLOBAL_TIMEOUT * TIME_BASE)) {
+        // success
         hSession->hUSB->recvIOComplete = false;
     }
 }
@@ -425,48 +462,28 @@ int HdcHostUSB::OpenDeviceMyNeed(HUSB hUSB)
     return ret;
 }
 
-// at main thread
-void LIBUSB_CALL HdcHostUSB::WriteUSBBulkCallback(struct libusb_transfer *transfer)
-{
-    HSession hSession = reinterpret_cast<HSession>(transfer->user_data);
-    HdcSessionBase *server = reinterpret_cast<HdcSessionBase *>(hSession->classInstance);
-
-    if (LIBUSB_TRANSFER_COMPLETED != transfer->status || (hSession->isDead && 0 == hSession->ref)) {
-        WRITE_LOG(LOG_FATAL, "SendUSBRaw status:%d", transfer->status);
-        server->FreeSession(hSession->sessionId);
-    }
-    hSession->hUSB->sendIOComplete = true;
-    hSession->hUSB->cvTransferSend.notify_one();
-}
-
 // libusb can send directly across threads?!!!
-// Just call from child work thread, it will be block when overlap full
 int HdcHostUSB::SendUSBRaw(HSession hSession, uint8_t *data, const int length)
 {
     int ret = ERR_GENERIC;
     int childRet = -1;
+    int reallySize = 0;
     HUSB hUSB = hSession->hUSB;
-    hUSB->sendIOComplete = false;
     HdcSessionBase *server = reinterpret_cast<HdcSessionBase *>(hSession->classInstance);
     ++hSession->ref;
-    while (true) {
-        std::unique_lock<std::mutex> lock(hUSB->lockSend);
-        libusb_fill_bulk_transfer(hUSB->transferSend, hUSB->devHandle, hUSB->epHost, data, length, WriteUSBBulkCallback,
-                                  hSession, GLOBAL_TIMEOUT * TIME_BASE);
-        childRet = libusb_submit_transfer(hUSB->transferSend);
-        if (childRet < 0) {
-            ret = ERR_IO_FAIL;
+    do {
+        childRet = libusb_bulk_transfer(hUSB->devHandle, hUSB->epHost, data, length, &reallySize,
+                                        GLOBAL_TIMEOUT * TIME_BASE);
+        if (childRet < 0 || reallySize != length) {
             break;
         }
         ret = length;
-        hUSB->cvTransferSend.wait(lock, [hUSB]() { return hUSB->sendIOComplete; });
-        break;
-    }
-    --hSession->ref;
+    } while (false);
     if (ret < 0) {
         hSession->hUSB->sendIOComplete = true;
         server->FreeSession(hSession->sessionId);
     }
+    --hSession->ref;
     return ret;
 }
 

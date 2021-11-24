@@ -90,7 +90,7 @@ int HdcUSBBase::SendUSBBlock(HSession hSession, uint8_t *data, const int length)
             // win32 send ZLP will block winusb driver and LIBUSB_TRANSFER_ADD_ZERO_PACKET not effect
             // so, we send dummy packet to prevent zero packet generate
             auto dummy = BuildPacketHeader(hSession->sessionId, 0, 0);
-            if ((childRet = SendUSBRaw(hSession, dummy.data(), dummy.size())) < 0) {
+            if ((childRet = SendUSBRaw(hSession, dummy.data(), dummy.size())) <= 0) {
                 WRITE_LOG(LOG_FATAL, "SendUSBRaw dummy failed");
                 break;
             }
@@ -178,7 +178,7 @@ int HdcUSBBase::SendToHdcStream(HSession hSession, uv_stream_t *stream, uint8_t 
         PreSendUsbSoftReset(hSession, 0);  // 0 == reset current
         return 0;
     }
-    if ((childRet = Base::SendToStream(stream, appendData, dataSize)) < 0) {
+    if ((childRet = UsbToHdcProtocol(stream, appendData, dataSize)) < 0) {
         WRITE_LOG(LOG_FATAL, "Error usb send to stream dataSize:%d", dataSize);
         return ERR_IO_FAIL;
     }

@@ -30,6 +30,10 @@ protected:
     {
         return 0;
     }
+    virtual int UsbToHdcProtocol(uv_stream_t *stream, uint8_t *appendData, int dataSize)
+    {
+        return 0;
+    };
     int SendToHdcStream(HSession hSession, uv_stream_t *stream, uint8_t *appendData, int dataSize);
     int GetSafeUsbBlockSize(uint16_t wMaxPacketSizeSend);
     bool IsUsbPacketHeader(uint8_t *ioBuf, int ioBytes);
