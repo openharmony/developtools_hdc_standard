@@ -349,7 +349,7 @@ int HdcHostUSB::UsbToHdcProtocol(uv_stream_t *stream, uint8_t *appendData, int d
     int childRet = 0;
 
     while (index < dataSize) {
-        if (select(fd + 1, NULL, &fdSet, NULL, &timeout) <= 0) {
+        if ((childRet = select(fd + 1, NULL, &fdSet, NULL, &timeout)) <= 0) {
             break;
         }
         childRet = send(fd, (const char *)appendData + index, dataSize - index, 0);
@@ -475,6 +475,7 @@ int HdcHostUSB::SendUSBRaw(HSession hSession, uint8_t *data, const int length)
         childRet = libusb_bulk_transfer(hUSB->devHandle, hUSB->epHost, data, length, &reallySize,
                                         GLOBAL_TIMEOUT * TIME_BASE);
         if (childRet < 0 || reallySize != length) {
+            WRITE_LOG(LOG_FATAL, "SendUSBRaw failed, ret:%d reallySize:%d", childRet, reallySize);
             break;
         }
         ret = length;
