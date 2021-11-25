@@ -19,6 +19,7 @@ HdcChannelBase::HdcChannelBase(const bool serverOrClient, const string &addrStri
     SetChannelTCPString(addrString);
     isServerOrClient = serverOrClient;
     loopMain = loopMainIn;
+    threadChanneMain = uv_thread_self();
     uv_rwlock_init(&mainAsync);
     uv_async_init(loopMain, &asyncMainLoop, MainAsyncCallback);
     uv_rwlock_init(&lockMapChannel);
@@ -158,11 +159,11 @@ Finish:
 void HdcChannelBase::WriteCallback(uv_write_t *req, int status)
 {
     HChannel hChannel = (HChannel)req->handle->data;
-    --hChannel->sendRef;
+    --hChannel->ref;
     HdcChannelBase *thisClass = (HdcChannelBase *)hChannel->clsChannel;
     if (status < 0) {
         Base::TryCloseHandle((uv_handle_t *)req->handle);
-        if (!hChannel->isDead && !hChannel->sendRef) {
+        if (!hChannel->isDead && !hChannel->ref) {
             thisClass->FreeChannel(hChannel->channelId);
             WRITE_LOG(LOG_DEBUG, "WriteCallback TryCloseHandle");
         }
@@ -177,7 +178,7 @@ void HdcChannelBase::AsyncMainLoopTask(uv_idle_t *handle)
     HdcChannelBase *thisClass = (HdcChannelBase *)param->thisClass;
 
     switch (param->method) {
-        case ASYNC_FREE_SESSION: {
+        case ASYNC_FREE_CHANNEL: {
             // alloc/release should pair in main thread.
             thisClass->FreeChannel(param->sid);
             break;
@@ -245,16 +246,10 @@ void HdcChannelBase::PushAsyncMessage(const uint32_t channelId, const uint8_t me
     uv_async_send(&asyncMainLoop);
 }
 
-// client to server, or vice versa
-// works only in current working thread
-void HdcChannelBase::Send(const uint32_t channelId, uint8_t *bufPtr, const int size)
+void HdcChannelBase::SendChannel(HChannel hChannel, uint8_t *bufPtr, const int size)
 {
     uv_stream_t *sendStream = nullptr;
     int sizeNewBuf = size + DWORD_SERIALIZE_SIZE;
-    HChannel hChannel = (HChannel)AdminChannel(OP_QUERY, channelId, nullptr);
-    if (!hChannel || hChannel->isDead) {
-        return;
-    }
     auto data = new uint8_t[sizeNewBuf]();
     if (!data) {
         return;
@@ -270,16 +265,29 @@ void HdcChannelBase::Send(const uint32_t channelId, uint8_t *bufPtr, const int s
         sendStream = (uv_stream_t *)&hChannel->hChildWorkTCP;
     }
     if (!uv_is_closing((const uv_handle_t *)sendStream) && uv_is_writable(sendStream)) {
-        ++hChannel->sendRef;
+        ++hChannel->ref;
         Base::SendToStreamEx(sendStream, data, sizeNewBuf, nullptr, (void *)WriteCallback, data);
     }
 }
 
-void HdcChannelBase::AllocCallback(uv_handle_t *handle, size_t sizeWanted, uv_buf_t *buf)
+// works only in current working thread
+void HdcChannelBase::Send(const uint32_t channelId, uint8_t *bufPtr, const int size)
 {
-    if (sizeWanted <= 0) {
+    HChannel hChannel = (HChannel)AdminChannel(OP_QUERY_REF, channelId, nullptr);
+    if (!hChannel) {
         return;
     }
+    do {
+        if (hChannel->isDead) {
+            break;
+        }
+        SendChannel(hChannel, bufPtr, size);
+    } while (false);
+    --hChannel->ref;
+}
+
+void HdcChannelBase::AllocCallback(uv_handle_t *handle, size_t sizeWanted, uv_buf_t *buf)
+{
     HChannel context = (HChannel)handle->data;
     Base::ReallocBuf(&context->ioBuf, &context->bufSize, context->availTailIndex, sizeWanted);
     buf->base = (char *)context->ioBuf + context->availTailIndex;
@@ -289,26 +297,36 @@ void HdcChannelBase::AllocCallback(uv_handle_t *handle, size_t sizeWanted, uv_bu
     }
 }
 
+uint32_t HdcChannelBase::GetChannelPseudoUid()
+{
+    uint32_t uid = 0;
+    HChannel hInput = nullptr;
+    do {
+        uid = static_cast<uint32_t>(Base::GetRandom());
+    } while ((hInput = AdminChannel(OP_QUERY, uid, nullptr)) != nullptr);
+    return uid;
+}
+
 uint32_t HdcChannelBase::MallocChannel(HChannel *hOutChannel)
 {
     auto hChannel = new HdcChannel();
     if (!hChannel) {
         return 0;
     }
-    uint32_t channelId = Base::GetRuntimeMSec();
+    uint32_t channelId = GetChannelPseudoUid();
     if (isServerOrClient) {
         hChannel->serverOrClient = isServerOrClient;
         ++channelId;  // Use different value for serverForClient&client in per process
     }
     uv_tcp_init(loopMain, &hChannel->hWorkTCP);
-    ++hChannel->uvRef;
+    ++hChannel->uvHandleRef;
     hChannel->hWorkThread = uv_thread_self();
     hChannel->hWorkTCP.data = hChannel;
     hChannel->clsChannel = this;
     hChannel->channelId = channelId;
     AdminChannel(OP_ADD, channelId, hChannel);
     *hOutChannel = hChannel;
-    WRITE_LOG(LOG_DEBUG, "Mallocchannel:%d", channelId);
+    WRITE_LOG(LOG_DEBUG, "Mallocchannel:%u", channelId);
     return channelId;
 }
 
@@ -317,12 +335,12 @@ void HdcChannelBase::FreeChannelFinally(uv_idle_t *handle)
 {
     HChannel hChannel = (HChannel)handle->data;
     HdcChannelBase *thisClass = (HdcChannelBase *)hChannel->clsChannel;
-    if (hChannel->uvRef > 0) {
+    if (hChannel->uvHandleRef > 0) {
         return;
     }
     thisClass->NotifyInstanceChannelFree(hChannel);
     thisClass->AdminChannel(OP_REMOVE, hChannel->channelId, nullptr);
-    WRITE_LOG(LOG_DEBUG, "!!!FreeChannelFinally channelId:%d finish", hChannel->channelId);
+    WRITE_LOG(LOG_DEBUG, "!!!FreeChannelFinally channelId:%u finish", hChannel->channelId);
     if (!hChannel->serverOrClient) {
         uv_stop(thisClass->loopMain);
     }
@@ -334,7 +352,7 @@ void HdcChannelBase::FreeChannelContinue(HChannel hChannel)
 {
     auto closeChannelHandle = [](uv_handle_t *handle) -> void {
         HChannel hChannel = (HChannel)handle->data;
-        --hChannel->uvRef;
+        --hChannel->uvHandleRef;
         Base::TryCloseHandle((uv_handle_t *)handle);
     };
     hChannel->availTailIndex = 0;
@@ -347,7 +365,7 @@ void HdcChannelBase::FreeChannelContinue(HChannel hChannel)
         Base::TryCloseHandle((uv_handle_t *)&hChannel->stdoutTty, closeChannelHandle);
     }
     if (uv_is_closing((const uv_handle_t *)&hChannel->hWorkTCP)) {
-        --hChannel->uvRef;
+        --hChannel->uvHandleRef;
     } else {
         Base::TryCloseHandle((uv_handle_t *)&hChannel->hWorkTCP, closeChannelHandle);
     }
@@ -358,7 +376,7 @@ void HdcChannelBase::FreeChannelOpeate(uv_timer_t *handle)
 {
     HChannel hChannel = (HChannel)handle->data;
     HdcChannelBase *thisClass = (HdcChannelBase *)hChannel->clsChannel;
-    if (hChannel->sendRef > 0) {
+    if (hChannel->ref > 0) {
         return;
     }
     if (hChannel->hChildWorkTCP.loop) {
@@ -382,20 +400,19 @@ void HdcChannelBase::FreeChannelOpeate(uv_timer_t *handle)
 
 void HdcChannelBase::FreeChannel(const uint32_t channelId)
 {
+    if (threadChanneMain != uv_thread_self()) {
+        PushAsyncMessage(channelId, ASYNC_FREE_CHANNEL, nullptr, 0);
+        return;
+    }
     HChannel hChannel = AdminChannel(OP_QUERY, channelId, nullptr);
-    if (!hChannel) {
-        return;
-    }
-    // Two cases: alloc in main thread, or work thread
-    if (hChannel->hWorkThread != uv_thread_self()) {
-        PushAsyncMessage(hChannel->channelId, ASYNC_FREE_SESSION, nullptr, 0);
-        return;
-    }
-    if (hChannel->isDead) {
-        return;
-    }
-    Base::TimerUvTask(loopMain, hChannel, FreeChannelOpeate, MINOR_TIMEOUT);  // do immediately
-    hChannel->isDead = true;
+    do {
+        if (!hChannel || hChannel->isDead) {
+            break;
+        }
+        WRITE_LOG(LOG_DEBUG, "Begin to free channel, channelid:%u", channelId);
+        Base::TimerUvTask(loopMain, hChannel, FreeChannelOpeate, MINOR_TIMEOUT);  // do immediately
+        hChannel->isDead = true;
+    } while (false);
 }
 
 HChannel HdcChannelBase::AdminChannel(const uint8_t op, const uint32_t channelId, HChannel hInput)
@@ -418,6 +435,14 @@ HChannel HdcChannelBase::AdminChannel(const uint8_t op, const uint32_t channelId
                 hRet = mapChannel[channelId];
             }
             uv_rwlock_rdunlock(&lockMapChannel);
+            break;
+        case OP_QUERY_REF:
+            uv_rwlock_wrlock(&lockMapChannel);
+            if (mapChannel.count(channelId)) {
+                hRet = mapChannel[channelId];
+                ++hRet->ref;
+            }
+            uv_rwlock_wrunlock(&lockMapChannel);
             break;
         case OP_UPDATE:
             uv_rwlock_wrlock(&lockMapChannel);

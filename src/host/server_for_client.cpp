@@ -116,12 +116,12 @@ void HdcServerForClient::EchoClient(HChannel hChannel, MessageLevel level, const
     if (log.back() != '\n') {
         log += "\r\n";
     }
-    Send(hChannel->channelId, (uint8_t *)log.c_str(), log.size());
+    SendChannel(hChannel, (uint8_t *)log.c_str(), log.size());
 }
 
-void HdcServerForClient::EchoClientRaw(const uint32_t channelId, uint8_t *payload, const int payloadSize)
+void HdcServerForClient::EchoClientRaw(const HChannel hChannel, uint8_t *payload, const int payloadSize)
 {
-    Send(channelId, payload, payloadSize);
+    SendChannel(hChannel, payload, payloadSize);
 }
 
 bool HdcServerForClient::SendToDaemon(HChannel hChannel, const uint16_t commandFlag, uint8_t *bufPtr, const int bufSize)
@@ -536,9 +536,9 @@ int HdcServerForClient::BindChannelToSession(HChannel hChannel, uint8_t *bufPtr,
     }
     uv_close_cb funcWorkTcpClose = [](uv_handle_t *handle) -> void {
         HChannel hChannel = (HChannel)handle->data;
-        --hChannel->sendRef;
+        --hChannel->ref;
     };
-    ++hChannel->sendRef;
+    ++hChannel->ref;
     if (!isClosing) {
         uv_close((uv_handle_t *)&hChannel->hWorkTCP, funcWorkTcpClose);
     }

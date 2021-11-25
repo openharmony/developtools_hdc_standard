@@ -271,9 +271,9 @@ void HdcClient::BindLocalStd(HChannel hChannel)
         return;
     }
     hChannel->stdoutTty.data = hChannel;
-    ++hChannel->uvRef;
+    ++hChannel->uvHandleRef;
     hChannel->stdinTty.data = hChannel;
-    ++hChannel->uvRef;
+    ++hChannel->uvHandleRef;
     if (bShellInteractive) {
         WRITE_LOG(LOG_DEBUG, "uv_tty_init uv_tty_set_mode");
         ModifyTty(true, &hChannel->stdinTty);
