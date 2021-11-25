@@ -35,7 +35,8 @@ private:
     };
     static int LIBUSB_CALL HotplugHostUSBCallback(libusb_context *ctx, libusb_device *device,
                                                   libusb_hotplug_event event, void *userData);
-    static void UsbWorkThread(void *arg);  // 3rd thread
+    static void UsbWorkThread(void *arg);         // 3rd thread
+    static void SessionUsbWorkThread(void *arg);  // 3rd thread
     static void WatchDevPlugin(uv_timer_t *handle);
     static void KickoutZombie(HSession hSession);
     static void LIBUSB_CALL ReadUSBBulkCallback(struct libusb_transfer *transfer);

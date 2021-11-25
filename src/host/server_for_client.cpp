@@ -57,7 +57,7 @@ void HdcServerForClient::AcceptClient(uv_stream_t *server, int status)
     uv_recv_buffer_size((uv_handle_t *)&hChannel->hWorkTCP, &bufMaxSize);
     auto funcChannelHeaderAlloc = [](uv_handle_t *handle, size_t sizeWanted, uv_buf_t *buf) -> void {
         HChannel context = (HChannel)handle->data;
-        Base::ReallocBuf(&context->ioBuf, &context->bufSize, context->availTailIndex, sizeWanted);
+        Base::ReallocBuf(&context->ioBuf, &context->bufSize, sizeWanted);  // sizeWanted default 6k
         buf->base = (char *)context->ioBuf + context->availTailIndex;
         buf->len = sizeof(struct ChannelHandShake) + DWORD_SERIALIZE_SIZE;  // only recv static size
     };

@@ -24,7 +24,6 @@ constexpr uint8_t GLOBAL_TIMEOUT = 30;
 constexpr uint16_t DEFAULT_PORT = 8710;
 constexpr uint16_t MAX_SIZE_IOBUF = 15360;  // 15360
 constexpr uint16_t MAX_USBFFS_BULK = 16384;
-constexpr uint16_t MAX_SIZE_SOCKETPAIR = MAX_SIZE_IOBUF * 4;
 constexpr bool ENABLE_IO_CHECKSUM = false;
 const string DEFAULT_SERVER_ADDR = "127.0.0.1:8710";
 
