@@ -91,7 +91,7 @@ static bool TryCloseLoop(uv_loop_t *ptrLoop, const char *callerName)
     return ret;
 }
 
-static void Stop(int signo)
+static void FreeInstance()
 {
     if (clsHdcJdwpSimulator) {
         clsHdcJdwpSimulator->stop();
@@ -102,6 +102,11 @@ static void Stop(int signo)
     TryCloseLoop(&loopMain, "Hdcjdwp test exit");
     HiLog::Info(LABEL, "jdwp_test_process exit.");
     PrintMessage("jdwp_test_process exit.");
+}
+
+static void Stop(int signo)
+{
+    FreeInstance();
     _exit(0);
 }
 
@@ -121,5 +126,16 @@ int main(int argc, const char *argv[])
     }
     uv_run(&loopMain, UV_RUN_DEFAULT);
 
+#ifdef JS_JDWP_CONNECT
+    PrintMessage("Enter 'exit' will stop the test.");
+    std::string line;
+    while (std::getline(std::cin, line)) {
+        if (!strcmp(line.c_str(), "exit")) {
+            PrintMessage("Exit current process.");
+            break;
+        }
+    }
+    FreeInstance();
+#endif // JS_JDWP_CONNECT
     return 0;
 }

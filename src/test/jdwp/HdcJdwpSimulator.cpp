@@ -17,6 +17,8 @@
 using namespace OHOS;
 using namespace OHOS::HiviewDFX;
 static constexpr HiLogLabel LABEL = {LOG_CORE, 0, "JDWP_TEST"};
+static constexpr uint8_t JS_PKG_BASE_SIZE =
+    15 + sizeof(uint32_t) * 2 + 1; // len:uint32_t+1:\n+{"pid":uint32_t,"pkg":}
 
 HdcJdwpSimulator::HdcJdwpSimulator(uv_loop_t *loopIn)
 {
@@ -62,14 +64,14 @@ RetErrCode HdcJdwpSimulator::SendToStream(uv_stream_t *handleStream, const uint8
     uv_buf_t bfr;
     while (true) {
         reqWrite->data = (void *)pDynBuf;
-        bfr.base = (char *)buf;
+        bfr.base = (char *)pDynBuf;
         bfr.len = bufLen;
         if (!uv_is_writable(handleStream)) {
             HiLog::Info(LABEL, "SendToStream uv_is_unwritable!");
             delete reqWrite;
             break;
         }
-        HiLog::Info(LABEL, "SendToStream pid_curr:%{public}s", buf);
+        HiLog::Info(LABEL, "SendToStream buf:%{public}s", pDynBuf);
         uv_write(reqWrite, handleStream, &bfr, 1, (uv_write_cb)finishCallback);
         ret = RetErrCode::SUCCESS;
         break;
@@ -86,6 +88,7 @@ void HdcJdwpSimulator::alloc_buffer(uv_handle_t *handle, size_t suggested_size, 
     buf->len = suggested_size;
 }
 
+#ifndef JS_JDWP_CONNECT
 // Process incoming data.  If no data is available, this will block until some
 // arrives.
 void HdcJdwpSimulator::ProcessIncoming(uv_stream_t *client, ssize_t nread, const uv_buf_t *buf)
@@ -158,22 +161,54 @@ void HdcJdwpSimulator::ReceiveNewFd(uv_stream_t *q, ssize_t nread, const uv_buf_
         uv_close((uv_handle_t *)&ctxJdwp->newFd, NULL);
     }
 }
+#endif // JS_JDWP_CONNECT
 
 void HdcJdwpSimulator::ConnectJdwp(uv_connect_t *connection, int status)
 {
     HiLog::Debug(LABEL, "ConnectJdwp:%{public}d error:%{public}s", status, uv_err_name(status));
-    char pid[4] = {0};
-    int pid_curr = static_cast<int>(getpid());
-    if (sprintf_s(pid, sizeof(pid), "%d", pid_curr) < 0) {
-        HiLog::Info(LABEL, "ConnectJdwp set pid fail.");
+    uint32_t pid_curr = static_cast<uint32_t>(getpid());
+#ifdef JS_JDWP_CONNECT
+    string pkgName = "JDWP_TEST";
+    // len +1 + size of data
+    uint32_t pkgSize = pkgName.size() +
+                       JS_PKG_BASE_SIZE; // "{"pid":uint32_t,"pkg:"uint8_t[JS_PKG_MAME_MAX_SIZE]}";
+    uint8_t *info = new uint8_t[pkgSize]();
+    if (!info) {
+        HiLog::Error(LABEL, "ConnectJdwp new info fail.");
+        return;
     }
+    std::memset(info, 0, pkgSize);
+    JsMsg *jsMsg = (JsMsg *)info;
+    jsMsg->pid = pid_curr;
+    jsMsg->pkgName = pkgName;
+    jsMsg->msgLen = pkgSize;
+    HiLog::Info(LABEL,
+                "ConnectJdwp send pid:%{public}d, pkgName:%{public}s, len:%{public}d, "
+                "pkgSize.:%{public}d",
+                jsMsg->pid, jsMsg->pkgName.c_str(), jsMsg->msgLen, pkgSize);
+#else
+    char pid[5] = {0};
+    if (sprintf_s(pid, sizeof(pid), "%d", pid_curr) < 0) {
+        HiLog::Info(LABEL, "ConnectJdwp trans pid fail :%{public}d.", pid_curr);
+        return;
+    }
+#endif // JS_JDWP_CONNECT
     HCtxJdwpSimulator ctxJdwp = (HCtxJdwpSimulator)connection->data;
     HdcJdwpSimulator *thisClass = static_cast<HdcJdwpSimulator *>(ctxJdwp->thisClass);
-    HiLog::Info(LABEL, "ConnectJdwp pid:%{public}s", pid);
-    thisClass->SendToStream((uv_stream_t *)connection->handle, (uint8_t *)pid, sizeof(pid),
+#ifdef JS_JDWP_CONNECT
+    HiLog::Info(LABEL, "ConnectJdwp send JS msg:%{public}s", info);
+    thisClass->SendToStream((uv_stream_t *)connection->handle, (uint8_t *)info, pkgSize,
                             (void *)FinishWriteCallback);
-    HiLog::Info(LABEL, "ConnectJdwp reading , pid:%{public}s", pid);
+    if (info) {
+        delete[] info;
+    }
+#else
+    HiLog::Info(LABEL, "ConnectJdwp send pid:%{public}s", pid);
+    thisClass->SendToStream((uv_stream_t *)connection->handle, (uint8_t *)pid, sizeof(pid_curr),
+                            (void *)FinishWriteCallback);
+    HiLog::Info(LABEL, "ConnectJdwp reading.");
     uv_read_start((uv_stream_t *)&ctxJdwp->pipe, thisClass->alloc_buffer, ReceiveNewFd);
+#endif // JS_JDWP_CONNECT
 }
 
 void *HdcJdwpSimulator::MallocContext()
