@@ -770,13 +770,10 @@ int HdcSessionBase::FetchIOBuf(HSession hSession, uint8_t *ioBuf, int read)
 
 void HdcSessionBase::AllocCallback(uv_handle_t *handle, size_t sizeWanted, uv_buf_t *buf)
 {
-    // sizeWanted == libuv staic value 65535
-    sizeWanted = MAX_SIZE_SOCKETPAIR;  // anti highload IO from socketpair
     HSession context = (HSession)handle->data;
-    Base::ReallocBuf(&context->ioBuf, &context->bufSize, context->availTailIndex, sizeWanted);
+    Base::ReallocBuf(&context->ioBuf, &context->bufSize, Base::GetMaxBufSize() * 4);
     buf->base = (char *)context->ioBuf + context->availTailIndex;
-    buf->len = context->bufSize - context->availTailIndex - 1;  // 16Bytes are retained to prevent memory sticking
-    assert(buf->len >= 0);
+    buf->len = context->bufSize - context->availTailIndex;
 }
 
 void HdcSessionBase::FinishWriteSessionTCP(uv_write_t *req, int status)
@@ -820,6 +817,7 @@ void HdcSessionBase::ReadCtrlFromSession(uv_stream_t *uvpipe, ssize_t nread, con
     while (true) {
         if (nread < 0) {
             WRITE_LOG(LOG_DEBUG, "SessionCtrl failed,%s", uv_strerror(nread));
+            uv_read_stop(uvpipe);
             break;
         }
         if (nread > 64) {  // 64 : max length

@@ -226,6 +226,7 @@ struct HdcUSB {
     mutex lockSend;
     libusb_transfer *transferSend;
     bool sendIOComplete;
+    uv_thread_t threadUsbChildWork;
 #else
     // usb accessory FunctionFS
     // USB main thread use, sub-thread disable, sub-thread uses the main thread USB handle
