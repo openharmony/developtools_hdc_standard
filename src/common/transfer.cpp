@@ -49,7 +49,6 @@ bool HdcTransferBase::ResetCtx(CtxFile *context, bool full)
         context->remotePath = "";
         context->transferBegin = 0;
         context->taskQueue.clear();
-        Base::ZeroStruct(ctxNow.transferConfig);
     }
     return true;
 }
@@ -199,9 +198,8 @@ void HdcTransferBase::OnFileIO(uv_fs_t *req)
                 break;
             }
             if (context->indexIO < context->fileSize) {
-                // read continue until result >0, let single file packet +packet header less than GetMaxBufSize()
-                constexpr auto maxBufFactor = 0.8;
-                thisClass->SimpleFileIO(context, context->indexIO, nullptr, Base::GetMaxBufSize() * maxBufFactor);
+                thisClass->SimpleFileIO(context, context->indexIO, nullptr,
+                                        Base::GetMaxBufSize() * thisClass->maxTransferBufFactor);
             }
         } else if (req->fs_type == UV_FS_WRITE) {  // write
             if (context->indexIO >= context->fileSize) {
@@ -384,12 +382,10 @@ bool HdcTransferBase::CommandDispatch(const uint16_t command, uint8_t *payload, 
     while (true) {
         if (command == commandBegin) {
             CtxFile *context = &ctxNow;
-            SimpleFileIO(context, context->indexIO, nullptr, Base::GetMaxBufSize());
+            SimpleFileIO(context, context->indexIO, nullptr, Base::GetMaxBufSize() * maxTransferBufFactor);
             context->transferBegin = Base::GetRuntimeMSec();
         } else if (command == commandData) {
-            // The size of the actual HOST end may be larger than maxbuf
-            constexpr auto doubleSize = 2;
-            if (payloadSize > MAX_SIZE_IOBUF * doubleSize || payloadSize < 0) {
+            if ((uint32_t)payloadSize > HDC_BUF_MAX_BYTES || payloadSize < 0) {
                 ret = false;
                 break;
             }

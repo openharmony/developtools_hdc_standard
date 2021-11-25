@@ -178,6 +178,7 @@ private:
     uv_rwlock_t lockMapSession;
     std::atomic<uint32_t> sessionRef = 0;
     const uint8_t payloadProtectStaticVcode = 0x09;
+    uv_thread_t threadSessionMain;
 };
 }  // namespace Hdc
 #endif

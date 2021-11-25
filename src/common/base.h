@@ -141,6 +141,14 @@ namespace Base {
     bool IsRoot();
     char GetPathSep();
     bool IsAbsolutePath(string &path);
+    inline int GetMaxBufSize()
+    {
+        return MAX_SIZE_IOBUF;
+    }
+    inline int GetUsbffsBulkSize()
+    {
+        return MAX_USBFFS_BULK;
+    }
 }  // namespace base
 }  // namespace Hdc
 

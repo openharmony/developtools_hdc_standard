@@ -29,6 +29,7 @@ HdcSessionBase::HdcSessionBase(bool serverOrDaemonIn)
     serverOrDaemon = serverOrDaemonIn;
     ctxUSB = nullptr;
     wantRestart = false;
+    threadSessionMain = uv_thread_self();
 
 #ifdef HDC_HOST
     if (serverOrDaemon) {
@@ -118,7 +119,7 @@ void HdcSessionBase::ClearOwnTasks(HSession hSession, const uint32_t channelIDIn
                 continue;
             }
             BeginRemoveTask(hTask);
-            WRITE_LOG(LOG_DEBUG, "ClearOwnTasks OP_CLEAR finish，session:%p channelIDInput:%d", hSession,
+            WRITE_LOG(LOG_DEBUG, "ClearOwnTasks OP_CLEAR finish, session:%p channelIDInput:%d", hSession,
                       channelIDInput);
             break;
         }
@@ -300,7 +301,7 @@ int HdcSessionBase::MallocSessionByConnectType(HSession hSession)
     switch (hSession->connType) {
         case CONN_TCP: {
             uv_tcp_init(&loopMain, &hSession->hWorkTCP);
-            ++hSession->uvRef;
+            ++hSession->uvHandleRef;
             hSession->hWorkTCP.data = hSession;
             break;
         }
@@ -312,14 +313,16 @@ int HdcSessionBase::MallocSessionByConnectType(HSession hSession)
                 break;
             }
             hSession->hUSB = hUSB;
+            hSession->hUSB->wMaxPacketSizeSend = MAX_PACKET_SIZE_HISPEED;
 #ifdef HDC_HOST
-            constexpr auto maxBufFactor = 1.5;
-            int max = Base::GetMaxBufSize() * maxBufFactor + sizeof(USBHead);
+            int max = Base::GetUsbffsBulkSize();
             hUSB->sizeEpBuf = max;
             hUSB->bufDevice = new uint8_t[max]();
             hUSB->bufHost = new uint8_t[max]();
             hUSB->transferRecv = libusb_alloc_transfer(0);
             hUSB->transferSend = libusb_alloc_transfer(0);
+            hUSB->recvIOComplete = true;
+            hUSB->sendIOComplete = true;
 #else
 #endif
             break;
@@ -335,7 +338,7 @@ int HdcSessionBase::MallocSessionByConnectType(HSession hSession)
 uint32_t HdcSessionBase::GetSessionPseudoUid()
 {
     uint32_t uid = 0;
-    Hdc::HSession hInput = nullptr;
+    HSession hInput = nullptr;
     do {
         uid = static_cast<uint32_t>(Base::GetRandom());
     } while ((hInput = AdminSession(OP_QUERY, uid, nullptr)) != nullptr);
@@ -362,12 +365,12 @@ HSession HdcSessionBase::MallocSession(bool serverOrDaemon, const ConnType connT
     hSession->hWorkThread = uv_thread_self();
     hSession->mapTask = new map<uint32_t, HTaskInfo>();
     hSession->listKey = new list<void *>;
-    hSession->uvRef = 0;
+    hSession->uvHandleRef = 0;
     // pullup child
     WRITE_LOG(LOG_DEBUG, "HdcSessionBase NewSession, sessionId:%u", hSession->sessionId);
 
     uv_tcp_init(&loopMain, &hSession->ctrlPipe[STREAM_MAIN]);
-    ++hSession->uvRef;
+    ++hSession->uvHandleRef;
     Base::CreateSocketPair(hSession->ctrlFd);
     uv_tcp_open(&hSession->ctrlPipe[STREAM_MAIN], hSession->ctrlFd[STREAM_MAIN]);
     uv_read_start((uv_stream_t *)&hSession->ctrlPipe[STREAM_MAIN], Base::AllocBufferCallback, ReadCtrlFromSession);
@@ -375,7 +378,7 @@ HSession HdcSessionBase::MallocSession(bool serverOrDaemon, const ConnType connT
     hSession->ctrlPipe[STREAM_WORK].data = hSession;
     // Activate USB DAEMON's data channel, may not for use
     uv_tcp_init(&loopMain, &hSession->dataPipe[STREAM_MAIN]);
-    ++hSession->uvRef;
+    ++hSession->uvHandleRef;
     Base::CreateSocketPair(hSession->dataFd);
     uv_tcp_open(&hSession->dataPipe[STREAM_MAIN], hSession->dataFd[STREAM_MAIN]);
     hSession->dataPipe[STREAM_MAIN].data = hSession;
@@ -433,7 +436,7 @@ void HdcSessionBase::FreeSessionFinally(uv_idle_t *handle)
 {
     HSession hSession = (HSession)handle->data;
     HdcSessionBase *thisClass = (HdcSessionBase *)hSession->classInstance;
-    if (hSession->uvRef > 0) {
+    if (hSession->uvHandleRef > 0) {
         return;
     }
     // Notify Server or Daemon, just UI or display commandline
@@ -452,7 +455,7 @@ void HdcSessionBase::FreeSessionContinue(HSession hSession)
 {
     auto closeSessionTCPHandle = [](uv_handle_t *handle) -> void {
         HSession hSession = (HSession)handle->data;
-        --hSession->uvRef;
+        --hSession->uvHandleRef;
         Base::TryCloseHandle((uv_handle_t *)handle);
     };
     if (CONN_TCP == hSession->connType) {
@@ -478,11 +481,17 @@ void HdcSessionBase::FreeSessionOpeate(uv_timer_t *handle)
 {
     HSession hSession = (HSession)handle->data;
     HdcSessionBase *thisClass = (HdcSessionBase *)hSession->classInstance;
-    if (hSession->sendRef > 0) {
+    if (hSession->ref > 0) {
+        WRITE_LOG(LOG_DEBUG, "ref:%u", uint32_t(hSession->ref));
         return;
     }
 #ifdef HDC_HOST
     if (hSession->hUSB != nullptr && (!hSession->hUSB->recvIOComplete || !hSession->hUSB->sendIOComplete)) {
+        if (!hSession->hUSB->recvIOComplete) {
+            HdcUSBBase *pUSB = ((HdcUSBBase *)hSession->classModule);
+            pUSB->CancelUsbLoopRead(hSession->hUSB);
+        }
+        // send will be end with timeout
         return;
     }
 #endif
@@ -509,21 +518,21 @@ void HdcSessionBase::FreeSessionOpeate(uv_timer_t *handle)
 
 void HdcSessionBase::FreeSession(const uint32_t sessionId)
 {
+    if (threadSessionMain != uv_thread_self()) {
+        PushAsyncMessage(sessionId, ASYNC_FREE_SESSION, nullptr, 0);
+        return;
+    }
     HSession hSession = AdminSession(OP_QUERY, sessionId, nullptr);
-    if (!hSession) {
-        return;
-    }
-    if (hSession->hWorkThread != uv_thread_self()) {
-        PushAsyncMessage(hSession->sessionId, ASYNC_FREE_SESSION, nullptr, 0);
-        return;
-    }
-    if (hSession->isDead) {
-        return;
-    }
-    hSession->isDead = true;
-    Base::TimerUvTask(&loopMain, hSession, FreeSessionOpeate);
-    NotifyInstanceSessionFree(hSession, false);
-    WRITE_LOG(LOG_DEBUG, "FreeSession sessionId:%u sendref:%u", hSession->sessionId, uint16_t(hSession->sendRef));
+    WRITE_LOG(LOG_DEBUG, "Begin to free session, sessionid:%u", sessionId);
+    do {
+        if (!hSession || hSession->isDead) {
+            break;
+        }
+        hSession->isDead = true;
+        Base::TimerUvTask(&loopMain, hSession, FreeSessionOpeate);
+        NotifyInstanceSessionFree(hSession, false);
+        WRITE_LOG(LOG_DEBUG, "FreeSession sessionId:%u ref:%u", hSession->sessionId, uint32_t(hSession->ref));
+    } while (false);
 }
 
 HSession HdcSessionBase::AdminSession(const uint8_t op, const uint32_t sessionId, HSession hInput)
@@ -546,6 +555,14 @@ HSession HdcSessionBase::AdminSession(const uint8_t op, const uint32_t sessionId
                 hRet = mapSession[sessionId];
             }
             uv_rwlock_rdunlock(&lockMapSession);
+            break;
+        case OP_QUERY_REF:
+            uv_rwlock_wrlock(&lockMapSession);
+            if (mapSession.count(sessionId)) {
+                hRet = mapSession[sessionId];
+                ++hRet->ref;
+            }
+            uv_rwlock_wrunlock(&lockMapSession);
             break;
         case OP_UPDATE:
             uv_rwlock_wrlock(&lockMapSession);
@@ -589,7 +606,6 @@ int HdcSessionBase::SendByProtocol(HSession hSession, uint8_t *bufPtr, const int
         return ERR_SESSION_NOFOUND;
     }
     int ret = 0;
-    ++hSession->sendRef;
     switch (hSession->connType) {
         case CONN_TCP: {
             if (hSession->hWorkThread == uv_thread_self()) {
@@ -601,6 +617,9 @@ int HdcSessionBase::SendByProtocol(HSession hSession, uint8_t *bufPtr, const int
             } else {
                 WRITE_LOG(LOG_FATAL, "SendByProtocol uncontrol send");
                 ret = ERR_API_FAIL;
+            }
+            if (ret > 0) {
+                ++hSession->ref;
             }
             break;
         }
@@ -694,13 +713,14 @@ int HdcSessionBase::OnRead(HSession hSession, uint8_t *bufPtr, const int bufLen)
 {
     int ret = ERR_GENERIC;
     if (memcmp(bufPtr, PACKET_FLAG.c_str(), PACKET_FLAG.size())) {
+        WRITE_LOG(LOG_FATAL, "PACKET_FLAG incorrect");
         return ERR_BUF_CHECK;
     }
     struct PayloadHead *payloadHead = (struct PayloadHead *)bufPtr;
     int tobeReadLen = ntohl(payloadHead->dataSize) + ntohs(payloadHead->headSize);
     int packetHeadSize = sizeof(struct PayloadHead);
     if (tobeReadLen <= 0 || (uint32_t)tobeReadLen > HDC_BUF_MAX_BYTES) {
-        // max 1G
+        WRITE_LOG(LOG_FATAL, "Packet size incorrect");
         return ERR_BUF_CHECK;
     }
     if (bufLen - packetHeadSize < tobeReadLen) {
@@ -720,6 +740,7 @@ int HdcSessionBase::FetchIOBuf(HSession hSession, uint8_t *ioBuf, int read)
     int indexBuf = 0;
     int childRet = 0;
     if (read < 0) {
+        WRITE_LOG(LOG_FATAL, "HdcSessionBase read io failed,%s", uv_strerror(read));
         return ERR_IO_FAIL;
     }
     hSession->availTailIndex += read;
@@ -749,6 +770,8 @@ int HdcSessionBase::FetchIOBuf(HSession hSession, uint8_t *ioBuf, int read)
 
 void HdcSessionBase::AllocCallback(uv_handle_t *handle, size_t sizeWanted, uv_buf_t *buf)
 {
+    // sizeWanted == libuv staic value 65535
+    sizeWanted = MAX_SIZE_SOCKETPAIR;  // anti highload IO from socketpair
     HSession context = (HSession)handle->data;
     Base::ReallocBuf(&context->ioBuf, &context->bufSize, context->availTailIndex, sizeWanted);
     buf->base = (char *)context->ioBuf + context->availTailIndex;
@@ -759,11 +782,11 @@ void HdcSessionBase::AllocCallback(uv_handle_t *handle, size_t sizeWanted, uv_bu
 void HdcSessionBase::FinishWriteSessionTCP(uv_write_t *req, int status)
 {
     HSession hSession = (HSession)req->handle->data;
-    --hSession->sendRef;
+    --hSession->ref;
     HdcSessionBase *thisClass = (HdcSessionBase *)hSession->classInstance;
     if (status < 0) {
         Base::TryCloseHandle((uv_handle_t *)req->handle);
-        if (!hSession->isDead && !hSession->sendRef) {
+        if (!hSession->isDead && !hSession->ref) {
             WRITE_LOG(LOG_DEBUG, "FinishWriteSessionTCP freesession :%p", hSession);
             thisClass->FreeSession(hSession->sessionId);
         }

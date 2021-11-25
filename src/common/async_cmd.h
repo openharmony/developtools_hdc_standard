@@ -22,43 +22,32 @@ public:
     AsyncCmd();
     virtual ~AsyncCmd();
     enum AsyncCmdOption {
-        OPTION_APPEND_NEWLINE = 1,
-        OPTION_COMMAND_ONETIME = 2,
-        OPTION_READBACK_OUT = 4,
+        OPTION_COMMAND_ONETIME = 1,
+        USB_OPTION_RESERVE2 = 2,
+        USB_OPTION_RESERVE4 = 4,
         USB_OPTION_RESERVE8 = 8,
     };
     // 1)is finish 2)exitStatus 3)resultString(maybe empty)
     using CmdResultCallback = std::function<bool(bool, int64_t, const string)>;
-    static uint32_t GetDefaultOption()
-    {
-        return OPTION_APPEND_NEWLINE | OPTION_COMMAND_ONETIME;
-    }
     // uv_loop_t loop is given to uv_spawn, which can't be const
-    bool Initial(uv_loop_t *loopIn, const CmdResultCallback callback, uint32_t optionsIn = GetDefaultOption());
+    bool Initial(uv_loop_t *loopIn, const CmdResultCallback callback, uint32_t optionsIn = 0);
     void DoRelease();  // Release process resources
     bool ExecuteCommand(const string &command);
     bool ReadyForRelease() const;
 
 private:
-    int StartProcess(string command = STRING_EMPTY);
-    // uv_read_cb callback 1st parameter can't be changed, const can't be added
-    static void ChildReadCallback(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf);
-    // uv_exit_cb callback 1st parameter can't be changed, const can't be added
-    static void ExitCallback(uv_process_t *req, int64_t exitStatus, int tersignal);
+    static bool FinishShellProc(const void *context, const bool result, const string exitMsg);
+    static bool ChildReadCallback(const void *context, uint8_t *buf, const int size);
+    int Popen(string command, bool readWrite, int &pid);
 
-    uv_loop_t *loop;
-    // loop is given to uv_spawn, which can't be const
-    uv_pipe_t stdinPipe;
-    uv_pipe_t stdoutPipe;
-    uv_pipe_t stderrPipe;
-    uv_process_t proc;
-    uv_process_options_t procOptions;
-    CmdResultCallback resultCallback;
-    string cmdResult;
-    bool running;
-    bool hasStop = false;
     uint32_t options = 0;
-    uint8_t uvRef = 0;
+    int fd = 0;
+    int pid;
+    HdcFileDescriptor *childShell = nullptr;
+    uint32_t refCount = 0;
+    CmdResultCallback resultCallback;
+    uv_loop_t *loop;
+    string cmdResult;
 };
 }  // namespace Hdc
 #endif
