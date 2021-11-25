@@ -50,7 +50,7 @@ HdcSessionBase::~HdcSessionBase()
         libusb_exit((libusb_context *)ctxUSB);
     }
 #endif
-    WRITE_LOG(LOG_DEBUG, "~HdcSessionBase free sessionRef:%d instance:%s", uint32_t(sessionRef),
+    WRITE_LOG(LOG_DEBUG, "~HdcSessionBase free sessionRef:%u instance:%s", uint32_t(sessionRef),
               serverOrDaemon ? "server" : "daemon");
 }
 
@@ -89,7 +89,7 @@ bool HdcSessionBase::BeginRemoveTask(HTaskInfo hTask)
         }
         HSession hSession = thisClass->AdminSession(OP_QUERY, hTask->sessionId, nullptr);
         thisClass->AdminTask(OP_REMOVE, hSession, hTask->channelId, nullptr);
-        WRITE_LOG(LOG_DEBUG, "TaskDelay task remove finish, channelId:%d", hTask->channelId);
+        WRITE_LOG(LOG_DEBUG, "TaskDelay task remove finish, channelId:%u", hTask->channelId);
         delete hTask;
         Base::TryCloseHandle((uv_handle_t *)handle, Base::CloseIdleCallback);
     };
@@ -119,7 +119,7 @@ void HdcSessionBase::ClearOwnTasks(HSession hSession, const uint32_t channelIDIn
                 continue;
             }
             BeginRemoveTask(hTask);
-            WRITE_LOG(LOG_DEBUG, "ClearOwnTasks OP_CLEAR finish, session:%p channelIDInput:%d", hSession,
+            WRITE_LOG(LOG_DEBUG, "ClearOwnTasks OP_CLEAR finish, session:%p channelIDInput:%u", hSession,
                       channelIDInput);
             break;
         }
@@ -1056,7 +1056,7 @@ bool HdcSessionBase::DispatchTaskData(HSession hSession, const uint32_t channelI
             hTaskInfo->serverOrDaemon = serverOrDaemon;
         }
         if (hTaskInfo->taskStop) {
-            WRITE_LOG(LOG_DEBUG, "RedirectToTask jump stopped task:%d", channelId);
+            WRITE_LOG(LOG_DEBUG, "RedirectToTask jump stopped task:%u", channelId);
             break;
         }
         if (hTaskInfo->taskFree) {
