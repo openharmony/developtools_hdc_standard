@@ -133,6 +133,9 @@ namespace Base {
     string ReplaceAll(string str, const string from, const string to);
     uint8_t CalcCheckSum(const uint8_t *data, int len);
     string GetFileNameAny(string &path);
+    string GetCwd();
+    string GetTmpDir();
+    void RemoveLogFile();
     uv_os_sock_t DuplicateUvSocket(uv_tcp_t *tcp);
     vector<uint8_t> Md5Sum(uint8_t *buf, int size);
     bool IsRoot();

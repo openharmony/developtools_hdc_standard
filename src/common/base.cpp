@@ -117,15 +117,16 @@ namespace Base {
 
     void PrintLogEx(const char *functionName, int line, uint8_t logLevel, const char *msg, ...)
     {
+        if (logLevel > g_logLevel) {
+            return;
+        }
         string debugInfo;
         string logBuf;
         string logLevelString;
         string threadIdString;
         string sep = "\n";
         string timeString;
-        if (logLevel > g_logLevel) {
-            return;
-        }
+
         va_list vaArgs;
         va_start(vaArgs, msg);
         string logDetail = Base::StringFormat(msg, vaArgs);
@@ -142,7 +143,8 @@ namespace Base {
         printf("%s", logBuf.c_str());
         fflush(stdout);
         // logfile, not thread-safe
-        FILE *fp = fopen("/data/local/tmp/hdc.log", "a");
+        string path = GetTmpDir() + LOG_FILE_NAME;
+        FILE *fp = fopen(path.c_str(), "a");
         if (fp == nullptr) {
             return;
         }
@@ -1177,6 +1179,47 @@ namespace Base {
             ret.insert(ret.begin(), md5Hash, md5Hash + sizeof(md5Hash));
         }
         return ret;
+    }
+
+    string GetCwd()
+    {
+        char path[PATH_MAX] = "";
+        size_t size = sizeof(path);
+        string res;
+        if (uv_cwd(path, &size) < 0) {
+            return res;
+        }
+        if (path[strlen(path) - 1] != Base::GetPathSep()) {
+            path[strlen(path)] = Base::GetPathSep();
+        }
+        res = path;
+        return res;
+    }
+
+    string GetTmpDir()
+    {
+        string res;
+#ifdef HDC_HOST
+        char path[PATH_MAX] = "";
+        size_t size = sizeof(path);
+        if (uv_os_tmpdir(path, &size) < 0) {
+            WRITE_LOG(LOG_FATAL, "get tmppath failed!");
+            return res;
+        }
+        if (path[strlen(path) - 1] != Base::GetPathSep()) {
+            path[strlen(path)] = Base::GetPathSep();
+        }
+        res = path;
+#else
+        res = "/data/local/tmp/";
+#endif
+        return res;
+    }
+
+    void RemoveLogFile()
+    {
+        string path = GetTmpDir() + LOG_FILE_NAME;
+        unlink(path.c_str());
     }
 
     bool IsRoot()
