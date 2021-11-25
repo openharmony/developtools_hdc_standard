@@ -185,10 +185,14 @@ bool HdcDaemonUnity::RebootDevice(const string &cmd)
     }
     return Base::SetHdcProperty(rebootProperty.c_str(), propertyVal.c_str());
 #else
-    if ((cmd == "recovery") || (cmd == "bootloader")) {
-        return DoReboot("updater");
+    string reason;
+    if (cmd == "recovery") {
+        reason = "updater";
+    } else if (cmd == "bootloader") {
+        reason = "updater";
     }
-    return DoReboot("");
+    WRITE_LOG(LOG_DEBUG, "DoReboot with args:[%s] for cmd:[%s]", reason.c_str(), cmd.c_str());
+    return DoReboot(reason.c_str());
 #endif
 }
 
