@@ -193,34 +193,19 @@ namespace Base {
         uv_tcp_keepalive(tcpHandle, 1, GLOBAL_TIMEOUT);
         // if MAX_SIZE_IOBUF==5k,bufMaxSize at least 40k. It must be set to io 8 times is more appropriate,
         // otherwise asynchronous IO is too fast, a lot of IO is wasted on IOloop, transmission speed will decrease
-        int bufMaxSize = MAX_SIZE_SOCKETPAIR;
+        int bufMaxSize = GetMaxBufSize() * 10;
         uv_recv_buffer_size((uv_handle_t *)tcpHandle, &bufMaxSize);
         uv_send_buffer_size((uv_handle_t *)tcpHandle, &bufMaxSize);
     }
 
-    void ReallocBuf(uint8_t **origBuf, int *nOrigSize, const int indexUsedBuf, int sizeWanted)
+    void ReallocBuf(uint8_t **origBuf, int *nOrigSize, int sizeWanted)
     {
-        int remainLen = *nOrigSize - indexUsedBuf;
-        // init:0, left less than expected
-        if (!*nOrigSize || (remainLen < sizeWanted && (*nOrigSize + sizeWanted < sizeWanted * 2))) {
-            // Memory allocation size is slightly larger than the maximum
-            int nNewLen = *nOrigSize + sizeWanted + EXTRA_ALLOC_SIZE;
-            uint8_t *bufPtrOrig = *origBuf;
-            *origBuf = new uint8_t[nNewLen]();
-            if (!*origBuf) {
-                *origBuf = bufPtrOrig;
-            } else {
-                *nOrigSize = nNewLen;
-                if (bufPtrOrig) {
-                    if (memcpy_s(*origBuf, nNewLen, bufPtrOrig, *nOrigSize)) {
-                        WRITE_LOG(LOG_FATAL, "ReallocBuf failed");
-                    }
-                    delete[] bufPtrOrig;
-                }
-            }
-            uint8_t *buf = static_cast<uint8_t *>(*origBuf + indexUsedBuf);
-            Base::ZeroBuf(buf, nNewLen - indexUsedBuf);
-        }
+        if (*nOrigSize > 0)
+            return;
+        *origBuf = new uint8_t[sizeWanted];
+        if (!*origBuf)
+            return;
+        *nOrigSize = sizeWanted;
     }
 
     // As an uv_alloc_cb it must keep the same as prototype

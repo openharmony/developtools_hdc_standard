@@ -50,7 +50,7 @@ HdcSessionBase::~HdcSessionBase()
         libusb_exit((libusb_context *)ctxUSB);
     }
 #endif
-    WRITE_LOG(LOG_DEBUG, "~HdcSessionBase free sessionRef:%d instance:%s", uint32_t(sessionRef),
+    WRITE_LOG(LOG_DEBUG, "~HdcSessionBase free sessionRef:%u instance:%s", uint32_t(sessionRef),
               serverOrDaemon ? "server" : "daemon");
 }
 
@@ -89,7 +89,7 @@ bool HdcSessionBase::BeginRemoveTask(HTaskInfo hTask)
         }
         HSession hSession = thisClass->AdminSession(OP_QUERY, hTask->sessionId, nullptr);
         thisClass->AdminTask(OP_REMOVE, hSession, hTask->channelId, nullptr);
-        WRITE_LOG(LOG_DEBUG, "TaskDelay task remove finish, channelId:%d", hTask->channelId);
+        WRITE_LOG(LOG_DEBUG, "TaskDelay task remove finish, channelId:%u", hTask->channelId);
         delete hTask;
         Base::TryCloseHandle((uv_handle_t *)handle, Base::CloseIdleCallback);
     };
@@ -119,7 +119,7 @@ void HdcSessionBase::ClearOwnTasks(HSession hSession, const uint32_t channelIDIn
                 continue;
             }
             BeginRemoveTask(hTask);
-            WRITE_LOG(LOG_DEBUG, "ClearOwnTasks OP_CLEAR finish, session:%p channelIDInput:%d", hSession,
+            WRITE_LOG(LOG_DEBUG, "ClearOwnTasks OP_CLEAR finish, session:%p channelIDInput:%u", hSession,
                       channelIDInput);
             break;
         }
@@ -770,13 +770,10 @@ int HdcSessionBase::FetchIOBuf(HSession hSession, uint8_t *ioBuf, int read)
 
 void HdcSessionBase::AllocCallback(uv_handle_t *handle, size_t sizeWanted, uv_buf_t *buf)
 {
-    // sizeWanted == libuv staic value 65535
-    sizeWanted = MAX_SIZE_SOCKETPAIR;  // anti highload IO from socketpair
     HSession context = (HSession)handle->data;
-    Base::ReallocBuf(&context->ioBuf, &context->bufSize, context->availTailIndex, sizeWanted);
+    Base::ReallocBuf(&context->ioBuf, &context->bufSize, Base::GetMaxBufSize() * 4);
     buf->base = (char *)context->ioBuf + context->availTailIndex;
-    buf->len = context->bufSize - context->availTailIndex - 1;  // 16Bytes are retained to prevent memory sticking
-    assert(buf->len >= 0);
+    buf->len = context->bufSize - context->availTailIndex;
 }
 
 void HdcSessionBase::FinishWriteSessionTCP(uv_write_t *req, int status)
@@ -820,6 +817,7 @@ void HdcSessionBase::ReadCtrlFromSession(uv_stream_t *uvpipe, ssize_t nread, con
     while (true) {
         if (nread < 0) {
             WRITE_LOG(LOG_DEBUG, "SessionCtrl failed,%s", uv_strerror(nread));
+            uv_read_stop(uvpipe);
             break;
         }
         if (nread > 64) {  // 64 : max length
@@ -1056,7 +1054,7 @@ bool HdcSessionBase::DispatchTaskData(HSession hSession, const uint32_t channelI
             hTaskInfo->serverOrDaemon = serverOrDaemon;
         }
         if (hTaskInfo->taskStop) {
-            WRITE_LOG(LOG_DEBUG, "RedirectToTask jump stopped task:%d", channelId);
+            WRITE_LOG(LOG_DEBUG, "RedirectToTask jump stopped task:%u", channelId);
             break;
         }
         if (hTaskInfo->taskFree) {

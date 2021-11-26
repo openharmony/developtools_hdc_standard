@@ -200,6 +200,7 @@ void HdcHostUSB::WatchDevPlugin(uv_timer_t *handle)
     libusb_free_device_list(devs, 1);
 }
 
+// Main thread USB operates in this thread
 void HdcHostUSB::UsbWorkThread(void *arg)
 {
     HdcHostUSB *thisClass = (HdcHostUSB *)arg;
@@ -210,6 +211,7 @@ void HdcHostUSB::UsbWorkThread(void *arg)
         zerotime.tv_usec = 0;  // if == 0,windows will be high CPU load
         libusb_handle_events_timeout(thisClass->ctxUSB, &zerotime);
     }
+    WRITE_LOG(LOG_DEBUG, "Host Sessionbase usb workthread finish");
 }
 
 int HdcHostUSB::StartupUSBWork()
@@ -349,7 +351,7 @@ int HdcHostUSB::UsbToHdcProtocol(uv_stream_t *stream, uint8_t *appendData, int d
     int childRet = 0;
 
     while (index < dataSize) {
-        if (select(fd + 1, NULL, &fdSet, NULL, &timeout) <= 0) {
+        if ((childRet = select(fd + 1, NULL, &fdSet, NULL, &timeout)) <= 0) {
             break;
         }
         childRet = send(fd, (const char *)appendData + index, dataSize - index, 0);
@@ -389,7 +391,7 @@ void LIBUSB_CALL HdcHostUSB::ReadUSBBulkCallback(struct libusb_transfer *transfe
     bool bOK = false;
     int childRet = 0;
     constexpr int infinity = 0;  // ignore timeout
-    --hSession->ref;
+
     while (true) {
         if (!thisClass->modRunning || (hSession->isDead && 0 == hSession->ref))
             break;
@@ -417,6 +419,7 @@ void LIBUSB_CALL HdcHostUSB::ReadUSBBulkCallback(struct libusb_transfer *transfe
         hUSB->recvIOComplete = true;
         WRITE_LOG(LOG_WARN, "ReadUSBBulkCallback failed");
     }
+    --hSession->ref;  // until function finsh, dec ref
 }
 
 void HdcHostUSB::RegisterReadCallback(HSession hSession)
@@ -448,8 +451,7 @@ int HdcHostUSB::OpenDeviceMyNeed(HUSB hUSB)
         if (CheckActiveConfig(device, hUSB)) {
             break;
         }
-        // USB filter rules are set according to specific device
-        // pedding device
+        // USB filter rules are set according to specific device pedding device
         libusb_claim_interface(handle, hUSB->interfaceNumber);
         ret = 0;
         break;
@@ -462,7 +464,6 @@ int HdcHostUSB::OpenDeviceMyNeed(HUSB hUSB)
     return ret;
 }
 
-// libusb can send directly across threads?!!!
 int HdcHostUSB::SendUSBRaw(HSession hSession, uint8_t *data, const int length)
 {
     int ret = ERR_GENERIC;
@@ -475,6 +476,7 @@ int HdcHostUSB::SendUSBRaw(HSession hSession, uint8_t *data, const int length)
         childRet = libusb_bulk_transfer(hUSB->devHandle, hUSB->epHost, data, length, &reallySize,
                                         GLOBAL_TIMEOUT * TIME_BASE);
         if (childRet < 0 || reallySize != length) {
+            WRITE_LOG(LOG_FATAL, "SendUSBRaw failed, ret:%d reallySize:%d", childRet, reallySize);
             break;
         }
         ret = length;
@@ -536,13 +538,32 @@ bool HdcHostUSB::ReadyForWorkThread(HSession hSession)
     return true;
 };
 
+// Target session USB operates in this thread
+void HdcHostUSB::SessionUsbWorkThread(void *arg)
+{
+    HSession hSession = (HSession)arg;
+    constexpr uint8_t USB_HANDLE_TIMEOUT = 3;  // second
+    WRITE_LOG(LOG_DEBUG, "SessionUsbWorkThread work thread:%p", uv_thread_self());
+    while (!hSession->isDead) {
+        struct timeval zerotime;
+        zerotime.tv_sec = USB_HANDLE_TIMEOUT;
+        zerotime.tv_usec = 0;  // if == 0,windows will be high CPU load
+        libusb_handle_events_timeout(hSession->hUSB->ctxUSB, &zerotime);
+    }
+    --hSession->ref;
+    WRITE_LOG(LOG_DEBUG, "Session usb workthread finish");
+}
+
 // Determines that daemonInfo must have the device
 HSession HdcHostUSB::ConnectDetectDaemon(const HSession hSession, const HDaemonInfo pdi)
 {
     HdcServer *pServer = (HdcServer *)clsMainBase;
     HUSB hUSB = hSession->hUSB;
     hUSB->usbMountPoint = pdi->usbMountPoint;
-    hUSB->ctxUSB = ctxUSB;
+
+    libusb_init((libusb_context **)&hUSB->ctxUSB);
+    ++hSession->ref;
+    uv_thread_create(&hUSB->threadUsbChildWork, SessionUsbWorkThread, hSession);
     if (!FindDeviceByID(hUSB, hUSB->usbMountPoint.c_str(), hUSB->ctxUSB)) {
         pServer->FreeSession(hSession->sessionId);
         return nullptr;
