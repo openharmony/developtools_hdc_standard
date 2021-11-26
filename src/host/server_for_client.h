@@ -24,7 +24,7 @@ public:
     virtual ~HdcServerForClient();
     int Initial();
     void EchoClient(HChannel hChannel, MessageLevel level, const char *msg, ...);
-    void EchoClientRaw(const uint32_t channelId, uint8_t *payload, const int payloadSize);
+    void EchoClientRaw(const HChannel hChannel, uint8_t *payload, const int payloadSize);
     uint16_t GetTCPListenPort();
     void Stop();
 

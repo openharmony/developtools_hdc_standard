@@ -42,6 +42,7 @@ enum OperateID {
     OP_ADD,
     OP_REMOVE,
     OP_QUERY,
+    OP_QUERY_REF,  // crossthread query, manually reduce ref
     OP_GET_STRLIST,
     OP_GET_STRLIST_FULL,
     OP_GET_ANY,
@@ -54,6 +55,7 @@ enum OperateID {
 enum RetErrCode {
     RET_SUCCESS = 0,
     ERR_GENERIC = -1,
+    ERR_NO_SUPPORT = -2,
     ERR_BUF_SIZE = -10000,
     ERR_BUF_ALLOC,
     ERR_BUF_OVERFLOW,
@@ -92,6 +94,7 @@ enum RetErrCode {
 enum AsyncEvent {
     ASYNC_STOP_MAINLOOP = 0,
     ASYNC_FREE_SESSION,
+    ASYNC_FREE_CHANNEL,
 };
 enum InnerCtrlCommand {
     SP_START_SESSION = 0,
@@ -157,7 +160,7 @@ enum HdcCommand {
 };
 
 enum UsbProtocolOption {
-    USB_OPTION_TAIL = 1,
+    USB_OPTION_HEADER = 1,
     USB_OPTION_RESET = 2,
     USB_OPTION_RESERVE4 = 4,
     USB_OPTION_RESERVE8 = 8,
@@ -171,7 +174,7 @@ struct USBHead {
     uint8_t flag[2];
     uint8_t option;
     uint32_t sessionId;
-    uint16_t dataSize;
+    uint32_t dataSize;
 };
 
 struct AsyncParam {
@@ -212,28 +215,27 @@ struct HdcUSB {
     uint8_t epHost;
     uint8_t devId;
     uint8_t busId;
-    int32_t sizeEpBuf;
-    uint16_t wMaxPacketSize;
+    uint16_t sizeEpBuf;
     string serialNumber;
     string usbMountPoint;
     uint8_t *bufDevice;
     uint8_t *bufHost;
-
-    mutex lockDeviceHandle;
     libusb_transfer *transferRecv;
     bool recvIOComplete;
 
     mutex lockSend;
-    condition_variable cvTransferSend;
     libusb_transfer *transferSend;
     bool sendIOComplete;
+    uv_thread_t threadUsbChildWork;
 #else
     // usb accessory FunctionFS
     // USB main thread use, sub-thread disable, sub-thread uses the main thread USB handle
     int bulkOut;  // EP1 device recv
     int bulkIn;   // EP2 device send
 #endif
-    vector<uint8_t> bufRecv;
+    mutex lockDeviceHandle;
+    uint16_t wMaxPacketSizeSend;
+    uint32_t bulkinDataSize;
     bool resetIO;  // if true, must break write and read,default false
 };
 using HUSB = struct HdcUSB *;
@@ -245,9 +247,9 @@ struct HdcSession {
     string connectKey;
     uint8_t connType;  // ConnType
     uint32_t sessionId;
-    std::atomic<uint16_t> sendRef;
-    uint8_t uvRef;       // libuv handle ref -- just main thread now
-    uint8_t uvChildRef;  // libuv handle ref -- just main thread now
+    std::atomic<uint32_t> ref;
+    uint8_t uvHandleRef;  // libuv handle ref -- just main thread now
+    uint8_t uvChildRef;   // libuv handle ref -- just main thread now
     bool childCleared;
     map<uint32_t, HTaskInfo> *mapTask;
     // class ptr
@@ -286,14 +288,14 @@ struct HdcChannel {
     string connectKey;
     uv_tcp_t hWorkTCP;  // work channel for client, forward channel for server
     uv_thread_t hWorkThread;
-    uint8_t uvRef = 0;  // libuv handle ref -- just main thread now
+    uint8_t uvHandleRef = 0;  // libuv handle ref -- just main thread now
     bool handshakeOK;
     bool isDead;
     bool serverOrClient;  // client's channel/ server's channel
     bool childCleared;
     bool interactiveShellMode;  // Is shell interactive mode
     bool keepAlive;             // channel will not auto-close by server
-    std::atomic<uint16_t> sendRef;
+    std::atomic<uint32_t> ref;
     uint32_t targetSessionId;
     // child work
     uv_tcp_t hChildWorkTCP;  // work channel for server, no use in client

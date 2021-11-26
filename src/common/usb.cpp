@@ -55,90 +55,135 @@ bool HdcUSBBase::ReadyForWorkThread(HSession hSession)
     return true;
 };
 
+vector<uint8_t> HdcUSBBase::BuildPacketHeader(uint32_t sessionId, uint8_t option, uint32_t dataSize)
+{
+    vector<uint8_t> vecData;
+    USBHead head;
+    head.sessionId = htonl(sessionId);
+    for (size_t i = 0; i < sizeof(head.flag); i++) {
+        head.flag[i] = USB_PACKET_FLAG.data()[i];
+    }
+    head.option = option;
+    head.dataSize = htonl(dataSize);
+    vecData.insert(vecData.end(), (uint8_t *)&head, (uint8_t *)&head + sizeof(USBHead));
+    return vecData;
+}
+
 // USB big data stream, block transmission, mainly to prevent accidental data packets from writing through EP port,
 // inserting the send queue causes the program to crash
 int HdcUSBBase::SendUSBBlock(HSession hSession, uint8_t *data, const int length)
 {
-    //  Format:USBPacket1 payload1...USBPacketn payloadn；
-    //  [USBHead1(PayloadHead1+Payload1)]+[USBHead2(Payload2)]+...+[USBHeadN(PayloadN)]
-    int maxIOSize = Base::GetMaxBufSize();
-    int sizeUSBPacketHead = sizeof(USBHead);
-    int singleSize = maxIOSize - sizeUSBPacketHead;
-    int iMod = length % singleSize;
-    int iCount = (length - iMod) / singleSize + 1;
-    int offset = 0;
-    int i = 0;  // It doesn't matter of 0 or 1, start from 1 to send it according to the serial number.
-    uint8_t *ioBuf = new uint8_t[maxIOSize]();
-    if (!ioBuf) {
-        return ERR_BUF_ALLOC;
-    }
-    for (i = 0; i < iCount; ++i) {
-        USBHead *pUSBHead = (USBHead *)ioBuf;
-        int errCode = memcpy_s(pUSBHead->flag, sizeof(pUSBHead->flag), PACKET_FLAG.c_str(), PACKET_FLAG.size());
-        if (errCode != EOK) {
-            offset = ERR_BUF_COPY;
+    int childRet = 0;
+    int ret = ERR_IO_FAIL;
+    auto header = BuildPacketHeader(hSession->sessionId, USB_OPTION_HEADER, length);
+    hSession->hUSB->lockDeviceHandle.lock();
+    do {
+        if ((childRet = SendUSBRaw(hSession, header.data(), header.size())) <= 0) {
+            WRITE_LOG(LOG_FATAL, "SendUSBRaw index failed");
             break;
         }
-        pUSBHead->sessionId = hSession->sessionId;
-        if (i != iCount - 1) {
-            pUSBHead->dataSize = static_cast<uint16_t>(singleSize);
-        } else {
-            pUSBHead->dataSize = static_cast<uint16_t>(iMod);
-            pUSBHead->option = pUSBHead->option | USB_OPTION_TAIL;
-        }
-        uint8_t *payload = ioBuf + sizeUSBPacketHead;
-        if (EOK != memcpy_s(payload, maxIOSize - sizeUSBPacketHead, (uint8_t *)data + offset, pUSBHead->dataSize)) {
-            offset = ERR_BUF_COPY;
+        if ((childRet = SendUSBRaw(hSession, data, length)) <= 0) {
+            WRITE_LOG(LOG_FATAL, "SendUSBRaw body failed");
             break;
         }
-        offset += pUSBHead->dataSize;
-        if (SendUSBRaw(hSession, ioBuf, sizeUSBPacketHead + pUSBHead->dataSize) <= 0) {
-            offset = ERR_IO_FAIL;
-            break;
-        }
-    }
-    delete[] ioBuf;
-    return offset;
-}
-
-int HdcUSBBase::SendToHdcStream(HSession hSession, uv_stream_t *stream, uint8_t *appendData, int dataSize)
-{
-    HUSB hUSB = hSession->hUSB;
-    vector<uint8_t> &bufRecv = hUSB->bufRecv;
-    bufRecv.insert(bufRecv.end(), appendData, appendData + dataSize);
-    int ret = RET_SUCCESS;
-    while (bufRecv.size() > sizeof(USBHead)) {
-        USBHead *usbHeader = (USBHead *)bufRecv.data();
-        if (memcmp(usbHeader->flag, PACKET_FLAG.c_str(), PACKET_FLAG.size())) {
-            WRITE_LOG(LOG_FATAL, "Error usb packet");
-            ret = ERR_BUF_CHECK;
-            break;
-        }
-        if (bufRecv.size() < sizeof(USBHead) + usbHeader->dataSize) {
-            WRITE_LOG(LOG_DEBUG, "SendToHdcStream not enough");
-            break;  // successful , but not enough
-        }
-        if (usbHeader->sessionId != hSession->sessionId) {
-            // Only server do it here, daemon 'SendUsbSoftReset' no use
-            // hilog + ctrl^C to reproduction scene
-            //
-            // Because the USB-reset API does not work on all platforms, the last session IO data may be
-            // recveived, we need to ignore it.
-            if (hSession->serverOrDaemon && !hUSB->resetIO) {
-                WRITE_LOG(LOG_WARN, "SendToHdcStream sessionId not matched");
-                SendUsbSoftReset(hUSB, usbHeader->sessionId);
-                hUSB->resetIO = true;
-            }
-        } else {
-            // usb data to logic
-            if (Base::SendToStream(stream, bufRecv.data() + sizeof(USBHead), usbHeader->dataSize) < 0) {
-                ret = ERR_IO_FAIL;
-                WRITE_LOG(LOG_FATAL, "Error usb send to stream");
+        if (childRet > 0 && (childRet % hSession->hUSB->wMaxPacketSizeSend == 0)) {
+            // win32 send ZLP will block winusb driver and LIBUSB_TRANSFER_ADD_ZERO_PACKET not effect
+            // so, we send dummy packet to prevent zero packet generate
+            auto dummy = BuildPacketHeader(hSession->sessionId, 0, 0);
+            if ((childRet = SendUSBRaw(hSession, dummy.data(), dummy.size())) <= 0) {
+                WRITE_LOG(LOG_FATAL, "SendUSBRaw dummy failed");
                 break;
             }
         }
-        bufRecv.erase(bufRecv.begin(), bufRecv.begin() + sizeof(USBHead) + usbHeader->dataSize);
-    }
+        ret = length;
+    } while (false);
+    hSession->hUSB->lockDeviceHandle.unlock();
     return ret;
 }
+
+bool HdcUSBBase::IsUsbPacketHeader(uint8_t *ioBuf, int ioBytes)
+{
+    USBHead *usbPayloadHeader = (struct USBHead *)ioBuf;
+    uint32_t maybeSize = ntohl(usbPayloadHeader->dataSize);
+    bool isHeader = false;
+    do {
+        if (memcmp(usbPayloadHeader->flag, USB_PACKET_FLAG.c_str(), USB_PACKET_FLAG.size())) {
+            break;
+        }
+        if (ioBytes != sizeof(USBHead)) {
+            break;
+        }
+        if (maybeSize == 0) {
+            isHeader = true;  // nop packet
+            break;
+        } else {  // maybeSize != 0
+            if (usbPayloadHeader->option & USB_OPTION_HEADER) {
+                isHeader = true;
+                break;
+            }
+        }
+    } while (false);
+    return isHeader;
+}
+
+void HdcUSBBase::PreSendUsbSoftReset(HSession hSession, uint32_t sessionIdOld)
+{
+    HUSB hUSB = hSession->hUSB;
+    if (hSession->serverOrDaemon && !hUSB->resetIO) {
+        uint32_t sid = sessionIdOld;
+        // or we can sendmsg to childthread send?
+        hUSB->lockDeviceHandle.lock();
+        ++hSession->ref;
+        WRITE_LOG(LOG_WARN, "SendToHdcStream check, sessionId not matched");
+        SendUsbSoftReset(hSession, sid);
+        --hSession->ref;
+        hUSB->lockDeviceHandle.unlock();
+    }
+}
+
+int HdcUSBBase::CheckPacketOption(HSession hSession, uint8_t *appendData, int dataSize)
+{
+    HUSB hUSB = hSession->hUSB;
+    // special short packet
+    USBHead *header = (USBHead *)appendData;
+    header->sessionId = ntohl(header->sessionId);
+    header->dataSize = ntohl(header->dataSize);
+    if (header->sessionId != hSession->sessionId) {
+        // Only server do it here, daemon 'SendUsbSoftReset' no use
+        // hilog + ctrl^C to reproduction scene
+        //
+        // Because the USB-reset API does not work on all platforms, the last session IO data may be
+        // recveived, we need to ignore it.
+        PreSendUsbSoftReset(hSession, header->sessionId);
+        return 0;
+    }
+    if (header->option & USB_OPTION_HEADER) {
+        // header packet
+        hUSB->bulkinDataSize = header->dataSize;
+    }
+    // soft ZLP
+    return hUSB->bulkinDataSize;
+}
+
+// return value: <0 error; = 0 all finish; >0 need size
+int HdcUSBBase::SendToHdcStream(HSession hSession, uv_stream_t *stream, uint8_t *appendData, int dataSize)
+{
+    int childRet = 0;
+    HUSB hUSB = hSession->hUSB;
+    if (IsUsbPacketHeader(appendData, dataSize)) {
+        return CheckPacketOption(hSession, appendData, dataSize);
+    }
+    if (hUSB->bulkinDataSize <= (uint32_t)childRet) {
+        // last session data
+        PreSendUsbSoftReset(hSession, 0);  // 0 == reset current
+        return 0;
+    }
+    if ((childRet = UsbToHdcProtocol(stream, appendData, dataSize)) < 0) {
+        WRITE_LOG(LOG_FATAL, "Error usb send to stream dataSize:%d", dataSize);
+        return ERR_IO_FAIL;
+    }
+    hUSB->bulkinDataSize -= childRet;
+    return hUSB->bulkinDataSize;
+}
+
 }
