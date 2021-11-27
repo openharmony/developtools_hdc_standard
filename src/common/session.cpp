@@ -320,7 +320,6 @@ int HdcSessionBase::MallocSessionByConnectType(HSession hSession)
             hUSB->bufDevice = new uint8_t[max]();
             hUSB->bufHost = new uint8_t[max]();
             hUSB->transferRecv = libusb_alloc_transfer(0);
-            hUSB->transferSend = libusb_alloc_transfer(0);
             hUSB->recvIOComplete = true;
             hUSB->sendIOComplete = true;
 #else
@@ -415,7 +414,6 @@ void HdcSessionBase::FreeSessionByConnectType(HSession hSession)
         delete[] hUSB->bufDevice;
         delete[] hUSB->bufHost;
         libusb_free_transfer(hUSB->transferRecv);
-        libusb_free_transfer(hUSB->transferSend);
         libusb_exit(hUSB->ctxUSB);
 #else
         if (hUSB->bulkIn > 0) {
@@ -483,9 +481,9 @@ void HdcSessionBase::FreeSessionOpeate(uv_timer_t *handle)
     HSession hSession = (HSession)handle->data;
     HdcSessionBase *thisClass = (HdcSessionBase *)hSession->classInstance;
     if (hSession->ref > 0) {
-        WRITE_LOG(LOG_DEBUG, "ref:%u", uint32_t(hSession->ref));
         return;
     }
+    WRITE_LOG(LOG_DEBUG, "FreeSessionOpeate ref:%u", uint32_t(hSession->ref));
 #ifdef HDC_HOST
     if (hSession->hUSB != nullptr && (!hSession->hUSB->recvIOComplete || !hSession->hUSB->sendIOComplete)) {
         if (!hSession->hUSB->recvIOComplete) {
