@@ -24,11 +24,16 @@ public:
     enum AsyncCmdOption {
         OPTION_COMMAND_ONETIME = 1,
         USB_OPTION_RESERVE2 = 2,
-        USB_OPTION_RESERVE4 = 4,
+        OPTION_READBACK_OUT = 4,  // PS: Not used, remove it later
         USB_OPTION_RESERVE8 = 8,
     };
     // 1)is finish 2)exitStatus 3)resultString(maybe empty)
     using CmdResultCallback = std::function<bool(bool, int64_t, const string)>;
+    // PS: Not used, remove it later
+    static uint32_t GetDefaultOption()
+    {
+        return OPTION_COMMAND_ONETIME;
+    }
     // uv_loop_t loop is given to uv_spawn, which can't be const
     bool Initial(uv_loop_t *loopIn, const CmdResultCallback callback, uint32_t optionsIn = 0);
     void DoRelease();  // Release process resources
