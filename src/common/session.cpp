@@ -416,6 +416,7 @@ void HdcSessionBase::FreeSessionByConnectType(HSession hSession)
         delete[] hUSB->bufHost;
         libusb_free_transfer(hUSB->transferRecv);
         libusb_free_transfer(hUSB->transferSend);
+        libusb_exit(hUSB->ctxUSB);
 #else
         if (hUSB->bulkIn > 0) {
             close(hUSB->bulkIn);
