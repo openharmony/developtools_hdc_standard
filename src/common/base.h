@@ -24,7 +24,7 @@ namespace Base {
     // tcpHandle can't be const as it's passed into uv_tcp_keepalive
     void SetTcpOptions(uv_tcp_t *tcpHandle);
     // Realloc need to update origBuf&origSize which can't be const
-    void ReallocBuf(uint8_t **origBuf, int *nOrigSize, const int indexUsedBuf, int sizeWanted);
+    void ReallocBuf(uint8_t **origBuf, int *nOrigSize, int sizeWanted);
     // handle&sendHandle must keep sync with uv_write
     int SendToStreamEx(uv_stream_t *handleStream, const uint8_t *buf, const int bufLen, uv_stream_t *handleSend,
                        const void *finishCallback, const void *pWriteReqData);
@@ -39,10 +39,8 @@ namespace Base {
     uint64_t GetRandom(const uint64_t min = 0, const uint64_t max = UINT64_MAX);
     int ConnectKey2IPPort(const char *connectKey, char *outIP, uint16_t *outPort);
     // As an uv_work_cb it must keep the same as prototype
-    // clang-format off
-    int StartWorkThread(uv_loop_t *loop, uv_work_cb pFuncWorkThread,
-                        uv_after_work_cb pFuncAfterThread, void *pThreadData);
-    // clang-format on
+    int StartWorkThread(uv_loop_t *loop, uv_work_cb pFuncWorkThread, uv_after_work_cb pFuncAfterThread,
+                        void *pThreadData);
     // As an uv_work_cb it must keep the same as prototype
     void FinishWorkThread(uv_work_t *req, int status);
     int GetMaxBufSize();
@@ -141,6 +139,14 @@ namespace Base {
     bool IsRoot();
     char GetPathSep();
     bool IsAbsolutePath(string &path);
+    inline int GetMaxBufSize()
+    {
+        return MAX_SIZE_IOBUF;
+    }
+    inline int GetUsbffsBulkSize()
+    {
+        return MAX_USBFFS_BULK;
+    }
 }  // namespace base
 }  // namespace Hdc
 
