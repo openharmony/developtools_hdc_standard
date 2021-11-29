@@ -57,7 +57,7 @@ void HdcServerForClient::AcceptClient(uv_stream_t *server, int status)
     uv_recv_buffer_size((uv_handle_t *)&hChannel->hWorkTCP, &bufMaxSize);
     auto funcChannelHeaderAlloc = [](uv_handle_t *handle, size_t sizeWanted, uv_buf_t *buf) -> void {
         HChannel context = (HChannel)handle->data;
-        Base::ReallocBuf(&context->ioBuf, &context->bufSize, context->availTailIndex, sizeWanted);
+        Base::ReallocBuf(&context->ioBuf, &context->bufSize, sizeWanted);  // sizeWanted default 6k
         buf->base = (char *)context->ioBuf + context->availTailIndex;
         buf->len = sizeof(struct ChannelHandShake) + DWORD_SERIALIZE_SIZE;  // only recv static size
     };
@@ -116,12 +116,12 @@ void HdcServerForClient::EchoClient(HChannel hChannel, MessageLevel level, const
     if (log.back() != '\n') {
         log += "\r\n";
     }
-    Send(hChannel->channelId, (uint8_t *)log.c_str(), log.size());
+    SendChannel(hChannel, (uint8_t *)log.c_str(), log.size());
 }
 
-void HdcServerForClient::EchoClientRaw(const uint32_t channelId, uint8_t *payload, const int payloadSize)
+void HdcServerForClient::EchoClientRaw(const HChannel hChannel, uint8_t *payload, const int payloadSize)
 {
-    Send(channelId, payload, payloadSize);
+    SendChannel(hChannel, payload, payloadSize);
 }
 
 bool HdcServerForClient::SendToDaemon(HChannel hChannel, const uint16_t commandFlag, uint8_t *bufPtr, const int bufSize)
@@ -536,9 +536,9 @@ int HdcServerForClient::BindChannelToSession(HChannel hChannel, uint8_t *bufPtr,
     }
     uv_close_cb funcWorkTcpClose = [](uv_handle_t *handle) -> void {
         HChannel hChannel = (HChannel)handle->data;
-        --hChannel->sendRef;
+        --hChannel->ref;
     };
-    ++hChannel->sendRef;
+    ++hChannel->ref;
     if (!isClosing) {
         uv_close((uv_handle_t *)&hChannel->hWorkTCP, funcWorkTcpClose);
     }
