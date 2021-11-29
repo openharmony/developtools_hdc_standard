@@ -185,50 +185,27 @@ namespace Base {
         return tmpString;
     }
 
-    int GetMaxBufSize()
-    {
-        return MAX_SIZE_IOBUF;
-    }
-
     void SetTcpOptions(uv_tcp_t *tcpHandle)
     {
-        constexpr int maxBufFactor = 10;
         if (!tcpHandle) {
-            WRITE_LOG(LOG_WARN, "SetTcpOptions nullptr Ptr");
             return;
         }
         uv_tcp_keepalive(tcpHandle, 1, GLOBAL_TIMEOUT);
         // if MAX_SIZE_IOBUF==5k,bufMaxSize at least 40k. It must be set to io 8 times is more appropriate,
         // otherwise asynchronous IO is too fast, a lot of IO is wasted on IOloop, transmission speed will decrease
-        int bufMaxSize = GetMaxBufSize() * maxBufFactor;
+        int bufMaxSize = GetMaxBufSize() * 10;
         uv_recv_buffer_size((uv_handle_t *)tcpHandle, &bufMaxSize);
         uv_send_buffer_size((uv_handle_t *)tcpHandle, &bufMaxSize);
     }
 
-    void ReallocBuf(uint8_t **origBuf, int *nOrigSize, const int indexUsedBuf, int sizeWanted)
+    void ReallocBuf(uint8_t **origBuf, int *nOrigSize, int sizeWanted)
     {
-        sizeWanted = GetMaxBufSize();
-        int remainLen = *nOrigSize - indexUsedBuf;
-        // init:0, left less than expected
-        if (!*nOrigSize || (remainLen < sizeWanted && (*nOrigSize + sizeWanted < sizeWanted * 2))) {
-            // Memory allocation size is slightly larger than the maximum
-            int nNewLen = *nOrigSize + sizeWanted + EXTRA_ALLOC_SIZE;
-            uint8_t *bufPtrOrig = *origBuf;
-            *origBuf = new uint8_t[nNewLen]();
-            if (!*origBuf) {
-                *origBuf = bufPtrOrig;
-            } else {
-                *nOrigSize = nNewLen;
-                if (bufPtrOrig) {
-                    if (memcpy_s(*origBuf, nNewLen, bufPtrOrig, *nOrigSize)) {
-                        WRITE_LOG(LOG_FATAL, "ReallocBuf failed");
-                    }
-                    delete[] bufPtrOrig;
-                }
-            }
-            uint8_t *buf = static_cast<uint8_t *>(*origBuf + indexUsedBuf);
-            Base::ZeroBuf(buf, nNewLen - indexUsedBuf);
-        }
+        if (*nOrigSize > 0)
+            return;
+        *origBuf = new uint8_t[sizeWanted];
+        if (!*origBuf)
+            return;
+        *nOrigSize = sizeWanted;
     }
 
     // As an uv_alloc_cb it must keep the same as prototype
@@ -1024,8 +1001,8 @@ namespace Base {
 
     const string StringFormat(const char * const formater, va_list &vaArgs)
     {
-        std::vector<char> args(MAX_SIZE_IOBUF);
-        const int retSize = vsnprintf_s(args.data(), MAX_SIZE_IOBUF, args.size() - 1, formater, vaArgs);
+        std::vector<char> args(GetMaxBufSize());
+        const int retSize = vsnprintf_s(args.data(), GetMaxBufSize(), args.size() - 1, formater, vaArgs);
         if (retSize < 0) {
             return std::string("");
         } else {
