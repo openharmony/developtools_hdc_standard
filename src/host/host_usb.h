@@ -37,7 +37,7 @@ private:
                                                   libusb_hotplug_event event, void *userData);
     static void UsbWorkThread(void *arg);         // 3rd thread
     static void SessionUsbWorkThread(void *arg);  // 3rd thread
-    static void WatchDevPlugin(uv_timer_t *handle);
+    static void WatchUsbNodeChange(uv_timer_t *handle);
     static void KickoutZombie(HSession hSession);
     static void LIBUSB_CALL ReadUSBBulkCallback(struct libusb_transfer *transfer);
     int StartupUSBWork();
@@ -59,7 +59,6 @@ private:
     libusb_context *ctxUSB;
     uv_timer_t devListWatcher;
     map<string, UsbCheckStatus> mapIgnoreDevice;
-    const int intervalDevCheck = 3000;
 
 private:
     bool SubmitUsbWorkthread(HSession hSession, libusb_transfer *transfer, const int nextReadSize, const int timeout);
