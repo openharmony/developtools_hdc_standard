@@ -77,8 +77,7 @@ int HdcDaemonUnity::ExecuteShell(const char *shellCommand)
         AsyncCmd::CmdResultCallback funcResultOutput;
         funcResultOutput = std::bind(&HdcDaemonUnity::AsyncCmdOut, this, std::placeholders::_1, std::placeholders::_2,
                                      std::placeholders::_3);
-        if (!asyncCommand.Initial(loopTask, funcResultOutput,
-                                  asyncCommand.GetDefaultOption() | asyncCommand.OPTION_READBACK_OUT)) {
+        if (!asyncCommand.Initial(loopTask, funcResultOutput)) {
             break;
         }
         asyncCommand.ExecuteCommand(shellCommand);
@@ -118,7 +117,7 @@ bool HdcDaemonUnity::FindMountDeviceByPath(const char *toQuery, char *dev)
         // clang-format on
         dev[BUF_SIZE_SMALL - 1] = '\0';
         dir[BUF_SIZE_SMALL - 1] = '\0';
-        if (res == 4 && (strcmp(toQuery, dir) == 0)) { // 4 : The correct number of parameters
+        if (res == 4 && (strcmp(toQuery, dir) == 0)) {  // 4 : The correct number of parameters
             return true;
         }
         token = strtok(nullptr, delims);
@@ -132,7 +131,7 @@ bool HdcDaemonUnity::RemountPartition(const char *dir)
     int off = 0;
     char dev[BUF_SIZE_SMALL] = "";
 
-    if (!FindMountDeviceByPath(dir, dev) || strlen(dev) < 4) { // 4 : file count
+    if (!FindMountDeviceByPath(dir, dev) || strlen(dev) < 4) {  // 4 : file count
         WRITE_LOG(LOG_DEBUG, "FindMountDeviceByPath failed");
         return false;
     }
@@ -186,10 +185,14 @@ bool HdcDaemonUnity::RebootDevice(const string &cmd)
     }
     return Base::SetHdcProperty(rebootProperty.c_str(), propertyVal.c_str());
 #else
-    if ((cmd == "recovery") || (cmd == "bootloader")) {
-        return DoReboot("updater");
+    string reason;
+    if (cmd == "recovery") {
+        reason = "updater";
+    } else if (cmd == "bootloader") {
+        reason = "updater";
     }
-    return DoReboot("");
+    WRITE_LOG(LOG_DEBUG, "DoReboot with args:[%s] for cmd:[%s]", reason.c_str(), cmd.c_str());
+    return DoReboot(reason.c_str());
 #endif
 }
 

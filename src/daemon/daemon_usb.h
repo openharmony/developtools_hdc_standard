@@ -37,17 +37,19 @@ private:
     static void OnUSBRead(uv_fs_t *req);
     static void WatchEPTimer(uv_timer_t *handle);
     int ConnectEPPoint(HUSB hUSB);
-    int DispatchToWorkThread(const uint32_t sessionId, uint8_t *readBuf, int readBytes);
-    int AvailablePacket(uint8_t *ioBuf, uint32_t *sessionId);
+    int DispatchToWorkThread(uint32_t sessionId, uint8_t *readBuf, int readBytes);
+    int AvailablePacket(uint8_t *ioBuf, int ioBytes, uint32_t *sessionId);
     void CloseEndpoint(HUSB hUSB, bool closeCtrlEp = false);
     string GetDevPath(const std::string &path);
     bool ReadyForWorkThread(HSession hSession);
-    int LoopUSBRead(HUSB hUSB);
+    int LoopUSBRead(HUSB hUSB, int readMaxWanted);
     HSession PrepareNewSession(uint32_t sessionId, uint8_t *pRecvBuf, int recvBytesIO);
     bool JumpAntiquePacket(const uint8_t &buf, ssize_t bytes) const;
     int SendUSBIOSync(HSession hSession, HUSB hMainUSB, const uint8_t *data, const int length);
     int CloseBulkEp(bool bulkInOut, int bulkFd, uv_loop_t *loop);
-    void ResetOldSession(const uint32_t sessionId);
+    void ResetOldSession(uint32_t sessionId);
+    int GetMaxPacketSize(int fdFfs);
+    int UsbToHdcProtocol(uv_stream_t *stream, uint8_t *appendData, int dataSize);
 
     HdcUSB usbHandle;
     string basePath;                // usb device's base path
