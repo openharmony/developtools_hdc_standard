@@ -131,8 +131,7 @@ bool HdcHostUSB::DetectMyNeed(libusb_device *device, string &sn)
     uv_timer_t *waitTimeDoCmd = new uv_timer_t;
     uv_timer_init(&hdcServer->loopMain, waitTimeDoCmd);
     waitTimeDoCmd->data = hSession;
-    constexpr uint16_t PRECONNECT_INTERVAL = 3000;
-    uv_timer_start(waitTimeDoCmd, hdcServer->UsbPreConnect, 0, PRECONNECT_INTERVAL);
+    uv_timer_start(waitTimeDoCmd, hdcServer->UsbPreConnect, 0, DEVICE_CHECK_INTERVAL);
     mapIgnoreDevice[sn] = HOST_USB_REGISTER;
     ret = true;
     delete hUSB;
@@ -164,12 +163,12 @@ void HdcHostUSB::ReviewUsbNodeLater(string &nodeKey)
     HdcServer *hdcServer = (HdcServer *)clsMainBase;
     // add to ignore list
     mapIgnoreDevice[nodeKey] = HOST_USB_IGNORE;
-    int delayRemoveFromList = intervalDevCheck * MINOR_TIMEOUT;  // wait little time for daemon reinit
+    int delayRemoveFromList = DEVICE_CHECK_INTERVAL * MINOR_TIMEOUT;  // wait little time for daemon reinit
     Base::DelayDo(&hdcServer->loopMain, delayRemoveFromList, 0, nodeKey, nullptr,
                   [this](const uint8_t flag, string &msg, const void *) -> void { RemoveIgnoreDevice(msg); });
 }
 
-void HdcHostUSB::WatchDevPlugin(uv_timer_t *handle)
+void HdcHostUSB::WatchUsbNodeChange(uv_timer_t *handle)
 {
     HdcHostUSB *thisClass = (HdcHostUSB *)handle->data;
     HdcServer *ptrConnect = (HdcServer *)thisClass->clsMainBase;
@@ -219,7 +218,7 @@ int HdcHostUSB::StartupUSBWork()
     // Because libusb(winusb backend) does not support hotplug under win32, we use list mode for all platforms
     WRITE_LOG(LOG_DEBUG, "USBHost loopfind mode");
     devListWatcher.data = this;
-    uv_timer_start(&devListWatcher, WatchDevPlugin, 0, intervalDevCheck);
+    uv_timer_start(&devListWatcher, WatchUsbNodeChange, 0, DEVICE_CHECK_INTERVAL);
     // Running pendding in independent threads does not significantly improve the efficiency
     uv_thread_create(&threadUsbWork, UsbWorkThread, this);
     return 0;
@@ -542,7 +541,7 @@ bool HdcHostUSB::ReadyForWorkThread(HSession hSession)
 void HdcHostUSB::SessionUsbWorkThread(void *arg)
 {
     HSession hSession = (HSession)arg;
-    constexpr uint8_t USB_HANDLE_TIMEOUT = 3;  // second
+    constexpr uint8_t USB_HANDLE_TIMEOUT = DEVICE_CHECK_INTERVAL / TIME_BASE;
     WRITE_LOG(LOG_DEBUG, "SessionUsbWorkThread work thread:%p", uv_thread_self());
     while (!hSession->isDead) {
         struct timeval zerotime;

@@ -222,9 +222,6 @@ struct HdcUSB {
     uint8_t *bufHost;
     libusb_transfer *transferRecv;
     bool recvIOComplete;
-
-    mutex lockSend;
-    libusb_transfer *transferSend;
     bool sendIOComplete;
     uv_thread_t threadUsbChildWork;
 #else
