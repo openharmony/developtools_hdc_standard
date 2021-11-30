@@ -269,7 +269,7 @@ namespace TranslateCommand {
             }
         }
         // Inner command, protocol uses only
-        else if (input == CMDSTR_INNER_ENABLE_KEEPALIVE) {
+        else if (!strncmp(input.c_str(), CMDSTR_INNER_ENABLE_KEEPALIVE.c_str(), CMDSTR_INNER_ENABLE_KEEPALIVE.size())) {
             outCmd->cmdFlag = CMD_KERNEL_ENABLE_KEEPALIVE;
         } else {
             stringError = "Unknown command...";
