@@ -60,7 +60,7 @@ hdc pc端可执行文件编译步骤：
 
 [3.支持运行环境](#section161941989593)
 
-linux版本建议ubuntu 16.04以上 64位，其他相近版本也可；libc++.so引用错误请使用ldd/readelf等命令检查库引用 windows版本建议windows10 64位，如果低版本windows winusb库缺失，请使用zadig更新库。
+linux版本建议ubuntu 18.04以上 64位，其他相近版本也可；libc++.so引用错误请使用ldd/readelf等命令检查库引用 windows版本建议windows10 64位，如果低版本windows winusb库缺失，请使用zadig更新库。
 
 
 ### Linux端USB设备权限说明<a name="section129654513264"></a>
