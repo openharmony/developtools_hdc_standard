@@ -54,6 +54,7 @@ constexpr uint32_t HDC_BUF_MAX_BYTES = INT_MAX;
 const string WHITE_SPACES = " \t\n\r";
 const string UT_TMP_PATH = "/tmp/hdc-ut";
 const string LOG_FILE_NAME = "hdc.log";
+const string LOG_BAK_NAME = "hdclast.log";
 const string SERVER_NAME = "HDCServer";
 const string STRING_EMPTY = "";
 const string HANDSHAKE_MESSAGE = "OHOS HDC";  // sep not char '-', not more than 11 bytes
