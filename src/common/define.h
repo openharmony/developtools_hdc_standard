@@ -89,6 +89,7 @@ const string CMDSTR_APP_INSTALL = "install";
 const string CMDSTR_APP_UNINSTALL = "uninstall";
 const string CMDSTR_APP_SIDELOAD = "sideload";
 const string CMDSTR_LIST_JDWP = "jpid";
+const string CMDSTR_TRACK_JDWP = "track-jpid";
 const string CMDSTR_INNER_ENABLE_KEEPALIVE = "alive";
 }  // namespace Hdc
 #endif  // HDC_DEFINE_H
