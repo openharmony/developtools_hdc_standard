@@ -13,6 +13,9 @@
 
 import("//build/ohos.gni")
 HDC_PATH = "//developtools/hdc_standard"
+declare_args() {
+  js_jdwp_connect = true
+}
 
 hdc_common_sources = [
   "${HDC_PATH}/src/common/async_cmd.cpp",
@@ -51,6 +54,9 @@ ohos_executable("hdcd") {
 
   defines = [ "HARMONY_PROJECT" ]
 
+  if (js_jdwp_connect) {
+    defines += [ "JS_JDWP_CONNECT" ]
+  }
   configs = [ ":hdc_config" ]
 
   deps = [
