@@ -238,6 +238,8 @@ namespace TranslateCommand {
             outCmd->cmdFlag = CMD_UNITY_REMOUNT;
         } else if (!strcmp(input.c_str(), CMDSTR_LIST_JDWP.c_str())) {
             outCmd->cmdFlag = CMD_UNITY_JPID;
+        } else if (!strcmp(input.c_str(), CMDSTR_TRACK_JDWP.c_str())) {
+            outCmd->cmdFlag = CMD_TRACK_JPID;
         } else if (!strncmp(input.c_str(), CMDSTR_TARGET_REBOOT.c_str(), CMDSTR_TARGET_REBOOT.size())) {
             TargetReboot(input.c_str(), outCmd);
         } else if (!strncmp(input.c_str(), CMDSTR_TARGET_MODE.c_str(), CMDSTR_TARGET_MODE.size())) {
