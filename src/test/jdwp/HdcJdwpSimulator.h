@@ -20,11 +20,11 @@ class HdcJdwpSimulator;
 
 class HdcJdwpSimulator {
 public:
-    explicit HdcJdwpSimulator(uv_loop_t *loopIn);
+    explicit HdcJdwpSimulator(uv_loop_t *loopIn, string pkg);
     ~HdcJdwpSimulator();
     bool Connect();
     void stop();
-    uv_loop_t *mLoop;
+    uv_loop_t *loop;
 
 protected:
     struct ContextJdwpSimulator {
@@ -36,10 +36,9 @@ protected:
     using HCtxJdwpSimulator = struct ContextJdwpSimulator *;
 
 private:
-    struct JsMsg {
+    struct JsMsgHeader {
         uint32_t msgLen;
         uint32_t pid;
-        string pkgName;
     };
     void *MallocContext();
     void FreeContext();
@@ -52,7 +51,8 @@ private:
     static void alloc_buffer(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf);
     static RetErrCode SendToStream(uv_stream_t *handleStream, const uint8_t *buf, const int bufLen,
                                    const void *finishCallback);
-    HCtxJdwpSimulator mCtxPoint;
+    HCtxJdwpSimulator ctxPoint;
     bool exit = false;
+    string pkgName;
 };
 #endif
