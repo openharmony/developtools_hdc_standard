@@ -129,6 +129,7 @@ enum HdcCommand {
     CMD_UNITY_BUGREPORT_INIT,
     CMD_UNITY_BUGREPORT_DATA,
     CMD_UNITY_JPID,
+    CMD_TRACK_JPID,
     // Shell commands types
     CMD_SHELL_INIT = 2000,
     CMD_SHELL_DATA,
