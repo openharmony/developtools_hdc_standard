@@ -13,8 +13,16 @@
  * limitations under the License.
  */
 #include "jdwp.h"
+#include <thread>
+#include <sys/eventfd.h>
 
 namespace Hdc {
+#ifdef JS_JDWP_CONNECT
+static constexpr uint32_t JPID_TRACK_LIST_SIZE = 1024 * 4;
+#else
+static constexpr uint32_t JPID_TRACK_LIST_SIZE = 1024;
+#endif // JS_JDWP_CONNECT
+
 HdcJdwp::HdcJdwp(uv_loop_t *loopIn)
 {
     Base::ZeroStruct(listenPipe);
@@ -22,11 +30,17 @@ HdcJdwp::HdcJdwp(uv_loop_t *loopIn)
     loop = loopIn;
     refCount = 0;
     uv_rwlock_init(&lockMapContext);
+    uv_rwlock_init(&lockJdwpTrack);
 }
 
 HdcJdwp::~HdcJdwp()
 {
+    if (awakenPollFd >= 0) {
+        close(awakenPollFd);
+        awakenPollFd = -1;
+    }
     uv_rwlock_destroy(&lockMapContext);
+    uv_rwlock_destroy(&lockJdwpTrack);
 }
 
 bool HdcJdwp::ReadyForRelease()
@@ -36,6 +50,8 @@ bool HdcJdwp::ReadyForRelease()
 
 void HdcJdwp::Stop()
 {
+    stop = true;
+    WakePollThread();
     auto funcListenPipeClose = [](uv_handle_t *handle) -> void {
         HdcJdwp *thisClass = (HdcJdwp *)handle->data;
         --thisClass->refCount;
@@ -81,27 +97,58 @@ void HdcJdwp::FreeContext(HCtxJdwp ctx)
 void HdcJdwp::ReadStream(uv_stream_t *pipe, ssize_t nread, const uv_buf_t *buf)
 {
     bool ret = true;
-    HCtxJdwp ctxJdwp = (HCtxJdwp)pipe->data;
-    HdcJdwp *thisClass = (HdcJdwp *)ctxJdwp->thisClass;
-    char *p = ctxJdwp->buf;
-    uint32_t pid = 0;
-
-    if (nread == UV_ENOBUFS) {  // It is definite enough, usually only 4 bytes
+    if (nread == UV_ENOBUFS) { // It is definite enough, usually only 4 bytes
         ret = false;
         WRITE_LOG(LOG_DEBUG, "HdcJdwp::ReadStream IOBuf max");
     } else if (nread == 0) {
         return;
-    } else if (nread < 0 || nread != 4) {  // 4 : 4 bytes
+#ifdef JS_JDWP_CONNECT
+    } else if (nread < 0 || nread < JS_PKG_MIN_SIZE) {
+#else
+    } else if (nread < 0 || nread != 4) { // 4 : 4 bytes
+#endif // JS_JDWP_CONNECT
         ret = false;
-        WRITE_LOG(LOG_DEBUG, "HdcJdwp::ReadStream program exit pid:%d", ctxJdwp->pid);
+        WRITE_LOG(LOG_DEBUG, "HdcJdwp::ReadStream invalid package nread:%d.", nread);
     }
+
+    HCtxJdwp ctxJdwp = (HCtxJdwp)pipe->data;
+    HdcJdwp *thisClass = (HdcJdwp *)ctxJdwp->thisClass;
     if (ret) {
-        pid = atoi(p);
+        uint32_t pid = 0;
+        char *p = ctxJdwp->buf;
+        if (nread == sizeof(uint32_t)) { // Java: pid
+            pid = atoi(p);
+        } else { // JS:pid PkgName
+#ifdef JS_JDWP_CONNECT
+            struct JsMsgHeader *jsMsg = (struct JsMsgHeader *)p;
+            if (jsMsg->msgLen == nread) {
+                pid = jsMsg->pid;
+                string pkgName =
+                    string((char *)p + sizeof(JsMsgHeader), jsMsg->msgLen - sizeof(JsMsgHeader));
+                ctxJdwp->pkgName = pkgName;
+            } else {
+                ret = false;
+                WRITE_LOG(LOG_DEBUG, "HdcJdwp::ReadStream invalid js package size %d:%d.",
+                          jsMsg->msgLen, nread);
+            }
+#endif // JS_JDWP_CONNECT
+        }
         if (pid > 0) {
-            WRITE_LOG(LOG_DEBUG, "JDWP accept pid:%d", pid);
             ctxJdwp->pid = pid;
+#ifdef JS_JDWP_CONNECT
+            WRITE_LOG(LOG_DEBUG, "JDWP accept pid:%d-pkg:%s", pid, ctxJdwp->pkgName.c_str());
+#else
+            WRITE_LOG(LOG_DEBUG, "JDWP accept pid:%d", pid);
+#endif // JS_JDWP_CONNECT
             thisClass->AdminContext(OP_ADD, pid, ctxJdwp);
             ret = true;
+            int fd = -1;
+            if (uv_fileno((uv_handle_t *)&(ctxJdwp->pipe), &fd) < 0) {
+                WRITE_LOG(LOG_DEBUG, "HdcJdwp::ReadStream uv_fileno fail.");
+            } else {
+                thisClass->pollNodeMap.emplace(fd, PollNode(fd, pid));
+                thisClass->WakePollThread();
+            }
         }
     }
     Base::ZeroArray(ctxJdwp->buf);
@@ -109,6 +156,20 @@ void HdcJdwp::ReadStream(uv_stream_t *pipe, ssize_t nread, const uv_buf_t *buf)
         thisClass->FreeContext(ctxJdwp);
     }
 }
+
+#ifdef JS_JDWP_CONNECT
+string HdcJdwp::GetProcessListExtendPkgName()
+{
+    string ret;
+    uv_rwlock_rdlock(&lockMapContext);
+    for (auto &&v : mapCtxJdwp) {
+        HCtxJdwp hj = v.second;
+        ret += std::to_string(v.first) + " " + hj->pkgName + "\n";
+    }
+    uv_rwlock_rdunlock(&lockMapContext);
+    return ret;
+}
+#endif // JS_JDWP_CONNECT
 
 void HdcJdwp::AcceptClient(uv_stream_t *server, int status)
 {
@@ -191,11 +252,17 @@ void *HdcJdwp::AdminContext(const uint8_t op, const uint32_t pid, HCtxJdwp ctxJd
         case OP_CLEAR: {
             uv_rwlock_wrlock(&lockMapContext);
             mapCtxJdwp.clear();
+            pollNodeMap.clear();
             uv_rwlock_wrunlock(&lockMapContext);
             break;
         }
         default:
             break;
+    }
+    if (op == OP_ADD || op == OP_REMOVE || op == OP_CLEAR) {
+        uv_rwlock_rdlock(&lockJdwpTrack);
+        ProcessListUpdated();
+        uv_rwlock_rdunlock(&lockJdwpTrack);
     }
     return hRet;
 }
@@ -268,12 +335,173 @@ string HdcJdwp::GetProcessList()
 }
 // cross thread call finish
 
+size_t HdcJdwp::JdwpProcessListMsg(char *buffer, size_t bufferlen)
+{
+    // Message is length-prefixed with 4 hex digits in ASCII.
+    static constexpr size_t headerLen = 5;
+
+    char head[headerLen + 2];
+#ifdef JS_JDWP_CONNECT
+    string result = GetProcessListExtendPkgName();
+#else
+    string result = GetProcessList();
+#endif // JS_JDWP_CONNECT
+
+    size_t len = result.length();
+    if (bufferlen < (len + headerLen)) {
+        WRITE_LOG(LOG_WARN, "truncating JDWP process list (max len = %zu) ", bufferlen);
+        len = bufferlen;
+    }
+    if (snprintf_s(head, sizeof head, sizeof head - 1, "%04zx\n", len) < 0) {
+        WRITE_LOG(LOG_WARN, " JdwpProcessListMsg head fail.");
+        return 0;
+    }
+    if (memcpy_s(buffer, bufferlen, head, headerLen) != 0) {
+        WRITE_LOG(LOG_WARN, " JdwpProcessListMsg get head fail.");
+        return 0;
+    }
+    if (memcpy_s(buffer + headerLen, (bufferlen - headerLen), result.c_str(), len) != 0) {
+        WRITE_LOG(LOG_WARN, " JdwpProcessListMsg get data  fail.");
+        return 0;
+    }
+    return len + headerLen;
+}
+
+void HdcJdwp::ProcessListUpdated(void)
+{
+    if (jdwpTrackers.size() <= 0) {
+        return;
+    }
+    std::string data;
+    data.resize(JPID_TRACK_LIST_SIZE);
+    size_t len = JdwpProcessListMsg(&data[0], data.size());
+    if (len <= 0) {
+        return;
+    }
+    data.resize(len);
+    for (auto &t : jdwpTrackers) {
+        if (t->taskStop || t->taskFree || !t->taskClass) {
+            jdwpTrackers.erase(remove(jdwpTrackers.begin(), jdwpTrackers.end(), t),
+                                jdwpTrackers.end());
+        } else {
+            void *clsSession = t->ownerSessionClass;
+            HdcSessionBase *sessionBase = reinterpret_cast<HdcSessionBase *>(clsSession);
+            sessionBase->LogMsg(t->sessionId, t->channelId, MSG_OK, data.c_str());
+        }
+    }
+}
+
+bool HdcJdwp::CreateJdwpTracker(HTaskInfo hTaskInfo)
+{
+    if (hTaskInfo == nullptr) {
+        return false;
+    }
+    jdwpTrackers.push_back(hTaskInfo);
+    ProcessListUpdated();
+    return true;
+}
+
+void HdcJdwp::DrainAwakenPollThread() const
+{
+    uint64_t value = 0;
+    ssize_t retVal = read(awakenPollFd, &value, sizeof(value));
+    if (retVal < 0) {
+        WRITE_LOG(LOG_FATAL, "DrainAwakenPollThread: Failed to read data from awaken pipe %d",
+                  retVal);
+    }
+}
+
+void HdcJdwp::WakePollThread()
+{
+    if (awakenPollFd < 0) {
+        WRITE_LOG(LOG_DEBUG, "awakenPollFd: MUST initialized before notifying");
+        return;
+    }
+    static const uint64_t increment = 1;
+    ssize_t retVal = write(awakenPollFd, &increment, sizeof(increment));
+    if (retVal < 0) {
+        WRITE_LOG(LOG_FATAL, "WakePollThread: Failed to write data into awaken pipe %d", retVal);
+    }
+}
+
+void *HdcJdwp::FdEventPollThread(void *args)
+{
+    auto thisClass = static_cast<HdcJdwp *>(args);
+    std::vector<struct pollfd> pollfds;
+    size_t size = 0;
+    while (!thisClass->stop) {
+        if (size != thisClass->pollNodeMap.size() || thisClass->pollNodeMap.size() == 0) {
+            pollfds.clear();
+            struct pollfd pollFd;
+            for (const auto &pair : thisClass->pollNodeMap) {
+                pollFd.fd = pair.second.pollfd.fd;
+                pollFd.events = pair.second.pollfd.events;
+                pollFd.revents = pair.second.pollfd.revents;
+                pollfds.push_back(pollFd);
+            }
+            pollFd.fd = thisClass->awakenPollFd;
+            pollFd.events = POLLIN;
+            pollFd.revents = 0;
+            pollfds.push_back(pollFd);
+            size = pollfds.size();
+        }
+        poll(&pollfds[0], size, -1);
+        for (const auto &pollfdsing : pollfds) {
+            if (pollfdsing.revents &
+                (POLLNVAL | POLLRDHUP | POLLHUP | POLLERR)) { // POLLNVAL:fd not open
+                auto it = thisClass->pollNodeMap.find(pollfdsing.fd);
+                if (it != thisClass->pollNodeMap.end()) {
+                    uint32_t targetPID = it->second.ppid;
+                    HCtxJdwp ctx =
+                        (HCtxJdwp)(thisClass->AdminContext(OP_QUERY, targetPID, nullptr));
+                    if (ctx != nullptr) {
+                        WRITE_LOG(LOG_INFO, "FreeContext for targetPID :%d", targetPID);
+                        uv_read_stop((uv_stream_t *)&ctx->pipe);
+                        thisClass->FreeContext(ctx);
+                    }
+                }
+                thisClass->pollNodeMap.erase(it);
+            } else if (pollfdsing.revents & POLLIN) {
+                if (pollfdsing.fd == thisClass->awakenPollFd) {
+                    thisClass->DrainAwakenPollThread();
+                }
+            }
+        }
+    }
+    return nullptr;
+}
+
+int HdcJdwp::CreateFdEventPoll()
+{
+    pthread_t tid;
+    if (awakenPollFd >= 0) {
+        close(awakenPollFd);
+        awakenPollFd = -1;
+    }
+    awakenPollFd = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK);
+    if (awakenPollFd < 0) {
+        WRITE_LOG(LOG_FATAL, "CreateFdEventPoll : Failed to create awakenPollFd");
+        return ERR_GENERIC;
+    }
+    int tret = pthread_create(&tid, nullptr, FdEventPollThread, this);
+    if (tret != 0) {
+        WRITE_LOG(LOG_INFO, "FdEventPollThread create fail.");
+        return tret;
+    }
+    return RET_SUCCESS;
+}
+
 // jdb -connect com.sun.jdi.SocketAttach:hostname=localhost,port=8000
 int HdcJdwp::Initial()
 {
+    pollNodeMap.clear();
     if (!JdwpListen()) {
         return ERR_MODULE_JDWP_FAILED;
     }
+    if (CreateFdEventPoll() < 0) {
+        return ERR_MODULE_JDWP_FAILED;
+    }
+    stop = false;
     return RET_SUCCESS;
 }
 }

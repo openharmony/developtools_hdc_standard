@@ -155,7 +155,7 @@ bool HdcFile::SlaveCheck(uint8_t *payload, const int payloadSize)
     // begin work
     ++refCount;
     uv_fs_open(loopTask, &ctxNow.fsOpenReq, ctxNow.localPath.c_str(), UV_FS_O_TRUNC | UV_FS_O_CREAT | UV_FS_O_WRONLY,
-               S_IWUSR | S_IRUSR, OnFileOpen);
+               S_IWUSR | S_IRUSR | S_IRGRP | S_IROTH, OnFileOpen);
     ctxNow.transferBegin = Base::GetRuntimeMSec();
     return ret;
 }

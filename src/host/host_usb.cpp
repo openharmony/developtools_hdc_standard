@@ -163,7 +163,7 @@ void HdcHostUSB::ReviewUsbNodeLater(string &nodeKey)
     HdcServer *hdcServer = (HdcServer *)clsMainBase;
     // add to ignore list
     mapIgnoreDevice[nodeKey] = HOST_USB_IGNORE;
-    int delayRemoveFromList = DEVICE_CHECK_INTERVAL * 5;  // wait little time for daemon reinit
+    int delayRemoveFromList = DEVICE_CHECK_INTERVAL * MINOR_TIMEOUT;  // wait little time for daemon reinit
     Base::DelayDo(&hdcServer->loopMain, delayRemoveFromList, 0, nodeKey, nullptr,
                   [this](const uint8_t flag, string &msg, const void *) -> void { RemoveIgnoreDevice(msg); });
 }
