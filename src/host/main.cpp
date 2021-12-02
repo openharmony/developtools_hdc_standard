@@ -66,6 +66,7 @@ int IsRegisterCommand(string &outCommand, const char *cmd, const char *cmdnext)
     registerCommand.push_back(CMDSTR_APP_SIDELOAD);
     registerCommand.push_back(CMDSTR_TARGET_REBOOT);
     registerCommand.push_back(CMDSTR_LIST_JDWP);
+    registerCommand.push_back(CMDSTR_TRACK_JDWP);
 
     for (string v : registerCommand) {
         if (doubleCommand == v) {

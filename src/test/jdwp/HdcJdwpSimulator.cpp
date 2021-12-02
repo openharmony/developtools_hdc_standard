@@ -17,13 +17,11 @@
 using namespace OHOS;
 using namespace OHOS::HiviewDFX;
 static constexpr HiLogLabel LABEL = {LOG_CORE, 0, "JDWP_TEST"};
-static constexpr uint8_t JS_PKG_BASE_SIZE =
-    15 + sizeof(uint32_t) * 2 + 1; // len:uint32_t+1:\n+{"pid":uint32_t,"pkg":}
-
-HdcJdwpSimulator::HdcJdwpSimulator(uv_loop_t *loopIn)
+HdcJdwpSimulator::HdcJdwpSimulator(uv_loop_t *loopIn, string pkg)
 {
-    mLoop = loopIn;
+    loop = loopIn;
     exit = false;
+    pkgName = pkg;
 }
 
 HdcJdwpSimulator::~HdcJdwpSimulator() {}
@@ -149,7 +147,7 @@ void HdcJdwpSimulator::ReceiveNewFd(uv_stream_t *q, ssize_t nread, const uv_buf_
     if (pending != UV_TCP) {
         HiLog::Debug(LABEL, "None TCP type: %{public}d", pending);
     }
-    uv_tcp_init(thisClass->mLoop, &ctxJdwp->newFd);
+    uv_tcp_init(thisClass->loop, &ctxJdwp->newFd);
     if (uv_accept(q, (uv_stream_t *)&ctxJdwp->newFd) == 0) {
         uv_os_fd_t fd;
         ctxJdwp->hasNewFd = true;
@@ -167,42 +165,42 @@ void HdcJdwpSimulator::ConnectJdwp(uv_connect_t *connection, int status)
 {
     HiLog::Debug(LABEL, "ConnectJdwp:%{public}d error:%{public}s", status, uv_err_name(status));
     uint32_t pid_curr = static_cast<uint32_t>(getpid());
+    HCtxJdwpSimulator ctxJdwp = (HCtxJdwpSimulator)connection->data;
+    HdcJdwpSimulator *thisClass = static_cast<HdcJdwpSimulator *>(ctxJdwp->thisClass);
 #ifdef JS_JDWP_CONNECT
-    string pkgName = "JDWP_TEST";
-    // len +1 + size of data
-    uint32_t pkgSize = pkgName.size() +
-                       JS_PKG_BASE_SIZE; // "{"pid":uint32_t,"pkg:"uint8_t[JS_PKG_MAME_MAX_SIZE]}";
+    string pkgName = thisClass->pkgName;
+    uint32_t pkgSize = pkgName.size() + sizeof(JsMsgHeader); // JsMsgHeader pkgName;
     uint8_t *info = new uint8_t[pkgSize]();
     if (!info) {
         HiLog::Error(LABEL, "ConnectJdwp new info fail.");
         return;
     }
     std::memset(info, 0, pkgSize);
-    JsMsg *jsMsg = (JsMsg *)info;
+    JsMsgHeader *jsMsg = (JsMsgHeader *)info;
     jsMsg->pid = pid_curr;
-    jsMsg->pkgName = pkgName;
     jsMsg->msgLen = pkgSize;
-    HiLog::Info(LABEL,
-                "ConnectJdwp send pid:%{public}d, pkgName:%{public}s, len:%{public}d, "
-                "pkgSize.:%{public}d",
-                jsMsg->pid, jsMsg->pkgName.c_str(), jsMsg->msgLen, pkgSize);
+    HiLog::Info(LABEL, "ConnectJdwp send pid:%{public}d, pkgName:%{public}s, msgLen:%{public}d,",
+                jsMsg->pid, pkgName.c_str(), jsMsg->msgLen);
+    bool retFail = false;
+    if (memcpy_s(info + sizeof(JsMsgHeader), pkgName.size(), &pkgName[0], pkgName.size()) != 0) {
+        HiLog::Error(LABEL, "ConnectJdwp memcpy_s fail :%{public}s.", pkgName.c_str());
+        retFail = true;
+    }
+    if (!retFail) {
+        HiLog::Info(LABEL, "ConnectJdwp send JS msg:%{public}s", info);
+        thisClass->SendToStream((uv_stream_t *)connection->handle, (uint8_t *)info, pkgSize,
+                                (void *)FinishWriteCallback);
+    }
+    if (info) {
+        delete[] info;
+        info = nullptr;
+    }
 #else
     char pid[5] = {0};
     if (sprintf_s(pid, sizeof(pid), "%d", pid_curr) < 0) {
         HiLog::Info(LABEL, "ConnectJdwp trans pid fail :%{public}d.", pid_curr);
         return;
     }
-#endif // JS_JDWP_CONNECT
-    HCtxJdwpSimulator ctxJdwp = (HCtxJdwpSimulator)connection->data;
-    HdcJdwpSimulator *thisClass = static_cast<HdcJdwpSimulator *>(ctxJdwp->thisClass);
-#ifdef JS_JDWP_CONNECT
-    HiLog::Info(LABEL, "ConnectJdwp send JS msg:%{public}s", info);
-    thisClass->SendToStream((uv_stream_t *)connection->handle, (uint8_t *)info, pkgSize,
-                            (void *)FinishWriteCallback);
-    if (info) {
-        delete[] info;
-    }
-#else
     HiLog::Info(LABEL, "ConnectJdwp send pid:%{public}s", pid);
     thisClass->SendToStream((uv_stream_t *)connection->handle, (uint8_t *)pid, sizeof(pid_curr),
                             (void *)FinishWriteCallback);
@@ -226,18 +224,18 @@ void *HdcJdwpSimulator::MallocContext()
 void HdcJdwpSimulator::FreeContext()
 {
     HiLog::Debug(LABEL, "HdcJdwpSimulator::FreeContext start");
-    if (!mCtxPoint) {
+    if (!ctxPoint) {
         return;
     }
 
-    if (mLoop && !uv_is_closing((uv_handle_t *)&mCtxPoint->pipe)) {
-        uv_close((uv_handle_t *)&mCtxPoint->pipe, nullptr);
+    if (loop && !uv_is_closing((uv_handle_t *)&ctxPoint->pipe)) {
+        uv_close((uv_handle_t *)&ctxPoint->pipe, nullptr);
     }
-    if (mCtxPoint->hasNewFd && mLoop && !uv_is_closing((uv_handle_t *)&mCtxPoint->newFd)) {
-        uv_close((uv_handle_t *)&mCtxPoint->newFd, nullptr);
+    if (ctxPoint->hasNewFd && loop && !uv_is_closing((uv_handle_t *)&ctxPoint->newFd)) {
+        uv_close((uv_handle_t *)&ctxPoint->newFd, nullptr);
     }
-    delete mCtxPoint;
-    mCtxPoint = nullptr;
+    delete ctxPoint;
+    ctxPoint = nullptr;
     HiLog::Debug(LABEL, "HdcJdwpSimulator::FreeContext end");
 }
 
@@ -245,15 +243,15 @@ bool HdcJdwpSimulator::Connect()
 {
     string jdwpCtrlName = "\0jdwp-control";
     uv_connect_t *connect = new uv_connect_t();
-    mCtxPoint = (HCtxJdwpSimulator)MallocContext();
-    if (!mCtxPoint) {
+    ctxPoint = (HCtxJdwpSimulator)MallocContext();
+    if (!ctxPoint) {
         HiLog::Info(LABEL, "MallocContext failed");
         return false;
     }
-    connect->data = mCtxPoint;
-    uv_pipe_init(mLoop, (uv_pipe_t *)&mCtxPoint->pipe, 1);
+    connect->data = ctxPoint;
+    uv_pipe_init(loop, (uv_pipe_t *)&ctxPoint->pipe, 1);
     HiLog::Info(LABEL, " HdcJdwpSimulator Connect begin");
-    uv_pipe_connect(connect, &mCtxPoint->pipe, jdwpCtrlName.c_str(), ConnectJdwp);
+    uv_pipe_connect(connect, &ctxPoint->pipe, jdwpCtrlName.c_str(), ConnectJdwp);
     return true;
 }
 

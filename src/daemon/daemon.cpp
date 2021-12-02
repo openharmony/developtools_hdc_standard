@@ -106,7 +106,8 @@ bool HdcDaemon::RedirectToTask(HTaskInfo hTaskInfo, HSession hSession, const uin
         case CMD_UNITY_ROOTRUN:
         case CMD_UNITY_TERMINATE:
         case CMD_UNITY_BUGREPORT_INIT:
-        case CMD_UNITY_JPID:
+        case CMD_JDWP_LIST:
+        case CMD_JDWP_TRACK:
             ret = TaskCommandDispatch<HdcDaemonUnity>(hTaskInfo, TYPE_UNITY, command, payload, payloadSize);
             break;
         case CMD_SHELL_INIT:
