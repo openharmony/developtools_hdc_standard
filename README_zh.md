@@ -1,17 +1,15 @@
 # HDC-OpenHarmony设备连接器<a name="ZH-CN_TOPIC_0000001149090043"></a>
 
--   [简介](#section662115419449)
--   [架构](#section15908143623714)
--   [目录](#section161941989596)
-    -   [pc端编译说明](#section129654513262)
-    -   [pc端获取说明](#section129654513263)
-        -    [1.下载sdk获取(建议)](#section161941989591)
-        -    [2.自行编译](#section161941989592)
-        -    [3.支持运行环境](#section161941989593)
-    -   [命令帮助](#section129654513264)
-
--   [使用问题自查说明](#section1371113476307)
--   [FAQ](#section1371113476308)
+- [HDC-OpenHarmony设备连接器<a name="ZH-CN_TOPIC_0000001149090043"></a>](#)
+  - [简介<a name="section662115419449"></a>](#简介)
+  - [架构<a name="section15908143623714"></a>](#架构)
+  - [目录<a name="section161941989596"></a>](#目录)
+    - [pc端编译说明<a name="section129654513262"></a>](#pc端编译说明)
+    - [pc端获取说明<a name="section129654513263"></a>](#pc端获取说明)
+    - [Linux端USB设备权限说明<a name="section129654513264"></a>](#linux端usb设备权限说明)
+    - [命令帮助<a name="section129654513265"></a>](#命令帮助)
+  - [使用问题自查说明<a name="section1371113476307"></a>](#使用问题自查说明)
+  - [FAQ<a name="section1371113476308"></a>](#faq)
 
 ## 简介<a name="section662115419449"></a>
 
@@ -36,8 +34,7 @@ hdc主要有三部分组成：
 │       ├── common    # 设备端和host端公用的代码目录
 │       ├── daemon    # 设备端的代码目录 
 │       ├── host      # host端的代码目录
-│       ├── test      # 测试用例的代码目录 
-│   └── prebuilt      # 预编译目录，存放预编译的二进制文件
+│       └── test      # 测试用例的代码目录  
 ```
 
 ### pc端编译说明<a name="section129654513262"></a>
@@ -45,15 +42,11 @@ hdc主要有三部分组成：
 
 hdc pc端可执行文件编译步骤：
 
-1. 工程准备：更新下载整个工程，使得工程包含https://gitee.com/openharmony/build/pulls/89 等必要的提交。
+1. 编译命令：编译sdk命令 请参考https://gitee.com/openharmony/build/blob/master/README_zh.md 仓编译sdk说明， 执行其指定的sdk编译命令来编译整个sdk， hdc会被编译打包到里面。
 
-2. 编译命令：编译sdk命令 请参考https://gitee.com/openharmony/build/blob/master/README_zh.md 仓编译sdk说明， 执行其指定的sdk编译命令来编译整个sdk， hdc会被编译打包到里面。
-
-3. 编译：在目标开发机上运行上面调整好的sdk编译命令， 正常编译hdc_std会输出到sdk平台相关目录下； 注意： ubuntu环境下只能编译windows/linux版本工具，mac版需要在macos开发机上编译。
-
+2. 编译：在目标开发机上运行上面调整好的sdk编译命令， 正常编译hdc_std会输出到sdk平台相关目录下； 注意： ubuntu环境下只能编译windows/linux版本工具，mac版需要在macos开发机上编译。
 
 ### pc端获取说明<a name="section129654513263"></a>
-
 
 [1.下载sdk获取(建议)](#section161941989591)
 ```
@@ -67,10 +60,40 @@ hdc pc端可执行文件编译步骤：
 
 [3.支持运行环境](#section161941989593)
 
-linux版本建议ubuntu 16.04以上 64位，其他相近版本也可；libc++.so引用错误请使用ldd/readelf等命令检查库引用 windows版本建议windows10 64位，如果低版本windows winusb库缺失，请使用zadig更新库。
+linux版本建议ubuntu 18.04以上 64位，其他相近版本也可；libc++.so引用错误请使用ldd/readelf等命令检查库引用 windows版本建议windows10 64位，如果低版本windows winusb库缺失，请使用zadig更新库。
 
 
-### 命令帮助<a name="section129654513264"></a>
+### Linux端USB设备权限说明<a name="section129654513264"></a>
+
+
+在Linux下在非root权限下使用hdc会出现无法找到设备的情况，此问题原因为用户USB操作权限问题，解决方法如下：
+
+1. 开启非root用户USB设备操作权限
+   该操作方法简单易行，但是可能存在潜在安全问题，请根据使用场景自行评估
+   ```
+   sudo chmod -R 777 /dev/bus/usb/
+   ```
+2. 永久修改 USB 设备权限
+   1）使用lsusb命令找出USB设备的vendorID和productID
+   2）创建一个新的udev规则
+   
+   编辑UDEV加载规则，用设备的"idVendor"和"idProduct"来替换默认值。MODE="0666"表示USB设备的权限
+   GROUP代表用户组，要确保此时登录的系统用户在该用户组中
+   可用 "usermod -a -G username groupname" 将用户添加到用户组中
+   ```
+   sudo vim /etc/udev/rules.d/90-myusb.rules
+   SUBSYSTEMS=="usb", ATTRS{idVendor}=="067b", ATTRS{idProduct}=="2303", GROUP="users", MODE="0666"
+      ```
+   重启电脑或重新加载 udev 规则
+   ```
+   sudo udevadm control --reload
+   ```
+3. su 切换到root用户下运行测试程序
+   ```
+   sudo hdc_std list targets
+   ```
+
+### 命令帮助<a name="section129654513265"></a>
 
 hdc当前常用命令如下，未尽命令使用hdc -h或者hdc --help查看：
 
@@ -108,7 +131,7 @@ hdc当前常用命令如下，未尽命令使用hdc -h或者hdc --help查看：
 </tr>
 <tr id="row139301957122519"><td class="cellrowborder" valign="top" width="50%" headers="mcps1.2.3.1.1 "><p id="p8424164318423"><a name="p8424164318423"></a><a name="p8424164318423"></a>target mount</p>
 </td>
-<td class="cellrowborder" valign="top" width="50%" headers="mcps1.2.3.1.2 "><p id="p13424154324215"><a name="p13424154324215"></a><a name="p13424154324215"></a><span>以读写模式挂载/system等分区</span></p>
+<td class="cellrowborder" valign="top" width="50%" headers="mcps1.2.3.1.2 "><p id="p13424154324215"><a name="p13424154324215"></a><a name="p13424154324215"></a><span>以读写模式挂载/vendor、/data等分区，因为安全性问题，需要挂在根目录或者/system分区</br>请单独使用'hdc_std shell mount -o rw,remount /'等命令</span></p>
 <p id="p23801376351"><a name="p23801376351"></a><a name="p23801376351"></a>举例： hdc target mount</p>
 </td>
 </tr>
@@ -133,6 +156,7 @@ hdc当前常用命令如下，未尽命令使用hdc -h或者hdc --help查看：
 <tr id="row1493015702512"><td class="cellrowborder" valign="top" width="50%" headers="mcps1.2.3.1.1 "><p id="p1542610433424"><a name="p1542610433424"></a><a name="p1542610433424"></a>tconn <em id="i82358142025"><a name="i82358142025"></a><a name="i82358142025"></a>host</em>[:<em id="i860817161021"><a name="i860817161021"></a><a name="i860817161021"></a>port</em>][-remove]</p>
 </td>
 <td class="cellrowborder" valign="top" width="50%" headers="mcps1.2.3.1.2 "><p id="p17426174384210"><a name="p17426174384210"></a><a name="p17426174384210"></a>通过【ip地址：端口号】来指定连接的设备</p>
+<p id="p15653482487"><a name="p15653482487"></a><a name="p15653482487"></a>使用TCP模式连接设备，需在USB模式工作下使用tmode tcp切换至TCP工作模式，或者在<br>系统属性值中设置persist.hdc.mode属性值为tcp，如果需要监听固定TCP端口需要再设置<br>persist.hdc.port的端口号，反之则TCP监听端口随机</p>
 <p id="p15653482488"><a name="p15653482488"></a><a name="p15653482488"></a>举例： hdc tconn 192.168.0.100:10178</p>
 </td>
 </tr>
@@ -222,10 +246,10 @@ hdc当前常用命令如下，未尽命令使用hdc -h或者hdc --help查看：
     hdc shell
     ```
 
--   网络连接。
+-   TCP网络连接。
 
     ```
-    hdc tconn 192.168.0.100:8710
+    hdc tconn 192.168.0.100:10178
     ```
 
 
@@ -240,14 +264,29 @@ hdc当前常用命令如下，未尽命令使用hdc -h或者hdc --help查看：
   - step2a： 设备管理器设备异常或无设备， 请结合板测试设备端串口下确认下usb部分设备枚举上报是否异常；
   - step2b： 设备管理器设备正常时， 1）list targets 是否正常；2）hdc_std kill 后重试是否正常；
 
-**注意：客户端和设备端版本保持一致(-v参数查看版本)!**
-
-**注意：客户端和设备端版本保持一致(-v参数查看版本)!**
-
-**注意：客户端和设备端版本保持一致(-v参数查看版本)!**
+**注意：客户端和设备端版本保持一致(hdc_std -v,hdcd -v参数查看版本)!**
 
 ## FAQ<a name="section1371113476308"></a>
-1. list targets无设备：
-请参考上面《使用问题自查说明》小节， 1）检查设备是否连接正常；2）host端设备管理器设备信息是否正常；3）两端工具版本是否一致；4）设备端hdcd是否启动正常；
-2. 同样版本windows下正常，linux下无设备：同问题1同样排查步骤，另外注意在root权限下执行；
-3. windows版本工具无法执行报错：1）确认git lfs正常并使用git clone下载本工具仓预制二进制文件；2）检查文件大小和版本； 3）**友情提示**：本工具是控制台命令行下执行即可，不需要安装，不要尝试双击运行；
+-   1. list targets无设备：
+
+    ```
+    请参考上面《使用问题自查说明》小节 1）检查设备是否连接正常；2）host端设备管理器设备信息是否正常；3）两端工具版本是否一致；4）设备端hdcd是否启动正常；
+    ```
+-   2. 同样版本windows下正常，linux下无设备：
+
+    ```
+    同问题1同样排查步骤，另外注意在root权限下执行；
+    如果server进程起不来，请先sudo rm /tmp/*.pid 然后再使用sudo 执行list targets看看是否正常显示设备列表
+    ```
+-   3. windows版本工具无法执行报错：
+
+    ```
+    1）从dailybuild或正式发布的sdk压缩包，重新解压提取工具；2）检查文件大小和版本、校验哈希值； 3）本工具是控制台命令行下执行即可，适配平台下无任何组件和驱动依赖，不需要安装，不要尝试双击运行；
+    ```
+-   4. system分区推文件报错 [Fail]Error opening file: read-only file system：
+
+    ```
+    推送文件前参考执行如下命令:
+    hdc_std smode
+    hdc_std shell mount -o rw,remount /
+    ```

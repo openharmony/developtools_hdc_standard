@@ -1196,7 +1196,9 @@ namespace Base {
     void RemoveLogFile()
     {
         string path = GetTmpDir() + LOG_FILE_NAME;
-        unlink(path.c_str());
+        string newPath = GetTmpDir() + LOG_BAK_NAME;
+        unlink(newPath.c_str());
+        rename(path.c_str(), newPath.c_str());
     }
 
     bool IsRoot()
