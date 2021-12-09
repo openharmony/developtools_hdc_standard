@@ -59,7 +59,7 @@ private:
     uv_idle_t checkServerStop;
     uv_idle_t checkDaemonStop;
     Hdc::HdcServer *server;
-    Hdc::HdcDaemon *daemon;
+    void *daemon;  // Hdc::HdcDaemon *
     uint8_t waitServerDaemonReadyCount = 0;
     bool bConnectToDaemon = false;
 };

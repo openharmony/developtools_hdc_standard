@@ -45,7 +45,7 @@ namespace Base {
     {
         string tmpString = GetFileNameAny(debugInfo);
         debugInfo = StringFormat("%s:%d", tmpString.c_str(), line);
-        if (g_logLevel < LOG_FULL) {
+        if (g_logLevel < LOG_ALL) {
             debugInfo = "";
             threadIdString = "";
         } else {
@@ -97,11 +97,11 @@ namespace Base {
                 case LOG_WARN:
                     logLevelString = "\033[1;33mW\033[0m";
                     break;
-                case LOG_DEBUG:
+                case LOG_DEBUG:  // will reduce performance
                     logLevelString = "\033[1;36mD\033[0m";
                     break;
-                default:
-                    logLevelString = "\033[1;36mD\033[0m";
+                default:  // all, just more IO/Memory informations
+                    logLevelString = "\033[1;38;5;21mA\033[0m";
                     break;
             }
         } else {
@@ -221,6 +221,9 @@ namespace Base {
     // As an uv_write_cb it must keep the same as prototype
     void SendCallback(uv_write_t *req, int status)
     {
+        if (status < 0) {
+            WRITE_LOG(LOG_WARN, "SendCallback failed,status:%d", status);
+        }
         delete[]((uint8_t *)req->data);
         delete req;
     }
@@ -294,9 +297,11 @@ namespace Base {
         }
         uint8_t *pDynBuf = new uint8_t[bufLen];
         if (!pDynBuf) {
+            WRITE_LOG(LOG_WARN, "SendToStream, alloc failed, size:%d", bufLen);
             return ERR_BUF_ALLOC;
         }
         if (memcpy_s(pDynBuf, bufLen, buf, bufLen)) {
+            WRITE_LOG(LOG_WARN, "SendToStream, memory copy failed, size:%d", bufLen);
             delete[] pDynBuf;
             return ERR_BUF_COPY;
         }
@@ -308,10 +313,11 @@ namespace Base {
     int SendToStreamEx(uv_stream_t *handleStream, const uint8_t *buf, const int bufLen, uv_stream_t *handleSend,
                        const void *finishCallback, const void *pWriteReqData)
     {
-        int ret = -1;
+        int ret = ERR_GENERIC;
         uv_write_t *reqWrite = new uv_write_t();
         if (!reqWrite) {
-            return 0;
+            WRITE_LOG(LOG_WARN, "SendToStreamEx, new write_t failed, size:%d", bufLen);
+            return ERR_BUF_ALLOC;
         }
         uv_buf_t bfr;
         while (true) {
@@ -319,15 +325,22 @@ namespace Base {
             bfr.base = (char *)buf;
             bfr.len = bufLen;
             if (!uv_is_writable(handleStream)) {
+                WRITE_LOG(LOG_WARN, "SendToStreamEx, uv_is_writable false, size:%d", bufLen);
                 delete reqWrite;
                 break;
             }
             // handleSend must be a TCP socket or pipe, which is a server or a connection (listening or
             // connected state). Bound sockets or pipes will be assumed to be servers.
             if (handleSend) {
-                uv_write2(reqWrite, handleStream, &bfr, 1, handleSend, (uv_write_cb)finishCallback);
+                ret = uv_write2(reqWrite, handleStream, &bfr, 1, handleSend, (uv_write_cb)finishCallback);
             } else {
-                uv_write(reqWrite, handleStream, &bfr, 1, (uv_write_cb)finishCallback);
+                ret = uv_write(reqWrite, handleStream, &bfr, 1, (uv_write_cb)finishCallback);
+            }
+            if (ret < 0) {
+                WRITE_LOG(LOG_WARN, "SendToStreamEx, uv_write false, size:%d", bufLen);
+                delete reqWrite;
+                ret = ERR_IO_FAIL;
+                break;
             }
             ret = bufLen;
             break;

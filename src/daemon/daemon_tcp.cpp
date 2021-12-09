@@ -99,14 +99,13 @@ void HdcDaemonTCP::RecvUDPEntry(const sockaddr *addrSrc, uv_udp_t *handle, const
 void HdcDaemonTCP::SetUDPListen()
 {
     struct sockaddr_in addr;
-    int r;
     HdcSessionBase *ptrConnect = (HdcSessionBase *)clsMainBase;
     // udp broadcast
     servUDP.data = this;
-    r = uv_udp_init(&ptrConnect->loopMain, &servUDP);
-    r = uv_ip4_addr("0.0.0.0", DEFAULT_PORT, &addr);
-    r = uv_udp_bind(&servUDP, (const struct sockaddr *)&addr, UV_UDP_REUSEADDR);
-    r = uv_udp_recv_start(&servUDP, AllocStreamUDP, RecvUDP);
+    uv_udp_init(&ptrConnect->loopMain, &servUDP);
+    uv_ip4_addr("0.0.0.0", DEFAULT_PORT, &addr);
+    uv_udp_bind(&servUDP, (const struct sockaddr *)&addr, UV_UDP_REUSEADDR);
+    uv_udp_recv_start(&servUDP, AllocStreamUDP, RecvUDP);
 }
 
 // Set the daemon-side TCP listening

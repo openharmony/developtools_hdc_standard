@@ -22,6 +22,8 @@
 #include "../common/forward.h"
 #include "../common/async_cmd.h"
 #include "../common/serial_struct.h"
+
+#ifndef HDC_HOST //daemon used
 #include "jdwp.h"
 #include "daemon.h"
 #include "daemon_unity.h"
@@ -30,7 +32,7 @@
 #include "daemon_usb.h"
 #include "daemon_forward.h"
 #include "shell.h"
-
+#endif
 // clang-format on
 
 namespace Hdc {
