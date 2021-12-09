@@ -216,6 +216,7 @@ void HdcTransferBase::OnFileIO(uv_fs_t *req)
     if (tryFinishIO) {
         // close-step1
         ++thisClass->refCount;
+        uv_fs_fsync(thisClass->loopTask, &context->fsCloseReq, context->fsOpenReq.result, nullptr);
         uv_fs_close(thisClass->loopTask, &context->fsCloseReq, context->fsOpenReq.result, OnFileClose);
     }
 }
