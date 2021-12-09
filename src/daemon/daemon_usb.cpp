@@ -389,6 +389,9 @@ void HdcDaemonUSB::OnUSBRead(uv_fs_t *req)
     bool ret = false;
     int childRet = 0;
     --thisClass->ref;
+    if (thisClass->toReadUsbDataSize > hUSB->wMaxPacketSizeSend && bytesIOBytes != thisClass->toReadUsbDataSize) {
+        WRITE_LOG(LOG_WARN, "Not read all data, indexsay:%d really:%d", thisClass->toReadUsbDataSize, bytesIOBytes);
+    }
     while (thisClass->isAlive) {
         // Don't care is module running, first deal with this
         if (bytesIOBytes < 0) {
@@ -421,6 +424,7 @@ void HdcDaemonUSB::OnUSBRead(uv_fs_t *req)
             }
         }
         int nextReadSize = childRet == 0 ? hUSB->wMaxPacketSizeSend : std::min(childRet, Base::GetUsbffsBulkSize());
+        thisClass->toReadUsbDataSize = nextReadSize;
         if (thisClass->LoopUSBRead(hUSB, nextReadSize) < 0) {
             WRITE_LOG(LOG_FATAL, "LoopUSBRead failed");
             break;

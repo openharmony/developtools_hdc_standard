@@ -743,13 +743,17 @@ int HdcSessionBase::FetchIOBuf(HSession hSession, uint8_t *ioBuf, int read)
         return ERR_IO_FAIL;
     }
     hSession->availTailIndex += read;
+    WRITE_LOG(LOG_ALL, "FetchIOBuf begin, IOSize:%d availTailIndex:%d", read, hSession->availTailIndex);
     while (!hSession->isDead && hSession->availTailIndex > static_cast<int>(sizeof(PayloadHead))) {
         childRet = ptrConnect->OnRead(hSession, ioBuf + indexBuf, hSession->availTailIndex);
         if (childRet > 0) {
             hSession->availTailIndex -= childRet;
             indexBuf += childRet;
+            WRITE_LOG(LOG_ALL, "FetchIOBuf loop read indexBuf:%d availTailIndex:%d", indexBuf,
+                      hSession->availTailIndex);
         } else if (childRet == 0) {
             // Not enough a IO
+            WRITE_LOG(LOG_ALL, "FetchIOBuf loop read not enough, availTailIndex:%d", hSession->availTailIndex);
             break;
         } else {
             // <0
@@ -760,19 +764,25 @@ int HdcSessionBase::FetchIOBuf(HSession hSession, uint8_t *ioBuf, int read)
         // It may be multi-time IO to merge in a BUF, need to loop processing
     }
     if (indexBuf > 0 && hSession->availTailIndex > 0) {
-        memmove_s(hSession->ioBuf, hSession->bufSize, hSession->ioBuf + indexBuf, hSession->availTailIndex);
+        if (memmove_s(hSession->ioBuf, hSession->bufSize, hSession->ioBuf + indexBuf, hSession->availTailIndex)
+            != EOK) {
+            return ERR_BUF_COPY;
+        };
         uint8_t *bufToZero = (uint8_t *)(hSession->ioBuf + hSession->availTailIndex);
         Base::ZeroBuf(bufToZero, hSession->bufSize - hSession->availTailIndex);
     }
+    WRITE_LOG(LOG_ALL, "FetchIOBuf Finish, IOSize:%d availTailIndex:%d", read, hSession->availTailIndex);
     return indexBuf;
 }
 
 void HdcSessionBase::AllocCallback(uv_handle_t *handle, size_t sizeWanted, uv_buf_t *buf)
 {
     HSession context = (HSession)handle->data;
-    Base::ReallocBuf(&context->ioBuf, &context->bufSize, Base::GetMaxBufSize() * 4);
+    Base::ReallocBuf(&context->ioBuf, &context->bufSize, Base::GetMaxBufSize() * 10);
     buf->base = (char *)context->ioBuf + context->availTailIndex;
-    buf->len = context->bufSize - context->availTailIndex;
+    int size = context->bufSize - context->availTailIndex;
+    buf->len = std::min(size, (int)sizeWanted);
+    WRITE_LOG(LOG_ALL, "Session/Channel buffer given, size:%d addr:%p", buf->len, buf->base);
 }
 
 void HdcSessionBase::FinishWriteSessionTCP(uv_write_t *req, int status)
@@ -1041,7 +1051,7 @@ void HdcSessionBase::LogMsg(const uint32_t sessionId, const uint32_t channelId,
 bool HdcSessionBase::DispatchTaskData(HSession hSession, const uint32_t channelId, const uint16_t command,
                                       uint8_t *payload, int payloadSize)
 {
-    bool ret = false;
+    bool ret = true;
     while (true) {
         HTaskInfo hTaskInfo = AdminTask(OP_QUERY, hSession, channelId, nullptr);
         if (!hTaskInfo) {
@@ -1060,13 +1070,10 @@ bool HdcSessionBase::DispatchTaskData(HSession hSession, const uint32_t channelI
             WRITE_LOG(LOG_DEBUG, "Jump delete HTaskInfo");
             break;
         }
-        bool result = RedirectToTask(hTaskInfo, hSession, channelId, command, payload, payloadSize);
+        ret = RedirectToTask(hTaskInfo, hSession, channelId, command, payload, payloadSize);
         if (!hTaskInfo->hasInitial) {
             AdminTask(OP_ADD, hSession, channelId, hTaskInfo);
             hTaskInfo->hasInitial = true;
-        }
-        if (result) {
-            ret = true;
         }
         break;
     }

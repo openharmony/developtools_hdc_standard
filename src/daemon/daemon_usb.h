@@ -59,6 +59,7 @@ private:
     uv_mutex_t sendEP;
     bool isAlive = false;
     int controlEp = 0;  // EP0
+    int toReadUsbDataSize;
 };
 }  // namespace Hdc
 #endif

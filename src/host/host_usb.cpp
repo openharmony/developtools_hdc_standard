@@ -543,7 +543,8 @@ void HdcHostUSB::SessionUsbWorkThread(void *arg)
     HSession hSession = (HSession)arg;
     constexpr uint8_t USB_HANDLE_TIMEOUT = DEVICE_CHECK_INTERVAL / TIME_BASE;
     WRITE_LOG(LOG_DEBUG, "SessionUsbWorkThread work thread:%p", uv_thread_self());
-    while (!hSession->isDead) {
+    // run until all USB callback finish(ref == 1, I'm the only one left)
+    while (!hSession->isDead || hSession->ref > 1) {
         struct timeval zerotime;
         zerotime.tv_sec = USB_HANDLE_TIMEOUT;
         zerotime.tv_usec = 0;  // if == 0,windows will be high CPU load

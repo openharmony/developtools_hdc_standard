@@ -37,19 +37,16 @@ HdcTransferBase::~HdcTransferBase()
 
 bool HdcTransferBase::ResetCtx(CtxFile *context, bool full)
 {
-    context->fsOpenReq.data = context;
-    context->fsCloseReq.data = context;
-    context->thisClass = this;
+    if (full) {
+        *context = {};
+        context->fsOpenReq.data = context;
+        context->fsCloseReq.data = context;
+        context->thisClass = this;
+        context->loop = loopTask;
+        context->cb = OnFileIO;
+    }
     context->closeNotify = false;
     context->indexIO = 0;
-    context->loop = loopTask;
-    context->cb = OnFileIO;
-    if (full) {
-        context->localPath = "";
-        context->remotePath = "";
-        context->transferBegin = 0;
-        context->taskQueue.clear();
-    }
     return true;
 }
 
