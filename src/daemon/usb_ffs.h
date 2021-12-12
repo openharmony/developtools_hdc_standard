@@ -173,7 +173,7 @@ static struct UsbFunctionDesc config2 = {
     },
 };
 
-static const struct {
+struct usb_functionfs_desc_v2 {
     struct usb_functionfs_descs_head_v2 head;
     __le32 config1Count;
     __le32 config2Count;
@@ -183,36 +183,7 @@ static const struct {
     struct UsbFuncConfig config3Desc;
     struct usb_os_desc_header wosHead;
     struct usb_ext_compat_desc wosDesc;
-} __attribute__((packed)) USB_FFS_DESC = {
-    .head =
-    {
-        .magic = LONG_LE(FUNCTIONFS_DESCRIPTORS_MAGIC_V2),
-        .length = LONG_LE(sizeof(USB_FFS_DESC)),
-        .flags = FUNCTIONFS_HAS_FS_DESC | FUNCTIONFS_HAS_HS_DESC |
-                                 FUNCTIONFS_HAS_SS_DESC | FUNCTIONFS_HAS_MS_OS_DESC
-    },
-    .config1Count = 3,
-    .config2Count = 3,
-    .config3Count = 5,
-    .configWosCount = 1,
-    .config1Desc = config1,
-    .config2Desc = config2,
-    .config3Desc = config3,
-    .wosHead = {
-        .interface = 1,
-        .dwLength = LONG_LE(sizeof(USB_FFS_DESC.wosHead) + sizeof(USB_FFS_DESC.wosDesc)),
-        .bcdVersion = SHORT_LE(1),
-        .wIndex = SHORT_LE(4),
-        .bCount = 1,
-        .Reserved = 0,
-    },
-    .wosDesc = {
-        .bFirstInterfaceNumber = 0,
-        .Reserved1 = 1,
-        .CompatibleID = { 'W', 'I', 'N', 'U', 'S', 'B', '\0', '\0'},
-        .SubCompatibleID = {0},
-        .Reserved2 = {0},
-    }
-};
+} __attribute__((packed));
+
 }  // namespace Hdc
 #endif

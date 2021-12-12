@@ -23,11 +23,6 @@
 #include <random>
 #include <sstream>
 #include <thread>
-#ifdef __MUSL__
-extern "C" {
-#include "parameter.h"
-}
-#endif
 using namespace std::chrono;
 
 namespace Hdc {
@@ -535,42 +530,6 @@ namespace Base {
         }
         pclose(pipeHandle);
         return bytesRead;
-    }
-
-    bool SetHdcProperty(const char *key, const char *value)
-    {
-#ifndef __MUSL__
-#ifdef HDC_PCDEBUG
-        WRITE_LOG(LOG_DEBUG, "Setproperty, key:%s value:%s", key, value);
-#else
-        string sKey = key;
-        string sValue = value;
-        string sBuf = "setprop " + sKey + " " + value;
-        system(sBuf.c_str());
-#endif
-#else
-        SetParameter(key, value);
-#endif
-        return true;
-    }
-
-    bool GetHdcProperty(const char *key, char *value, uint16_t sizeOutBuf)
-    {
-#ifndef __MUSL__
-#ifdef HDC_PCDEBUG
-        WRITE_LOG(LOG_DEBUG, "Getproperty, key:%s value:%s", key, value);
-#else
-        string sKey = key;
-        string sBuf = "getprop " + sKey;
-        RunPipeComand(sBuf.c_str(), value, sizeOutBuf, true);
-#endif
-#else
-        string sKey = key;
-        string sBuf = "param get " + sKey;
-        RunPipeComand(sBuf.c_str(), value, sizeOutBuf, true);
-#endif
-        value[sizeOutBuf - 1] = '\0';
-        return true;
     }
 
     // bufLen == 0: alloc buffer in heap, need free it later

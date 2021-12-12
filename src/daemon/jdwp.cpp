@@ -17,6 +17,12 @@
 #include <thread>
 
 namespace Hdc {
+#ifdef JS_JDWP_CONNECT
+static constexpr uint32_t JPID_TRACK_LIST_SIZE = 1024 * 4;
+#else
+static constexpr uint32_t JPID_TRACK_LIST_SIZE = 1024;
+#endif  // JS_JDWP_CONNECT
+
 HdcJdwp::HdcJdwp(uv_loop_t *loopIn)
 {
     Base::ZeroStruct(listenPipe);
@@ -115,7 +121,7 @@ void HdcJdwp::ReadStream(uv_stream_t *pipe, ssize_t nread, const uv_buf_t *buf)
         } else {  // JS:pid PkgName
 #ifdef JS_JDWP_CONNECT
             struct JsMsgHeader *jsMsg = (struct JsMsgHeader *)p;
-            if (jsMsg->msgLen == nread) {
+            if (jsMsg->msgLen == (uint32_t)nread) {
                 pid = jsMsg->pid;
                 string pkgName = string((char *)p + sizeof(JsMsgHeader), jsMsg->msgLen - sizeof(JsMsgHeader));
                 ctxJdwp->pkgName = pkgName;

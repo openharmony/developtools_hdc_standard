@@ -49,9 +49,6 @@ namespace Base {
     void TryCloseHandle(const uv_handle_t *handle, uv_close_cb closeCallBack);
     void TryCloseHandle(const uv_handle_t *handle, bool alwaysCallback, uv_close_cb closeCallBack);
     char **SplitCommandToArgs(const char *cmdStringLine, int *slotIndex);
-    bool SetHdcProperty(const char *key, const char *value);
-    // value needs to save results which can't be const
-    bool GetHdcProperty(const char *key, char *value, uint16_t sizeOutBuf);
     bool RunPipeComand(const char *cmdString, char *outBuf, uint16_t sizeOutBuf, bool ignoreTailLF);
     // results need to save in buf which can't be const
     int ReadBinFile(const char *pathName, void **buf, const int bufLen);
