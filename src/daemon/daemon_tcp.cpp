@@ -21,7 +21,7 @@ HdcDaemonTCP::HdcDaemonTCP(const bool serverOrDaemonIn, void *ptrMainBase)
     // If the listening value for the property setting is obtained, it will be 0 randomly assigned.
     char strTCPPort[BUF_SIZE_TINY] = "";
     const uint16_t BUFF_SIZE = 8;
-    Base::GetHdcProperty("persist.hdc.port", strTCPPort, BUFF_SIZE);
+    SystemDepend::GetHdcProperty("persist.hdc.port", strTCPPort, BUFF_SIZE);
     tcpListenPort = atoi(strTCPPort);
     if (tcpListenPort <= 0) {
         tcpListenPort = 0;

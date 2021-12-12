@@ -50,6 +50,7 @@ private:
     void ResetOldSession(uint32_t sessionId);
     int GetMaxPacketSize(int fdFfs);
     int UsbToHdcProtocol(uv_stream_t *stream, uint8_t *appendData, int dataSize);
+    void FillUsbV2Head(struct usb_functionfs_desc_v2 &descUsbFfs);
 
     HdcUSB usbHandle;
     string basePath;                // usb device's base path

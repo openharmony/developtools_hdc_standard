@@ -35,7 +35,7 @@ bool ForkChildCheck(int argc, const char *argv[])
     // hdcd -b     #service start backgroundRun
     // hdcd -fork  #fork
     char modeSet[BUF_SIZE_TINY] = "";
-    Base::GetHdcProperty("persist.hdc.mode", modeSet, BUF_SIZE_TINY);
+    SystemDepend::GetHdcProperty("persist.hdc.mode", modeSet, BUF_SIZE_TINY);
     Base::PrintMessage("Background mode, persist.hdc.mode");
     string workMode = modeSet;
     workMode = Base::Trim(workMode);
@@ -135,7 +135,7 @@ bool GetDaemonCommandlineOptions(int argc, const char *argv[])
 void NeedDropPriv()
 {
     char droprootSet[BUF_SIZE_TINY] = "";
-    Base::GetHdcProperty("persist.hdc.root", droprootSet, BUF_SIZE_TINY);
+    SystemDepend::GetHdcProperty("persist.hdc.root", droprootSet, BUF_SIZE_TINY);
     droprootSet[sizeof(droprootSet) - 1] = '\0';
     string rootMode = droprootSet;
     if (Base::Trim(rootMode) == "1") {

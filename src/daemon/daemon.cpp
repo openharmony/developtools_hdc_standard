@@ -86,7 +86,7 @@ void HdcDaemon::InitMod(bool bEnableTCP, bool bEnableUSB)
 
     // enable security
     char value[4] = "0";
-    Base::GetHdcProperty("ro.hdc.secure", value, sizeof(value));
+    SystemDepend::GetHdcProperty("ro.hdc.secure", value, sizeof(value));
     string secure = value;
     enableSecure = (Base::Trim(secure) == "1");
 }

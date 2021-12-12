@@ -97,10 +97,45 @@ int HdcDaemonUSB::Initial()
     return 0;
 }
 
+// make gnuc++ happy. Clang support direct assignment value to structure, buf g++ weakness
+void HdcDaemonUSB::FillUsbV2Head(usb_functionfs_desc_v2 &descUsbFfs)
+{
+    descUsbFfs.head.magic = LONG_LE(FUNCTIONFS_DESCRIPTORS_MAGIC_V2);
+    descUsbFfs.head.length = LONG_LE(sizeof(descUsbFfs));
+    descUsbFfs.head.flags
+        = FUNCTIONFS_HAS_FS_DESC | FUNCTIONFS_HAS_HS_DESC | FUNCTIONFS_HAS_SS_DESC | FUNCTIONFS_HAS_MS_OS_DESC;
+    descUsbFfs.config1Count = 3;
+    descUsbFfs.config2Count = 3;
+    descUsbFfs.config3Count = 5;
+    descUsbFfs.configWosCount = 1;
+    descUsbFfs.config1Desc = config1;
+    descUsbFfs.config2Desc = config2;
+    descUsbFfs.config3Desc = config3;
+    descUsbFfs.wosHead.interface = 1;
+    descUsbFfs.wosHead.dwLength = LONG_LE(sizeof(descUsbFfs.wosHead) + sizeof(descUsbFfs.wosDesc));
+    descUsbFfs.wosHead.bcdVersion = SHORT_LE(1);
+    descUsbFfs.wosHead.wIndex = SHORT_LE(4);
+    descUsbFfs.wosHead.bCount = 1;
+    descUsbFfs.wosHead.Reserved = 0;
+    descUsbFfs.wosDesc.bFirstInterfaceNumber = 0;
+    descUsbFfs.wosDesc.Reserved1 = 1;
+    descUsbFfs.wosDesc.CompatibleID[0] = 'W';
+    descUsbFfs.wosDesc.CompatibleID[1] = 'I';
+    descUsbFfs.wosDesc.CompatibleID[2] = 'N';
+    descUsbFfs.wosDesc.CompatibleID[3] = 'U';
+    descUsbFfs.wosDesc.CompatibleID[4] = 'S';
+    descUsbFfs.wosDesc.CompatibleID[5] = 'B';
+    descUsbFfs.wosDesc.CompatibleID[6] = '\0';
+    Base::ZeroArray(descUsbFfs.wosDesc.SubCompatibleID);
+    Base::ZeroArray(descUsbFfs.wosDesc.Reserved2);
+}
+
 // DAEMON end USB module USB-FFS EP port connection
 int HdcDaemonUSB::ConnectEPPoint(HUSB hUSB)
 {
     int ret = ERR_GENERIC;
+    struct usb_functionfs_desc_v2 descUsbFfs = {};
+    FillUsbV2Head(descUsbFfs);
     while (true) {
         if (controlEp <= 0) {
             // After the control port sends the instruction, the device is initialized by the device to the HOST host,
@@ -112,7 +147,7 @@ int HdcDaemonUSB::ConnectEPPoint(HUSB hUSB)
                 WRITE_LOG(LOG_WARN, "%s: cannot open control endpoint: errno=%d", ep0Path.c_str(), errno);
                 break;
             }
-            if (write(controlEp, &USB_FFS_DESC, sizeof(USB_FFS_DESC)) < 0) {
+            if (write(controlEp, &descUsbFfs, sizeof(descUsbFfs)) < 0) {
                 WRITE_LOG(LOG_WARN, "%s: write ffs configs failed: errno=%d", ep0Path.c_str(), errno);
                 break;
             }
@@ -121,7 +156,7 @@ int HdcDaemonUSB::ConnectEPPoint(HUSB hUSB)
                 break;
             }
             // active usbrc，Send USB initialization singal
-            Base::SetHdcProperty("sys.usb.ffs.ready", "1");
+            SystemDepend::SetHdcProperty("sys.usb.ffs.ready", "1");
             WRITE_LOG(LOG_DEBUG, "ConnectEPPoint ctrl init finish, set usb-ffs ready");
         }
         string outPath = basePath + "/ep1";
@@ -395,32 +430,33 @@ void HdcDaemonUSB::OnUSBRead(uv_fs_t *req)
     while (thisClass->isAlive) {
         // Don't care is module running, first deal with this
         if (bytesIOBytes < 0) {
-            WRITE_LOG(LOG_WARN, "USBIO failed1 %s", uv_strerror(bytesIOBytes));
-            break;
-        } else if (bytesIOBytes == 0) {
-            // zero packet
-            WRITE_LOG(LOG_WARN, "Zero packet received");
-            ret = true;
-            break;
-        }
-        if (thisClass->JumpAntiquePacket(*bufPtr, bytesIOBytes)) {
-            WRITE_LOG(LOG_DEBUG, "JumpAntiquePacket auto jump");
-            ret = true;
-            break;
-        }
-        // guess is head of packet
-        if ((childRet = thisClass->AvailablePacket((uint8_t *)bufPtr, bytesIOBytes, &sessionId)) != RET_SUCCESS) {
-            if (childRet != ERR_IO_SOFT_RESET) {
-                WRITE_LOG(LOG_WARN, "AvailablePacket check failed, ret:%d buf:%-50s", bytesIOBytes, bufPtr);
+            if (bytesIOBytes != -EINTR) {  // Epoll will be broken when gdb attach
+                WRITE_LOG(LOG_WARN, "USBIO failed1 %s", uv_strerror(bytesIOBytes));
+                ret = false;
                 break;
             }
-            // reset packet
-            childRet = 0;  // need max size
+        } else if (bytesIOBytes == 0) {  // zero packet
+            WRITE_LOG(LOG_WARN, "Zero packet received");
         } else {
-            // AvailablePacket case
-            if ((childRet = thisClass->DispatchToWorkThread(sessionId, bufPtr, bytesIOBytes)) < 0) {
-                WRITE_LOG(LOG_FATAL, "DispatchToWorkThread failed");
+            if (thisClass->JumpAntiquePacket(*bufPtr, bytesIOBytes)) {
+                WRITE_LOG(LOG_DEBUG, "JumpAntiquePacket auto jump");
+                ret = true;
                 break;
+            }
+            // guess is head of packet
+            if ((childRet = thisClass->AvailablePacket((uint8_t *)bufPtr, bytesIOBytes, &sessionId)) != RET_SUCCESS) {
+                if (childRet != ERR_IO_SOFT_RESET) {
+                    WRITE_LOG(LOG_WARN, "AvailablePacket check failed, ret:%d buf:%-50s", bytesIOBytes, bufPtr);
+                    break;
+                }
+                // reset packet
+                childRet = 0;  // need max size
+            } else {
+                // AvailablePacket case
+                if ((childRet = thisClass->DispatchToWorkThread(sessionId, bufPtr, bytesIOBytes)) < 0) {
+                    WRITE_LOG(LOG_FATAL, "DispatchToWorkThread failed");
+                    break;
+                }
             }
         }
         int nextReadSize = childRet == 0 ? hUSB->wMaxPacketSizeSend : std::min(childRet, Base::GetUsbffsBulkSize());
