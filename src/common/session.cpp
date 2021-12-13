@@ -602,6 +602,7 @@ HTaskInfo HdcSessionBase::AdminTask(const uint8_t op, HSession hSession, const u
 int HdcSessionBase::SendByProtocol(HSession hSession, uint8_t *bufPtr, const int bufLen)
 {
     if (hSession->isDead) {
+        WRITE_LOG(LOG_WARN, "SendByProtocol session dead error");
         return ERR_SESSION_NOFOUND;
     }
     int ret = 0;
@@ -661,24 +662,29 @@ int HdcSessionBase::Send(const uint32_t sessionId, const uint32_t channelId, con
     int finalBufSize = sizeof(PayloadHead) + s.size() + dataSize;
     uint8_t *finayBuf = new uint8_t[finalBufSize]();
     if (finayBuf == nullptr) {
+        WRITE_LOG(LOG_WARN, "send allocmem err");
         return ERR_BUF_ALLOC;
     }
     bool bufRet = false;
     do {
         if (memcpy_s(finayBuf, sizeof(PayloadHead), reinterpret_cast<uint8_t *>(&payloadHead), sizeof(PayloadHead))) {
+            WRITE_LOG(LOG_WARN, "send copyhead err for dataSize:%d", dataSize);
             break;
         }
         if (memcpy_s(finayBuf + sizeof(PayloadHead), s.size(),
                      reinterpret_cast<uint8_t *>(const_cast<char *>(s.c_str())), s.size())) {
+            WRITE_LOG(LOG_WARN, "send copyProtbuf err for dataSize:%d", dataSize);
             break;
         }
         if (dataSize > 0 && memcpy_s(finayBuf + sizeof(PayloadHead) + s.size(), dataSize, data, dataSize)) {
+            WRITE_LOG(LOG_WARN, "send copyDatabuf err for dataSize:%d", dataSize);
             break;
         }
         bufRet = true;
     } while (false);
     if (!bufRet) {
         delete[] finayBuf;
+        WRITE_LOG(LOG_WARN, "send copywholedata err for dataSize:%d", dataSize);
         return ERR_BUF_COPY;
     }
     return SendByProtocol(hSession, finayBuf, finalBufSize);
@@ -723,9 +729,11 @@ int HdcSessionBase::OnRead(HSession hSession, uint8_t *bufPtr, const int bufLen)
         return ERR_BUF_CHECK;
     }
     if (bufLen - packetHeadSize < tobeReadLen) {
+        WRITE_LOG(LOG_WARN, "incorrect buflen:[%d] reqlen:[%d] hdrlen:[%d]", bufLen, tobeReadLen, packetHeadSize);
         return 0;
     }
     if (DecryptPayload(hSession, payloadHead, bufPtr + packetHeadSize)) {
+        WRITE_LOG(LOG_WARN, "decrypt plhead error");
         return ERR_BUF_CHECK;
     }
     ret = packetHeadSize + tobeReadLen;
@@ -750,6 +758,7 @@ int HdcSessionBase::FetchIOBuf(HSession hSession, uint8_t *ioBuf, int read)
             indexBuf += childRet;
         } else if (childRet == 0) {
             // Not enough a IO
+            WRITE_LOG(LOG_ALL, "FetchIOBuf loop read not enough, availTailIndex:%d", hSession->availTailIndex);
             break;
         } else {
             // <0
@@ -760,7 +769,10 @@ int HdcSessionBase::FetchIOBuf(HSession hSession, uint8_t *ioBuf, int read)
         // It may be multi-time IO to merge in a BUF, need to loop processing
     }
     if (indexBuf > 0 && hSession->availTailIndex > 0) {
-        memmove_s(hSession->ioBuf, hSession->bufSize, hSession->ioBuf + indexBuf, hSession->availTailIndex);
+        if (memmove_s(hSession->ioBuf, hSession->bufSize, hSession->ioBuf + indexBuf, hSession->availTailIndex)
+            != EOK) {
+            return ERR_BUF_COPY;
+        };
         uint8_t *bufToZero = (uint8_t *)(hSession->ioBuf + hSession->availTailIndex);
         Base::ZeroBuf(bufToZero, hSession->bufSize - hSession->availTailIndex);
     }
@@ -770,9 +782,10 @@ int HdcSessionBase::FetchIOBuf(HSession hSession, uint8_t *ioBuf, int read)
 void HdcSessionBase::AllocCallback(uv_handle_t *handle, size_t sizeWanted, uv_buf_t *buf)
 {
     HSession context = (HSession)handle->data;
-    Base::ReallocBuf(&context->ioBuf, &context->bufSize, Base::GetMaxBufSize() * 4);
+    Base::ReallocBuf(&context->ioBuf, &context->bufSize, Base::GetMaxBufSize() * 10);
     buf->base = (char *)context->ioBuf + context->availTailIndex;
-    buf->len = context->bufSize - context->availTailIndex;
+    int size = context->bufSize - context->availTailIndex;
+    buf->len = std::min(size, (int)sizeWanted);
 }
 
 void HdcSessionBase::FinishWriteSessionTCP(uv_write_t *req, int status)
@@ -1041,7 +1054,7 @@ void HdcSessionBase::LogMsg(const uint32_t sessionId, const uint32_t channelId,
 bool HdcSessionBase::DispatchTaskData(HSession hSession, const uint32_t channelId, const uint16_t command,
                                       uint8_t *payload, int payloadSize)
 {
-    bool ret = false;
+    bool ret = true;
     while (true) {
         HTaskInfo hTaskInfo = AdminTask(OP_QUERY, hSession, channelId, nullptr);
         if (!hTaskInfo) {
@@ -1060,13 +1073,10 @@ bool HdcSessionBase::DispatchTaskData(HSession hSession, const uint32_t channelI
             WRITE_LOG(LOG_DEBUG, "Jump delete HTaskInfo");
             break;
         }
-        bool result = RedirectToTask(hTaskInfo, hSession, channelId, command, payload, payloadSize);
+        ret = RedirectToTask(hTaskInfo, hSession, channelId, command, payload, payloadSize);
         if (!hTaskInfo->hasInitial) {
             AdminTask(OP_ADD, hSession, channelId, hTaskInfo);
             hTaskInfo->hasInitial = true;
-        }
-        if (result) {
-            ret = true;
         }
         break;
     }
