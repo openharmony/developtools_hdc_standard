@@ -887,22 +887,81 @@ namespace Base {
         return s.rfind(sub) == (s.length() - sub.length()) ? 1 : 0;
     }
 
+    const char *GetFileType(mode_t mode)
+    {
+        switch (mode & S_IFMT) {
+            case S_IFDIR:
+                return "directory";
+            case S_IFLNK:
+                return "symlink";
+            case S_IFREG:
+                return "regular file";
+#ifndef _WIN32
+            case S_IFBLK:
+                return "block device";
+            case S_IFCHR:
+                return "character device";
+            case S_IFIFO:
+                return "FIFO/pipe";
+            case S_IFSOCK:
+                return "socket";
+#endif
+            default:
+                return "Unknown";
+        }
+    }
+
+    void BuildErrorString(const char *localPath, const char *op, errno_t err, string &str)
+    {
+        // avoid to use stringstream
+        str = op;
+        str += " ";
+        str += localPath;
+        str += " failed, ";
+        str += strerror(err);
+    }
+
     // Both absolute and relative paths support
-    bool CheckDirectoryOrPath(const char *localPath, bool pathOrDir, bool readWrite)
+    bool CheckDirectoryOrPath(const char *localPath, bool pathOrDir, bool readWrite, string &errStr)
     {
         if (pathOrDir) {  // filepath
             uv_fs_t req;
+            mode_t mode;
             int r = uv_fs_lstat(nullptr, &req, localPath, nullptr);
+            if (r) {
+                BuildErrorString(localPath, "lstat", errno, errStr);
+            }
+
+            mode = req.statbuf.st_mode;
             uv_fs_req_cleanup(&req);
-            if (r == 0 && req.statbuf.st_mode & S_IFREG) {  // is file
+
+            if ((r == 0) && (mode & S_IFREG)) {  // is file
                 uv_fs_access(nullptr, &req, localPath, readWrite ? R_OK : W_OK, nullptr);
+                if (req.result) {
+                    const char *op = readWrite ? "access R_OK" : "access W_OK";
+                    BuildErrorString(localPath, op, errno, errStr);
+                }
                 uv_fs_req_cleanup(&req);
                 if (req.result == 0)
                     return true;
+            } else if (r == 0) {
+                const char *type = GetFileType(mode);
+                errStr = "Not support ";
+                errStr += type;
+                errStr += ": ";
+                errStr += localPath;
             }
         } else {  // dir
+            errStr = "Not support dir: ";
+            errStr += localPath;
         }
         return false;
+    }
+
+    bool CheckDirectoryOrPath(const char *localPath, bool pathOrDir, bool readWrite)
+    {
+        string strUnused;
+        return CheckDirectoryOrPath(localPath, pathOrDir, readWrite, strUnused);
     }
 
     // Using openssl encryption and decryption method, high efficiency; when encrypting more than 64 bytes,

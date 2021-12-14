@@ -67,6 +67,7 @@ bool HdcFile::BeginTransfer(CtxFile *context, const string &command)
 bool HdcFile::SetMasterParameters(CtxFile *context, const char *command, int argc, char **argv)
 {
     int srcArgvIndex = 0;
+    string errStr;
     const string CMD_OPTION_TSTMP = "-a";
     const string CMD_OPTION_SYNC = "-sync";
     const string CMD_OPTION_ZIP = "-z";
@@ -99,8 +100,8 @@ bool HdcFile::SetMasterParameters(CtxFile *context, const char *command, int arg
         // master and server
         ExtractRelativePath(context->transferConfig.clientCwd, context->localPath);
     }
-    if (!Base::CheckDirectoryOrPath(context->localPath.c_str(), true, true)) {
-        LogMsg(MSG_FAIL, "Src not exist, path: %s", context->localPath.c_str());
+    if (!Base::CheckDirectoryOrPath(context->localPath.c_str(), true, true, errStr)) {
+        LogMsg(MSG_FAIL, "%s", errStr.c_str());
         return false;
     }
     context->localName = Base::GetFullFilePath(context->localPath);
