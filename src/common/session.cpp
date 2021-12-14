@@ -729,7 +729,6 @@ int HdcSessionBase::OnRead(HSession hSession, uint8_t *bufPtr, const int bufLen)
         return ERR_BUF_CHECK;
     }
     if (bufLen - packetHeadSize < tobeReadLen) {
-        WRITE_LOG(LOG_WARN, "incorrect buflen:[%d] reqlen:[%d] hdrlen:[%d]", bufLen, tobeReadLen, packetHeadSize);
         return 0;
     }
     if (DecryptPayload(hSession, payloadHead, bufPtr + packetHeadSize)) {
@@ -758,7 +757,6 @@ int HdcSessionBase::FetchIOBuf(HSession hSession, uint8_t *ioBuf, int read)
             indexBuf += childRet;
         } else if (childRet == 0) {
             // Not enough a IO
-            WRITE_LOG(LOG_ALL, "FetchIOBuf loop read not enough, availTailIndex:%d", hSession->availTailIndex);
             break;
         } else {
             // <0
@@ -782,10 +780,10 @@ int HdcSessionBase::FetchIOBuf(HSession hSession, uint8_t *ioBuf, int read)
 void HdcSessionBase::AllocCallback(uv_handle_t *handle, size_t sizeWanted, uv_buf_t *buf)
 {
     HSession context = (HSession)handle->data;
-    Base::ReallocBuf(&context->ioBuf, &context->bufSize, Base::GetMaxBufSize() * 10);
+    Base::ReallocBuf(&context->ioBuf, &context->bufSize, Base::GetMaxBufSize() * 4);
     buf->base = (char *)context->ioBuf + context->availTailIndex;
     int size = context->bufSize - context->availTailIndex;
-    buf->len = std::min(size, (int)sizeWanted);
+    buf->len = std::min(size, static_cast<int>(sizeWanted));
 }
 
 void HdcSessionBase::FinishWriteSessionTCP(uv_write_t *req, int status)

@@ -741,16 +741,12 @@ namespace SerialStruct {
     template<> struct Serializer<int32_t> {
         static void Serialize(uint32_t tag, int32_t value, FlagsType<>, Writer &out, bool force = false)
         {
-            if (!force && value == INT32_C(0)) return;
-
             SerialDetail::WriteTagWriteType(tag, WireType::VARINT, out);
             SerialDetail::WriteVarint(value, out);
         }
 
         static void Serialize(uint32_t tag, int32_t value, FlagsType<flags::s>, Writer &out, bool force = false)
         {
-            if (!force && value == INT32_C(0)) return;
-
             SerialDetail::WriteTagWriteType(tag, WireType::VARINT, out);
             SerialDetail::WriteSignedVarint(value, out);
         }
@@ -758,8 +754,6 @@ namespace SerialStruct {
         static void Serialize(
             uint32_t tag, int32_t value, FlagsType<flags::s | flags::f>, Writer &out, bool force = false)
         {
-            if (!force && value == INT32_C(0)) return;
-
             SerialDetail::WriteTagWriteType(tag, WireType::FIXED32, out);
             SerialDetail::WriteSignedFixed(value, out);
         }
@@ -819,16 +813,12 @@ namespace SerialStruct {
     template<> struct Serializer<uint32_t> {
         static void Serialize(uint32_t tag, uint32_t value, FlagsType<>, Writer &out, bool force = false)
         {
-            if (!force && value == UINT32_C(0)) return;
-
             SerialDetail::WriteTagWriteType(tag, WireType::VARINT, out);
             SerialDetail::WriteVarint(value, out);
         }
 
         static void Serialize(uint32_t tag, uint32_t value, FlagsType<flags::f>, Writer &out, bool force = false)
         {
-            if (!force && value == UINT32_C(0)) return;
-
             SerialDetail::WriteTagWriteType(tag, WireType::FIXED32, out);
             SerialDetail::WriteFixed(value, out);
         }
@@ -871,16 +861,12 @@ namespace SerialStruct {
     template<> struct Serializer<int64_t> {
         static void Serialize(uint32_t tag, int64_t value, FlagsType<>, Writer &out, bool force = false)
         {
-            if (!force && value == INT64_C(0)) return;
-
             SerialDetail::WriteTagWriteType(tag, WireType::VARINT, out);
             SerialDetail::WriteVarint(value, out);
         }
 
         static void Serialize(uint32_t tag, int64_t value, FlagsType<flags::s>, Writer &out, bool force = false)
         {
-            if (!force && value == INT64_C(0)) return;
-
             SerialDetail::WriteTagWriteType(tag, WireType::VARINT, out);
             SerialDetail::WriteSignedVarint(value, out);
         }
@@ -888,8 +874,6 @@ namespace SerialStruct {
         static void Serialize(
             uint32_t tag, int64_t value, FlagsType<flags::s | flags::f>, Writer &out, bool force = false)
         {
-            if (!force && value == INT64_C(0)) return;
-
             SerialDetail::WriteTagWriteType(tag, WireType::FIXED64, out);
             SerialDetail::WriteSignedFixed(value, out);
         }
@@ -949,8 +933,6 @@ namespace SerialStruct {
     template<> struct Serializer<uint64_t> {
         static void Serialize(uint32_t tag, uint64_t value, FlagsType<>, Writer &out, bool force = false)
         {
-            if (!force && value == UINT64_C(0)) return;
-
             SerialDetail::WriteTagWriteType(tag, WireType::VARINT, out);
             SerialDetail::WriteVarint(value, out);
         }
@@ -1070,9 +1052,9 @@ namespace SerialStruct {
 
         static bool Parse(WireType wire_type, bool &value, FlagsType<>, reader &in)
         {
-            uint32_t value32;
-            if (Serializer<uint32_t>::Parse(wire_type, value32, FlagsType<>(), in)) {
-                value = (value32 > 0) ? true : false;
+            uint32_t intermedaite_value;
+            if (Serializer<uint32_t>::Parse(wire_type, intermedaite_value, FlagsType<>(), in)) {
+                value = static_cast<bool>(intermedaite_value);
                 return true;
             }
             return false;
@@ -1080,9 +1062,9 @@ namespace SerialStruct {
 
         static bool ParsePacked(bool &value, FlagsType<>, reader &in)
         {
-            uint32_t value32;
-            if (Serializer<uint32_t>::ParsePacked(value32, FlagsType<>(), in)) {
-                value = (value32 > 0) ? true : false;
+            uint32_t intermedaite_value;
+            if (Serializer<uint32_t>::ParsePacked(intermedaite_value, FlagsType<>(), in)) {
+                value = static_cast<bool>(intermedaite_value);
                 return true;
             }
             return false;
@@ -1126,8 +1108,6 @@ namespace SerialStruct {
     template<> struct Serializer<std::string> {
         static void Serialize(uint32_t tag, const std::string &value, FlagsType<>, Writer &out, bool force = false)
         {
-            if (!force && value.empty()) return;
-
             SerialDetail::WriteTagWriteType(tag, WireType::LENGTH_DELIMETED, out);
             SerialDetail::WriteVarint(value.size(), out);
             out.Write(value.data(), value.size());
@@ -1239,7 +1219,9 @@ namespace SerialStruct {
         size_t Read(void *bytes, size_t size) override
         {
             size_t readSize = std::min(size, _in.size() - _pos);
-            memcpy_s(bytes, size, _in.data() + _pos, readSize);
+            if (memcpy_s(bytes, size, _in.data() + _pos, readSize) != EOK) {
+                return readSize;
+            }
             _pos += readSize;
             return readSize;
         }
