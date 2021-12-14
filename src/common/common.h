@@ -61,6 +61,7 @@ using std::vector;
 #endif
 
 #include <securec.h>
+#include <limits.h>
 
 #include "define.h"
 #include "debug.h"

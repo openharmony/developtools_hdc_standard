@@ -75,8 +75,8 @@ void HdcHostUSB::SendUsbSoftReset(HSession hSession, uint32_t sessionIdOld)
     usbPayloadHeader.dataSize = 0;
     usbPayloadHeader.sessionId = htonl(sessionIdOld);
     if (memcpy_s(usbPayloadHeader.flag, sizeof(usbPayloadHeader.flag), USB_PACKET_FLAG.c_str(),
-                 sizeof(usbPayloadHeader.flag))
-        != EOK) {
+                 sizeof(usbPayloadHeader.flag)) != EOK) {
+        WRITE_LOG(LOG_FATAL, "SendUsbSoftReset memcpy failed");
         delete ctxReset;
         return;
     }
@@ -351,15 +351,18 @@ int HdcHostUSB::UsbToHdcProtocol(uv_stream_t *stream, uint8_t *appendData, int d
 
     while (index < dataSize) {
         if ((childRet = select(fd + 1, NULL, &fdSet, NULL, &timeout)) <= 0) {
+            WRITE_LOG(LOG_FATAL, "select error:%d [%s][%d]", errno, strerror(errno), childRet);
             break;
         }
         childRet = send(fd, (const char *)appendData + index, dataSize - index, 0);
         if (childRet < 0) {
+            WRITE_LOG(LOG_FATAL, "UsbToHdcProtocol senddata err:%d [%s]", errno, strerror(errno));
             break;
         }
         index += childRet;
     }
     if (index != dataSize) {
+        WRITE_LOG(LOG_FATAL, "UsbToHdcProtocol partialsenddata err:%d [%d]", index, dataSize);
         return ERR_IO_FAIL;
     }
     return index;
@@ -543,7 +546,8 @@ void HdcHostUSB::SessionUsbWorkThread(void *arg)
     HSession hSession = (HSession)arg;
     constexpr uint8_t USB_HANDLE_TIMEOUT = DEVICE_CHECK_INTERVAL / TIME_BASE;
     WRITE_LOG(LOG_DEBUG, "SessionUsbWorkThread work thread:%p", uv_thread_self());
-    while (!hSession->isDead) {
+    // run until all USB callback finish(ref == 1, It's the only one left)
+    while (!hSession->isDead || hSession->ref > 1) {
         struct timeval zerotime;
         zerotime.tv_sec = USB_HANDLE_TIMEOUT;
         zerotime.tv_usec = 0;  // if == 0,windows will be high CPU load
