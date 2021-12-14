@@ -22,7 +22,7 @@ public:
     HdcForwardBase(HTaskInfo hTaskInfo);
     virtual ~HdcForwardBase();
     bool CommandDispatch(const uint16_t command, uint8_t *payload, const int payloadSize);
-    bool BeginForward(const char *command, string &sError);
+    bool BeginForward(const string &command, string &sError);
     void StopTask();
     bool ReadyForRelease();
 
