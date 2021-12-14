@@ -40,7 +40,7 @@ namespace Base {
     {
         string tmpString = GetFileNameAny(debugInfo);
         debugInfo = StringFormat("%s:%d", tmpString.c_str(), line);
-        if (g_logLevel < LOG_ALL) {
+        if (g_logLevel < LOG_DEBUG) {
             debugInfo = "";
             threadIdString = "";
         } else {
@@ -103,7 +103,7 @@ namespace Base {
             logLevelString = std::to_string(logLevel);
         }
         string msTimeSurplus;
-        if (g_logLevel > LOG_DEBUG) {
+        if (g_logLevel >= LOG_DEBUG) {
             const auto sSinceUnix0Rest = duration_cast<microseconds>(sinceUnix0).count() % (TIME_BASE * TIME_BASE);
             msTimeSurplus = StringFormat(".%06llu", sSinceUnix0Rest);
         }
