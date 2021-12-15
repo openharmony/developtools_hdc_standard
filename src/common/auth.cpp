@@ -364,7 +364,7 @@ cleanup:
 
 void ReadDaemonKeys(const char *file, list<void *> *listPublicKey)
 {
-    char buf[BUF_SIZE_DEFAULT2];
+    char buf[BUF_SIZE_DEFAULT2] = { 0 };
     char *sep = nullptr;
     int ret;
     FILE *f = fopen(file, "re");
