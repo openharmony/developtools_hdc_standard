@@ -129,6 +129,7 @@ bool HdcDaemon::RedirectToTask(HTaskInfo hTaskInfo, HSession hSession, const uin
             break;
         case CMD_FORWARD_INIT:
         case CMD_FORWARD_CHECK:
+        case CMD_FORWARD_ACTIVE_MASTER:
         case CMD_FORWARD_ACTIVE_SLAVE:
         case CMD_FORWARD_DATA:
         case CMD_FORWARD_FREE_CONTEXT:
