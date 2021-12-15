@@ -747,6 +747,7 @@ bool HdcServer::RedirectToTask(HTaskInfo hTaskInfo, HSession hSession, const uin
         case CMD_FORWARD_CHECK:
         case CMD_FORWARD_CHECK_RESULT:
         case CMD_FORWARD_ACTIVE_MASTER:
+        case CMD_FORWARD_ACTIVE_SLAVE:
         case CMD_FORWARD_DATA:
         case CMD_FORWARD_FREE_CONTEXT:
             ret = TaskCommandDispatch<HdcHostForward>(hTaskInfo, TASK_FORWARD, command, payload, payloadSize);
