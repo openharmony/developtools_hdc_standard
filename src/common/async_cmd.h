@@ -51,7 +51,7 @@ private:
     HdcFileDescriptor *childShell = nullptr;
     uint32_t refCount = 0;
     CmdResultCallback resultCallback;
-    uv_loop_t *loop;
+    uv_loop_t *loop = nullptr;
     string cmdResult;
 };
 }  // namespace Hdc

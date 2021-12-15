@@ -79,7 +79,7 @@ namespace Base {
         system_clock::time_point timeNow = system_clock::now();          // now time
         system_clock::duration sinceUnix0 = timeNow.time_since_epoch();  // since 1970
         time_t sSinceUnix0 = duration_cast<seconds>(sinceUnix0).count();
-        std::tm tim = *std::localtime(&sSinceUnix0);
+        std::tm *tim = std::localtime(&sSinceUnix0);
         bool enableAnsiColor = false;
 #ifdef _WIN32
         enableAnsiColor = IsWindowsSupportAnsiColor();
@@ -112,7 +112,10 @@ namespace Base {
             const auto sSinceUnix0Rest = duration_cast<microseconds>(sinceUnix0).count() % (TIME_BASE * TIME_BASE);
             msTimeSurplus = StringFormat(".%06llu", sSinceUnix0Rest);
         }
-        timeString = StringFormat("%d:%d:%d%s", tim.tm_hour, tim.tm_min, tim.tm_sec, msTimeSurplus.c_str());
+        timeString = msTimeSurplus;
+        if (tim != nullptr) {
+            timeString = StringFormat("%d:%d:%d%s", tim->tm_hour, tim->tm_min, tim->tm_sec, msTimeSurplus.c_str());
+        }
     }
 
     void PrintLogEx(const char *functionName, int line, uint8_t logLevel, const char *msg, ...)
@@ -202,6 +205,10 @@ namespace Base {
     {
         if (*nOrigSize > 0)
             return;
+        if (sizeWanted <= 0) {
+            WRITE_LOG(LOG_WARN, "ReallocBuf failed, sizeWanted:%d", sizeWanted);
+            return;
+        }
         *origBuf = new uint8_t[sizeWanted];
         if (!*origBuf)
             return;

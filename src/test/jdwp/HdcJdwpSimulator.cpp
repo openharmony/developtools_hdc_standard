@@ -94,7 +94,7 @@ void HdcJdwpSimulator::ProcessIncoming(uv_stream_t *client, ssize_t nread, const
     HiLog::Debug(LABEL, "ProcessIncoming :%{public}d", nread);
     if (nread > 0) {
         std::unique_ptr<char[]> recv = std::make_unique<char[]>(nread + 1);
-        std::memset(recv.get(), 0, nread);
+        memset_s(recv.get(), nread + 1, 0, nread + 1);
         memcpy_s(recv.get(), nread, buf->base, nread);
         for (int i = 0; i < (nread + 1); i++) {
             HiLog::Info(LABEL, "ProcessIncoming recv2[%{public}d] :%{public}c", i, recv[i]);
@@ -175,7 +175,7 @@ void HdcJdwpSimulator::ConnectJdwp(uv_connect_t *connection, int status)
         HiLog::Error(LABEL, "ConnectJdwp new info fail.");
         return;
     }
-    std::memset(info, 0, pkgSize);
+    memset_s(info, pkgSize, 0, pkgSize);
     JsMsgHeader *jsMsg = (JsMsgHeader *)info;
     jsMsg->pid = pid_curr;
     jsMsg->msgLen = pkgSize;
