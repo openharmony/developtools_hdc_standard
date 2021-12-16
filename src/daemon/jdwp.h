@@ -32,6 +32,19 @@ public:
     bool CheckPIDExist(uint32_t targetPID);
 
 private:
+    static constexpr uint8_t JS_PKG_MX_SIZE = 135;
+    static constexpr uint8_t JS_PKG_MIN_SIZE = 15;  // JsMsgHeader + "pkgName:"uint8_t[7~127]
+
+#ifdef JS_JDWP_CONNECT
+    struct JsMsgHeader {
+        uint32_t msgLen;
+        uint32_t pid;
+    };
+    string GetProcessListExtendPkgName();
+    static constexpr uint32_t JPID_TRACK_LIST_SIZE = 1024 * 4;
+#else
+    static constexpr uint32_t JPID_TRACK_LIST_SIZE = 1024;
+#endif  // JS_JDWP_CONNECT
     struct _PollFd {
         int fd;
         short events;
@@ -54,27 +67,15 @@ private:
         uv_pipe_t pipe;
         HdcJdwp *thisClass;
         bool finish;
+        uint8_t dummy;
+        uv_tcp_t jvmTCP;
+        string pkgName;
 #ifdef JS_JDWP_CONNECT
         char buf[JS_PKG_MX_SIZE];
-        string pkgName;
 #else
         char buf[sizeof(uint32_t)];
 #endif  // JS_JDWP_CONNECT
-        uint8_t dummy;
-        uv_tcp_t jvmTCP;
     };
-#ifdef JS_JDWP_CONNECT
-    struct JsMsgHeader {
-        uint32_t msgLen;
-        uint32_t pid;
-    };
-    static constexpr uint8_t JS_PKG_MIN_SIZE = 15;  // JsMsgHeader + "pkgName:"uint8_t[7~127]
-    static constexpr uint8_t JS_PKG_MX_SIZE = 135;
-    static constexpr uint32_t JPID_TRACK_LIST_SIZE = 1024 * 4;
-    string GetProcessListExtendPkgName();
-#else
-    static constexpr uint32_t JPID_TRACK_LIST_SIZE = 1024;
-#endif  // JS_JDWP_CONNECT
     using HCtxJdwp = struct ContextJdwp *;
 
     bool JdwpListen();

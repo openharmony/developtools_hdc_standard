@@ -31,7 +31,6 @@ hdc_common_sources = [
   "${HDC_PATH}/src/common/tcp.cpp",
   "${HDC_PATH}/src/common/transfer.cpp",
   "${HDC_PATH}/src/common/usb.cpp",
-  "${HDC_PATH}/src/common/system_depend.cpp",
 ]
 
 config("hdc_config") {
@@ -50,6 +49,7 @@ ohos_executable("hdcd") {
     "src/daemon/jdwp.cpp",
     "src/daemon/main.cpp",
     "src/daemon/shell.cpp",
+    "src/daemon/system_depend.cpp",
   ]
   sources += hdc_common_sources
 
