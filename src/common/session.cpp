@@ -602,6 +602,7 @@ HTaskInfo HdcSessionBase::AdminTask(const uint8_t op, HSession hSession, const u
 int HdcSessionBase::SendByProtocol(HSession hSession, uint8_t *bufPtr, const int bufLen)
 {
     if (hSession->isDead) {
+        WRITE_LOG(LOG_WARN, "SendByProtocol session dead error");
         return ERR_SESSION_NOFOUND;
     }
     int ret = 0;
@@ -661,24 +662,29 @@ int HdcSessionBase::Send(const uint32_t sessionId, const uint32_t channelId, con
     int finalBufSize = sizeof(PayloadHead) + s.size() + dataSize;
     uint8_t *finayBuf = new uint8_t[finalBufSize]();
     if (finayBuf == nullptr) {
+        WRITE_LOG(LOG_WARN, "send allocmem err");
         return ERR_BUF_ALLOC;
     }
     bool bufRet = false;
     do {
         if (memcpy_s(finayBuf, sizeof(PayloadHead), reinterpret_cast<uint8_t *>(&payloadHead), sizeof(PayloadHead))) {
+            WRITE_LOG(LOG_WARN, "send copyhead err for dataSize:%d", dataSize);
             break;
         }
         if (memcpy_s(finayBuf + sizeof(PayloadHead), s.size(),
                      reinterpret_cast<uint8_t *>(const_cast<char *>(s.c_str())), s.size())) {
+            WRITE_LOG(LOG_WARN, "send copyProtbuf err for dataSize:%d", dataSize);
             break;
         }
         if (dataSize > 0 && memcpy_s(finayBuf + sizeof(PayloadHead) + s.size(), dataSize, data, dataSize)) {
+            WRITE_LOG(LOG_WARN, "send copyDatabuf err for dataSize:%d", dataSize);
             break;
         }
         bufRet = true;
     } while (false);
     if (!bufRet) {
         delete[] finayBuf;
+        WRITE_LOG(LOG_WARN, "send copywholedata err for dataSize:%d", dataSize);
         return ERR_BUF_COPY;
     }
     return SendByProtocol(hSession, finayBuf, finalBufSize);
@@ -731,6 +737,7 @@ int HdcSessionBase::OnRead(HSession hSession, uint8_t *bufPtr, const int bufLen)
         return 0;
     }
     if (DecryptPayload(hSession, payloadHead, bufPtr + packetHeadSize)) {
+        WRITE_LOG(LOG_WARN, "decrypt plhead error");
         return ERR_BUF_CHECK;
     }
     ret = packetHeadSize + tobeReadLen;
@@ -786,8 +793,7 @@ void HdcSessionBase::AllocCallback(uv_handle_t *handle, size_t sizeWanted, uv_bu
     Base::ReallocBuf(&context->ioBuf, &context->bufSize, Base::GetMaxBufSize() * 10);
     buf->base = (char *)context->ioBuf + context->availTailIndex;
     int size = context->bufSize - context->availTailIndex;
-    buf->len = std::min(size, (int)sizeWanted);
-    WRITE_LOG(LOG_ALL, "Session/Channel buffer given, size:%d addr:%p", buf->len, buf->base);
+    buf->len = std::min(size, static_cast<int>(sizeWanted));
 }
 
 void HdcSessionBase::FinishWriteSessionTCP(uv_write_t *req, int status)

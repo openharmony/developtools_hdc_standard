@@ -648,7 +648,11 @@ void HdcForwardBase::SendCallbackForwardBuf(uv_write_t *req, int status)
 int HdcForwardBase::SendForwardBuf(HCtxForward ctx, uint8_t *bufPtr, const int size)
 {
     int nRet = 0;
-    if (size > static_cast<int>(HDC_BUF_MAX_BYTES)) {
+    if (size > static_cast<int>(HDC_BUF_MAX_BYTES - 1)) {
+        return -1;
+    }
+    if (size <= 0) {
+        WRITE_LOG(LOG_WARN, "SendForwardBuf failed size:%d", size);
         return -1;
     }
     auto pDynBuf = new uint8_t[size];

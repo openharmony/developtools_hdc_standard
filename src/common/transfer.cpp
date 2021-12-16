@@ -313,11 +313,13 @@ int HdcTransferBase::GetSubFiles(const char *path, string filter, vector<string>
 // return true if file exist， false if file not exist
 bool HdcTransferBase::SmartSlavePath(string &cwd, string &localPath, const char *optName)
 {
+    string errStr;
     if (taskInfo->serverOrDaemon) {
         // slave and server
         ExtractRelativePath(cwd, localPath);
     }
-    if (Base::CheckDirectoryOrPath(localPath.c_str(), true, false)) {
+    if (Base::CheckDirectoryOrPath(localPath.c_str(), true, false, errStr)) {
+        WRITE_LOG(LOG_INFO, "%s", errStr.c_str());
         return true;
     }
     uv_fs_t req;

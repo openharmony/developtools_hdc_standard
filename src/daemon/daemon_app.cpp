@@ -147,6 +147,9 @@ void HdcDaemonApp::WhenTransferFinish(CtxFile *context)
     } else if (ctxNow.transferConfig.functionName == CMDSTR_APP_INSTALL) {
         PackageShell(true, context->transferConfig.options.c_str(), context->localPath.c_str());
     } else {
+        WRITE_LOG(LOG_WARN, "WhenTransferFinish error funcnm:[%s] lpath:[%s]",
+            ctxNow.transferConfig.functionName.c_str(), context->localPath.c_str());
+        PackageShell(true, context->transferConfig.options.c_str(), context->localPath.c_str());
     }
 };
 }

@@ -77,6 +77,7 @@ void HdcHostUSB::SendUsbSoftReset(HSession hSession, uint32_t sessionIdOld)
     if (memcpy_s(usbPayloadHeader.flag, sizeof(usbPayloadHeader.flag), USB_PACKET_FLAG.c_str(),
                  sizeof(usbPayloadHeader.flag))
         != EOK) {
+        WRITE_LOG(LOG_FATAL, "SendUsbSoftReset memcpy failed");
         delete ctxReset;
         return;
     }
@@ -356,15 +357,18 @@ int HdcHostUSB::UsbToHdcProtocol(uv_stream_t *stream, uint8_t *appendData, int d
 
     while (index < dataSize) {
         if ((childRet = select(fd + 1, NULL, &fdSet, NULL, &timeout)) <= 0) {
+            WRITE_LOG(LOG_FATAL, "select error:%d [%s][%d]", errno, strerror(errno), childRet);
             break;
         }
         childRet = send(fd, (const char *)appendData + index, dataSize - index, 0);
         if (childRet < 0) {
+            WRITE_LOG(LOG_FATAL, "UsbToHdcProtocol senddata err:%d [%s]", errno, strerror(errno));
             break;
         }
         index += childRet;
     }
     if (index != dataSize) {
+        WRITE_LOG(LOG_FATAL, "UsbToHdcProtocol partialsenddata err:%d [%d]", index, dataSize);
         return ERR_IO_FAIL;
     }
     return index;
