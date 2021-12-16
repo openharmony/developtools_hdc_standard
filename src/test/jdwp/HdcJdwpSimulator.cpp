@@ -16,7 +16,7 @@
 #include "HdcJdwpSimulator.h"
 using namespace OHOS;
 using namespace OHOS::HiviewDFX;
-static constexpr HiLogLabel LABEL = {LOG_CORE, 0, "JDWP_TEST"};
+static constexpr HiLogLabel LABEL = { LOG_CORE, 0, "JDWP_TEST" };
 HdcJdwpSimulator::HdcJdwpSimulator(uv_loop_t *loopIn, string pkg)
 {
     loop = loopIn;
@@ -24,18 +24,19 @@ HdcJdwpSimulator::HdcJdwpSimulator(uv_loop_t *loopIn, string pkg)
     pkgName = pkg;
 }
 
-HdcJdwpSimulator::~HdcJdwpSimulator() {}
+HdcJdwpSimulator::~HdcJdwpSimulator()
+{
+}
 
 void HdcJdwpSimulator::FinishWriteCallback(uv_write_t *req, int status)
 {
-    HiLog::Info(LABEL, "FinishWriteCallback:%{public}d error:%{public}s", status,
-                uv_err_name(status));
+    HiLog::Info(LABEL, "FinishWriteCallback:%{public}d error:%{public}s", status, uv_err_name(status));
     delete[]((uint8_t *)req->data);
     delete req;
 }
 
-RetErrCode HdcJdwpSimulator::SendToStream(uv_stream_t *handleStream, const uint8_t *buf,
-                                          const int bufLen, const void *finishCallback)
+RetErrCode HdcJdwpSimulator::SendToStream(uv_stream_t *handleStream, const uint8_t *buf, const int bufLen,
+                                          const void *finishCallback)
 {
     HiLog::Info(LABEL, "HdcJdwpSimulator::SendToStream: %{public}s, %{public}d", buf, bufLen);
     RetErrCode ret = RetErrCode::ERR_GENERIC;
@@ -56,6 +57,7 @@ RetErrCode HdcJdwpSimulator::SendToStream(uv_stream_t *handleStream, const uint8
 
     uv_write_t *reqWrite = new uv_write_t();
     if (!reqWrite) {
+        delete[] pDynBuf;
         HiLog::Error(LABEL, "HdcJdwpSimulator::SendToStream alloc reqWrite fail.");
         return RetErrCode::ERR_GENERIC;
     }
@@ -94,7 +96,7 @@ void HdcJdwpSimulator::ProcessIncoming(uv_stream_t *client, ssize_t nread, const
     HiLog::Debug(LABEL, "ProcessIncoming :%{public}d", nread);
     if (nread > 0) {
         std::unique_ptr<char[]> recv = std::make_unique<char[]>(nread + 1);
-        std::memset(recv.get(), 0, nread);
+        memset_s(recv.get(), nread + 1, 0, nread + 1);
         memcpy_s(recv.get(), nread, buf->base, nread);
         for (int i = 0; i < (nread + 1); i++) {
             HiLog::Info(LABEL, "ProcessIncoming recv2[%{public}d] :%{public}c", i, recv[i]);
@@ -102,8 +104,7 @@ void HdcJdwpSimulator::ProcessIncoming(uv_stream_t *client, ssize_t nread, const
 
         vector<uint8_t> reply;
         reply.clear();
-        reply.insert(reply.end(), HANDSHAKE_MESSAGE.c_str(),
-                     HANDSHAKE_MESSAGE.c_str() + HANDSHAKE_MESSAGE.size());
+        reply.insert(reply.end(), HANDSHAKE_MESSAGE.c_str(), HANDSHAKE_MESSAGE.c_str() + HANDSHAKE_MESSAGE.size());
         reply.insert(reply.end(), buf->base, buf->base + nread);
         HiLog::Info(LABEL, "ProcessIncoming--reply server");
         uint8_t *buf = reply.data();
@@ -111,8 +112,7 @@ void HdcJdwpSimulator::ProcessIncoming(uv_stream_t *client, ssize_t nread, const
         for (int i = 0; i < (HANDSHAKE_MESSAGE.size() + nread + 1); i++) {
             HiLog::Info(LABEL, "ProcessIncoming reply%{public}d :%{public}c", i, reply[i]);
         }
-        SendToStream(client, buf, HANDSHAKE_MESSAGE.size() + nread + 1,
-                     (void *)FinishWriteCallback);
+        SendToStream(client, buf, HANDSHAKE_MESSAGE.size() + nread + 1, (void *)FinishWriteCallback);
     } else {
         if (nread != UV_EOF) {
             HiLog::Debug(LABEL, "ProcessIncoming error %s\n", uv_err_name(nread));
@@ -128,8 +128,7 @@ void HdcJdwpSimulator::ReceiveNewFd(uv_stream_t *q, ssize_t nread, const uv_buf_
     HCtxJdwpSimulator ctxJdwp = (HCtxJdwpSimulator)q->data;
     HdcJdwpSimulator *thisClass = static_cast<HdcJdwpSimulator *>(ctxJdwp->thisClass);
     int pid_curr = static_cast<int>(getpid());
-    HiLog::Debug(LABEL, "HdcJdwpSimulator::ReceiveNewFd pid: %{public}d, nread: %{public}d\n",
-                 pid_curr, nread);
+    HiLog::Debug(LABEL, "HdcJdwpSimulator::ReceiveNewFd pid: %{public}d, nread: %{public}d\n", pid_curr, nread);
     if (nread < 0) {
         if (nread != UV_EOF) {
             HiLog::Error(LABEL, "Read error %s\n", uv_err_name(nread));
@@ -159,7 +158,7 @@ void HdcJdwpSimulator::ReceiveNewFd(uv_stream_t *q, ssize_t nread, const uv_buf_
         uv_close((uv_handle_t *)&ctxJdwp->newFd, NULL);
     }
 }
-#endif // JS_JDWP_CONNECT
+#endif  // JS_JDWP_CONNECT
 
 void HdcJdwpSimulator::ConnectJdwp(uv_connect_t *connection, int status)
 {
@@ -169,18 +168,18 @@ void HdcJdwpSimulator::ConnectJdwp(uv_connect_t *connection, int status)
     HdcJdwpSimulator *thisClass = static_cast<HdcJdwpSimulator *>(ctxJdwp->thisClass);
 #ifdef JS_JDWP_CONNECT
     string pkgName = thisClass->pkgName;
-    uint32_t pkgSize = pkgName.size() + sizeof(JsMsgHeader); // JsMsgHeader pkgName;
+    uint32_t pkgSize = pkgName.size() + sizeof(JsMsgHeader);  // JsMsgHeader pkgName;
     uint8_t *info = new uint8_t[pkgSize]();
     if (!info) {
         HiLog::Error(LABEL, "ConnectJdwp new info fail.");
         return;
     }
-    std::memset(info, 0, pkgSize);
+    memset_s(info, pkgSize, 0, pkgSize);
     JsMsgHeader *jsMsg = (JsMsgHeader *)info;
     jsMsg->pid = pid_curr;
     jsMsg->msgLen = pkgSize;
-    HiLog::Info(LABEL, "ConnectJdwp send pid:%{public}d, pkgName:%{public}s, msgLen:%{public}d,",
-                jsMsg->pid, pkgName.c_str(), jsMsg->msgLen);
+    HiLog::Info(LABEL, "ConnectJdwp send pid:%{public}d, pkgName:%{public}s, msgLen:%{public}d,", jsMsg->pid,
+                pkgName.c_str(), jsMsg->msgLen);
     bool retFail = false;
     if (memcpy_s(info + sizeof(JsMsgHeader), pkgName.size(), &pkgName[0], pkgName.size()) != 0) {
         HiLog::Error(LABEL, "ConnectJdwp memcpy_s fail :%{public}s.", pkgName.c_str());
@@ -196,7 +195,7 @@ void HdcJdwpSimulator::ConnectJdwp(uv_connect_t *connection, int status)
         info = nullptr;
     }
 #else
-    char pid[5] = {0};
+    char pid[5] = { 0 };
     if (sprintf_s(pid, sizeof(pid), "%d", pid_curr) < 0) {
         HiLog::Info(LABEL, "ConnectJdwp trans pid fail :%{public}d.", pid_curr);
         return;
@@ -206,7 +205,7 @@ void HdcJdwpSimulator::ConnectJdwp(uv_connect_t *connection, int status)
                             (void *)FinishWriteCallback);
     HiLog::Info(LABEL, "ConnectJdwp reading.");
     uv_read_start((uv_stream_t *)&ctxJdwp->pipe, thisClass->alloc_buffer, ReceiveNewFd);
-#endif // JS_JDWP_CONNECT
+#endif  // JS_JDWP_CONNECT
 }
 
 void *HdcJdwpSimulator::MallocContext()

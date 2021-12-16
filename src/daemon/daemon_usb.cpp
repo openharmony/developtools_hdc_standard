@@ -400,15 +400,18 @@ int HdcDaemonUSB::DispatchToWorkThread(uint32_t sessionId, uint8_t *readBuf, int
     if (!hChildSession) {
         hChildSession = PrepareNewSession(sessionId, readBuf, readBytes);
         if (!hChildSession) {
+            WRITE_LOG(LOG_WARN, "prep new session err for sessionId:%u", sessionId);
             return ERR_SESSION_NOFOUND;
         }
     }
 
     if (hChildSession->childCleared || hChildSession->isDead) {
+        WRITE_LOG(LOG_WARN, "session dead clr:%d - %d", hChildSession->childCleared, hChildSession->isDead);
         return ERR_SESSION_DEAD;
     }
     uv_stream_t *stream = reinterpret_cast<uv_stream_t *>(&hChildSession->dataPipe[STREAM_MAIN]);
     if ((childRet = SendToHdcStream(hChildSession, stream, readBuf, readBytes)) < 0) {
+        WRITE_LOG(LOG_WARN, "DispatchToWorkThread SendToHdcStream err ret:%d", childRet);
         return ERR_IO_FAIL;
     }
     return childRet;
