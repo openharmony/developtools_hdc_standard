@@ -22,7 +22,7 @@ public:
     HdcUSBBase(const bool serverOrDaemonIn, void *ptrMainBase);
     virtual ~HdcUSBBase();
     virtual bool ReadyForWorkThread(HSession hSession);
-    virtual void CancelUsbLoopRead(HUSB hUSB) {};
+    virtual void CancelUsbLoopRead(HSession hSession) {};
     int SendUSBBlock(HSession hSession, uint8_t *data, const int length);
 
 protected:

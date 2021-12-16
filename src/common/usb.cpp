@@ -133,10 +133,8 @@ void HdcUSBBase::PreSendUsbSoftReset(HSession hSession, uint32_t sessionIdOld)
         uint32_t sid = sessionIdOld;
         // or we can sendmsg to childthread send?
         hUSB->lockDeviceHandle.lock();
-        ++hSession->ref;
         WRITE_LOG(LOG_WARN, "SendToHdcStream check, sessionId not matched");
         SendUsbSoftReset(hSession, sid);
-        --hSession->ref;
         hUSB->lockDeviceHandle.unlock();
     }
 }

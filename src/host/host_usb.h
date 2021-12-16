@@ -53,7 +53,7 @@ private:
     void UpdateUSBDaemonInfo(HUSB hUSB, HSession hSession, uint8_t connStatus);
     void RegisterReadCallback(HSession hSession);
     void ReviewUsbNodeLater(string &nodeKey);
-    void CancelUsbLoopRead(HUSB hUSB);
+    void CancelUsbLoopRead(HSession hSession);
     int UsbToHdcProtocol(uv_stream_t *stream, uint8_t *appendData, int dataSize);
 
     libusb_context *ctxUSB;
