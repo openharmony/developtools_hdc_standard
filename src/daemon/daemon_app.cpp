@@ -73,7 +73,8 @@ bool HdcDaemonApp::CommandDispatch(const uint16_t command, uint8_t *payload, con
             ctxNow.fileSize = ctxNow.transferConfig.fileSize;
             ++refCount;
             uv_fs_open(loopTask, &ctxNow.fsOpenReq, ctxNow.localPath.c_str(),
-                       UV_FS_O_TRUNC | UV_FS_O_CREAT | UV_FS_O_WRONLY, S_IRUSR, OnFileOpen);
+                       UV_FS_O_TRUNC | UV_FS_O_CREAT | UV_FS_O_WRONLY, S_IWUSR | S_IRUSR | S_IRGRP | S_IROTH,
+                       OnFileOpen);
             break;
         }
         case CMD_APP_UNINSTALL: {
@@ -146,6 +147,9 @@ void HdcDaemonApp::WhenTransferFinish(CtxFile *context)
     } else if (ctxNow.transferConfig.functionName == CMDSTR_APP_INSTALL) {
         PackageShell(true, context->transferConfig.options.c_str(), context->localPath.c_str());
     } else {
+        WRITE_LOG(LOG_WARN, "WhenTransferFinish error funcnm:[%s] lpath:[%s]",
+            ctxNow.transferConfig.functionName.c_str(), context->localPath.c_str());
+        PackageShell(true, context->transferConfig.options.c_str(), context->localPath.c_str());
     }
 };
 }

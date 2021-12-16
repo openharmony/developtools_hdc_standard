@@ -37,19 +37,16 @@ HdcTransferBase::~HdcTransferBase()
 
 bool HdcTransferBase::ResetCtx(CtxFile *context, bool full)
 {
-    context->fsOpenReq.data = context;
-    context->fsCloseReq.data = context;
-    context->thisClass = this;
+    if (full) {
+        *context = {};
+        context->fsOpenReq.data = context;
+        context->fsCloseReq.data = context;
+        context->thisClass = this;
+        context->loop = loopTask;
+        context->cb = OnFileIO;
+    }
     context->closeNotify = false;
     context->indexIO = 0;
-    context->loop = loopTask;
-    context->cb = OnFileIO;
-    if (full) {
-        context->localPath = "";
-        context->remotePath = "";
-        context->transferBegin = 0;
-        context->taskQueue.clear();
-    }
     return true;
 }
 
@@ -219,6 +216,7 @@ void HdcTransferBase::OnFileIO(uv_fs_t *req)
     if (tryFinishIO) {
         // close-step1
         ++thisClass->refCount;
+        uv_fs_fsync(thisClass->loopTask, &context->fsCloseReq, context->fsOpenReq.result, nullptr);
         uv_fs_close(thisClass->loopTask, &context->fsCloseReq, context->fsOpenReq.result, OnFileClose);
     }
 }
@@ -315,11 +313,13 @@ int HdcTransferBase::GetSubFiles(const char *path, string filter, vector<string>
 // return true if file exist， false if file not exist
 bool HdcTransferBase::SmartSlavePath(string &cwd, string &localPath, const char *optName)
 {
+    string errStr;
     if (taskInfo->serverOrDaemon) {
         // slave and server
         ExtractRelativePath(cwd, localPath);
     }
-    if (Base::CheckDirectoryOrPath(localPath.c_str(), true, false)) {
+    if (Base::CheckDirectoryOrPath(localPath.c_str(), true, false, errStr)) {
+        WRITE_LOG(LOG_INFO, "%s", errStr.c_str());
         return true;
     }
     uv_fs_t req;
