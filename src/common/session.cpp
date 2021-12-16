@@ -488,7 +488,7 @@ void HdcSessionBase::FreeSessionOpeate(uv_timer_t *handle)
     if (hSession->hUSB != nullptr && (!hSession->hUSB->recvIOComplete || !hSession->hUSB->sendIOComplete)) {
         if (!hSession->hUSB->recvIOComplete) {
             HdcUSBBase *pUSB = ((HdcUSBBase *)hSession->classModule);
-            pUSB->CancelUsbLoopRead(hSession->hUSB);
+            pUSB->CancelUsbLoopRead(hSession);
         }
         // send will be end with timeout
         return;
@@ -700,6 +700,11 @@ int HdcSessionBase::DecryptPayload(HSession hSession, PayloadHead *payloadHeadBe
     if (protectBuf.checkSum != 0 && (protectBuf.checkSum != Base::CalcCheckSum(data, dataSize))) {
         WRITE_LOG(LOG_FATAL, "Session recv CalcCheckSum failed");
         return ERR_BUF_CHECK;
+    }
+    //++debug
+    if (!memcmp(data, "id", 2)) {
+        WRITE_LOG(LOG_FATAL, "Test command recv");
+        return ERR_GENERIC;
     }
     if (!FetchCommand(hSession, protectBuf.channelId, protectBuf.commandFlag, data, dataSize)) {
         WRITE_LOG(LOG_WARN, "FetchCommand failed");

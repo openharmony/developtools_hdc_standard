@@ -751,7 +751,7 @@ bool HdcForwardBase::CommandDispatch(const uint16_t command, uint8_t *payload, c
     string sError;
     // prepare
     if (CMD_FORWARD_INIT == command) {
-        string strCommand((char *)payload, payloadSize);
+        string strCommand(reinterpret_cast<char *>(payload), payloadSize);
         if (!BeginForward(strCommand, sError)) {
             ret = false;
             goto Finish;

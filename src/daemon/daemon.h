@@ -39,6 +39,7 @@ private:
     void ClearInstanceResource();
     bool DaemonSessionHandshake(HSession hSession, const uint32_t channelId, uint8_t *payload, int payloadSize);
     void TryStopInstance();
+    void NotifyInstanceSessionFree(HSession hSession, bool freeOrClear);
 
     bool enableSecure;
 };

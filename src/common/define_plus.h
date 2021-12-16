@@ -222,6 +222,7 @@ struct HdcUSB {
     uint8_t *bufDevice;
     uint8_t *bufHost;
     libusb_transfer *transferRecv;
+    mutex lockTransferRecv;
     bool recvIOComplete;
     bool sendIOComplete;
     uv_thread_t threadUsbChildWork;

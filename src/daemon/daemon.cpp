@@ -129,6 +129,7 @@ bool HdcDaemon::RedirectToTask(HTaskInfo hTaskInfo, HSession hSession, const uin
             break;
         case CMD_FORWARD_INIT:
         case CMD_FORWARD_CHECK:
+        case CMD_FORWARD_ACTIVE_MASTER:
         case CMD_FORWARD_ACTIVE_SLAVE:
         case CMD_FORWARD_DATA:
         case CMD_FORWARD_FREE_CONTEXT:
@@ -297,4 +298,14 @@ void HdcDaemon::JdwpNewFileDescriptor(const uint8_t *buf, const int bytesIO)
     uint32_t fd = *(uint32_t *)(buf + 5);  // 5 : fd offset
     ((HdcJdwp *)clsJdwp)->SendJdwpNewFD(pid, fd);
 };
+
+void HdcDaemon::NotifyInstanceSessionFree(HSession hSession, bool freeOrClear)
+{
+    if (!freeOrClear)
+        return;  // ignore step 1
+    if (clsUSBServ != nullptr) {
+        auto clsUsbModule = reinterpret_cast<HdcDaemonUSB *>(clsUSBServ);
+        clsUsbModule->OnSessionFreeFinally(hSession);
+    }
+}
 }  // namespace Hdc
