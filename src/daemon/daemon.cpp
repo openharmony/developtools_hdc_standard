@@ -301,8 +301,9 @@ void HdcDaemon::JdwpNewFileDescriptor(const uint8_t *buf, const int bytesIO)
 
 void HdcDaemon::NotifyInstanceSessionFree(HSession hSession, bool freeOrClear)
 {
-    if (!freeOrClear)
+    if (!freeOrClear) {
         return;  // ignore step 1
+    }
     if (clsUSBServ != nullptr) {
         auto clsUsbModule = reinterpret_cast<HdcDaemonUSB *>(clsUSBServ);
         clsUsbModule->OnSessionFreeFinally(hSession);

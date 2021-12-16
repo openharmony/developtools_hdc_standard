@@ -23,6 +23,8 @@ HdcJdwp::HdcJdwp(uv_loop_t *loopIn)
     listenPipe.data = this;
     loop = loopIn;
     refCount = 0;
+    awakenPollFd = 0;
+    stop = false;
     uv_rwlock_init(&lockMapContext);
     uv_rwlock_init(&lockJdwpTrack);
 }
