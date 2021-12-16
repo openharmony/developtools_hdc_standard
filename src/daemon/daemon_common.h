@@ -32,6 +32,7 @@
 #include "daemon_usb.h"
 #include "daemon_forward.h"
 #include "shell.h"
+#include "system_depend.h"
 #endif
 // clang-format on
 

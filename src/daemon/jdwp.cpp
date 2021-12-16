@@ -117,7 +117,7 @@ void HdcJdwp::ReadStream(uv_stream_t *pipe, ssize_t nread, const uv_buf_t *buf)
         } else {  // JS:pid PkgName
 #ifdef JS_JDWP_CONNECT
             struct JsMsgHeader *jsMsg = (struct JsMsgHeader *)p;
-            if (jsMsg->msgLen == nread) {
+            if (jsMsg->msgLen == static_cast<uint32_t>(nread)) {
                 pid = jsMsg->pid;
                 string pkgName = string((char *)p + sizeof(JsMsgHeader), jsMsg->msgLen - sizeof(JsMsgHeader));
                 ctxJdwp->pkgName = pkgName;
