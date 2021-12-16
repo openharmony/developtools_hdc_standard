@@ -707,11 +707,6 @@ int HdcSessionBase::DecryptPayload(HSession hSession, PayloadHead *payloadHeadBe
         WRITE_LOG(LOG_FATAL, "Session recv CalcCheckSum failed");
         return ERR_BUF_CHECK;
     }
-    //++debug
-    if (!memcmp(data, "id", 2)) {
-        WRITE_LOG(LOG_FATAL, "Test command recv");
-        return ERR_GENERIC;
-    }
     if (!FetchCommand(hSession, protectBuf.channelId, protectBuf.commandFlag, data, dataSize)) {
         WRITE_LOG(LOG_WARN, "FetchCommand failed");
         return ERR_GENERIC;
