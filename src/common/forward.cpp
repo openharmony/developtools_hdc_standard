@@ -119,12 +119,12 @@ void *HdcForwardBase::MallocContext(bool masterSlave)
 
 void HdcForwardBase::FreeContextCallBack(HCtxForward ctx)
 {
-    AdminContext(OP_REMOVE, ctx->id, nullptr);
-    Base::DoNextLoop(loopTask, ctx, [](const uint8_t flag, string &msg, const void *data) {
+    Base::DoNextLoop(loopTask, ctx, [this](const uint8_t flag, string &msg, const void *data) {
         HCtxForward ctx = (HCtxForward)data;
+        AdminContext(OP_REMOVE, ctx->id, nullptr);
         delete ctx;
+        --refCount;
     });
-    --refCount;
 }
 
 void HdcForwardBase::FreeJDWP(HCtxForward ctx)
@@ -491,7 +491,7 @@ bool HdcForwardBase::SetupPoint(HCtxForward ctxPoint)
     return ret;
 }
 
-bool HdcForwardBase::BeginForward(const char *command, string &sError)
+bool HdcForwardBase::BeginForward(const string &command, string &sError)
 {
     bool ret = false;
     int argc = 0;
@@ -501,7 +501,7 @@ bool HdcForwardBase::BeginForward(const char *command, string &sError)
         WRITE_LOG(LOG_FATAL, "MallocContext failed");
         return false;
     }
-    char **argv = Base::SplitCommandToArgs(command, &argc);
+    char **argv = Base::SplitCommandToArgs(command.c_str(), &argc);
     while (true) {
         if (argc < CMD_ARG1_COUNT) {
             break;
@@ -648,7 +648,11 @@ void HdcForwardBase::SendCallbackForwardBuf(uv_write_t *req, int status)
 int HdcForwardBase::SendForwardBuf(HCtxForward ctx, uint8_t *bufPtr, const int size)
 {
     int nRet = 0;
-    if (size > static_cast<int>(HDC_BUF_MAX_BYTES)) {
+    if (size > static_cast<int>(HDC_BUF_MAX_BYTES - 1)) {
+        return -1;
+    }
+    if (size <= 0) {
+        WRITE_LOG(LOG_WARN, "SendForwardBuf failed size:%d", size);
         return -1;
     }
     auto pDynBuf = new uint8_t[size];
@@ -751,7 +755,8 @@ bool HdcForwardBase::CommandDispatch(const uint16_t command, uint8_t *payload, c
     string sError;
     // prepare
     if (CMD_FORWARD_INIT == command) {
-        if (!BeginForward((char *)(payload), sError)) {
+        string strCommand(reinterpret_cast<char*>(payload), payloadSize);
+        if (!BeginForward(strCommand, sError)) {
             ret = false;
             goto Finish;
         }

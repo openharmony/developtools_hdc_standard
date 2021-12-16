@@ -24,8 +24,8 @@ enum LogLevel {
     LOG_INFO,  // default
     LOG_WARN,
     LOG_DEBUG,
-    LOG_FULL,
-    LOG_LAST = LOG_FULL,  // tail, not use
+    LOG_ALL,
+    LOG_LAST = LOG_ALL,  // tail, not use
 };
 #define WRITE_LOG(x, y...) Base::PrintLogEx(__FILE__, __LINE__, x, y)
 
@@ -129,6 +129,7 @@ enum HdcCommand {
     CMD_UNITY_BUGREPORT_INIT,
     CMD_UNITY_BUGREPORT_DATA,
     CMD_UNITY_JPID,
+    CMD_TRACK_JPID,
     // Shell commands types
     CMD_SHELL_INIT = 2000,
     CMD_SHELL_DATA,
