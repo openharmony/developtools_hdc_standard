@@ -45,7 +45,7 @@ namespace Base {
     {
         string tmpString = GetFileNameAny(debugInfo);
         debugInfo = StringFormat("%s:%d", tmpString.c_str(), line);
-        if (g_logLevel < LOG_FULL) {
+        if (g_logLevel < LOG_ALL) {
             debugInfo = "";
             threadIdString = "";
         } else {
@@ -79,7 +79,7 @@ namespace Base {
         system_clock::time_point timeNow = system_clock::now();          // now time
         system_clock::duration sinceUnix0 = timeNow.time_since_epoch();  // since 1970
         time_t sSinceUnix0 = duration_cast<seconds>(sinceUnix0).count();
-        std::tm tim = *std::localtime(&sSinceUnix0);
+        std::tm *tim = std::localtime(&sSinceUnix0);
         bool enableAnsiColor = false;
 #ifdef _WIN32
         enableAnsiColor = IsWindowsSupportAnsiColor();
@@ -97,11 +97,11 @@ namespace Base {
                 case LOG_WARN:
                     logLevelString = "\033[1;33mW\033[0m";
                     break;
-                case LOG_DEBUG:
+                case LOG_DEBUG:  // will reduce performance
                     logLevelString = "\033[1;36mD\033[0m";
                     break;
-                default:
-                    logLevelString = "\033[1;36mD\033[0m";
+                default:  // all, just more IO/Memory informations
+                    logLevelString = "\033[1;38;5;21mA\033[0m";
                     break;
             }
         } else {
@@ -112,7 +112,10 @@ namespace Base {
             const auto sSinceUnix0Rest = duration_cast<microseconds>(sinceUnix0).count() % (TIME_BASE * TIME_BASE);
             msTimeSurplus = StringFormat(".%06llu", sSinceUnix0Rest);
         }
-        timeString = StringFormat("%d:%d:%d%s", tim.tm_hour, tim.tm_min, tim.tm_sec, msTimeSurplus.c_str());
+        timeString = msTimeSurplus;
+        if (tim != nullptr) {
+            timeString = StringFormat("%d:%d:%d%s", tim->tm_hour, tim->tm_min, tim->tm_sec, msTimeSurplus.c_str());
+        }
     }
 
     void PrintLogEx(const char *functionName, int line, uint8_t logLevel, const char *msg, ...)
@@ -202,6 +205,10 @@ namespace Base {
     {
         if (*nOrigSize > 0)
             return;
+        if (sizeWanted <= 0) {
+            WRITE_LOG(LOG_WARN, "ReallocBuf failed, sizeWanted:%d", sizeWanted);
+            return;
+        }
         *origBuf = new uint8_t[sizeWanted];
         if (!*origBuf)
             return;
@@ -221,6 +228,9 @@ namespace Base {
     // As an uv_write_cb it must keep the same as prototype
     void SendCallback(uv_write_t *req, int status)
     {
+        if (status < 0) {
+            WRITE_LOG(LOG_WARN, "SendCallback failed,status:%d", status);
+        }
         delete[]((uint8_t *)req->data);
         delete req;
     }
@@ -294,9 +304,11 @@ namespace Base {
         }
         uint8_t *pDynBuf = new uint8_t[bufLen];
         if (!pDynBuf) {
+            WRITE_LOG(LOG_WARN, "SendToStream, alloc failed, size:%d", bufLen);
             return ERR_BUF_ALLOC;
         }
         if (memcpy_s(pDynBuf, bufLen, buf, bufLen)) {
+            WRITE_LOG(LOG_WARN, "SendToStream, memory copy failed, size:%d", bufLen);
             delete[] pDynBuf;
             return ERR_BUF_COPY;
         }
@@ -308,10 +320,11 @@ namespace Base {
     int SendToStreamEx(uv_stream_t *handleStream, const uint8_t *buf, const int bufLen, uv_stream_t *handleSend,
                        const void *finishCallback, const void *pWriteReqData)
     {
-        int ret = -1;
+        int ret = ERR_GENERIC;
         uv_write_t *reqWrite = new uv_write_t();
         if (!reqWrite) {
-            return 0;
+            WRITE_LOG(LOG_WARN, "SendToStreamEx, new write_t failed, size:%d", bufLen);
+            return ERR_BUF_ALLOC;
         }
         uv_buf_t bfr;
         while (true) {
@@ -319,15 +332,22 @@ namespace Base {
             bfr.base = (char *)buf;
             bfr.len = bufLen;
             if (!uv_is_writable(handleStream)) {
+                WRITE_LOG(LOG_WARN, "SendToStreamEx, uv_is_writable false, size:%d", bufLen);
                 delete reqWrite;
                 break;
             }
             // handleSend must be a TCP socket or pipe, which is a server or a connection (listening or
             // connected state). Bound sockets or pipes will be assumed to be servers.
             if (handleSend) {
-                uv_write2(reqWrite, handleStream, &bfr, 1, handleSend, (uv_write_cb)finishCallback);
+                ret = uv_write2(reqWrite, handleStream, &bfr, 1, handleSend, (uv_write_cb)finishCallback);
             } else {
-                uv_write(reqWrite, handleStream, &bfr, 1, (uv_write_cb)finishCallback);
+                ret = uv_write(reqWrite, handleStream, &bfr, 1, (uv_write_cb)finishCallback);
+            }
+            if (ret < 0) {
+                WRITE_LOG(LOG_WARN, "SendToStreamEx, uv_write false, size:%d", bufLen);
+                delete reqWrite;
+                ret = ERR_IO_FAIL;
+                break;
             }
             ret = bufLen;
             break;
@@ -874,22 +894,81 @@ namespace Base {
         return s.rfind(sub) == (s.length() - sub.length()) ? 1 : 0;
     }
 
+    const char *GetFileType(mode_t mode)
+    {
+        switch (mode & S_IFMT) {
+            case S_IFDIR:
+                return "directory";
+            case S_IFLNK:
+                return "symlink";
+            case S_IFREG:
+                return "regular file";
+#ifndef _WIN32
+            case S_IFBLK:
+                return "block device";
+            case S_IFCHR:
+                return "character device";
+            case S_IFIFO:
+                return "FIFO/pipe";
+            case S_IFSOCK:
+                return "socket";
+#endif
+            default:
+                return "Unknown";
+        }
+    }
+
+    void BuildErrorString(const char *localPath, const char *op, errno_t err, string &str)
+    {
+        // avoid to use stringstream
+        str = op;
+        str += " ";
+        str += localPath;
+        str += " failed, ";
+        str += strerror(err);
+    }
+
     // Both absolute and relative paths support
-    bool CheckDirectoryOrPath(const char *localPath, bool pathOrDir, bool readWrite)
+    bool CheckDirectoryOrPath(const char *localPath, bool pathOrDir, bool readWrite, string &errStr)
     {
         if (pathOrDir) {  // filepath
             uv_fs_t req;
+            mode_t mode;
             int r = uv_fs_lstat(nullptr, &req, localPath, nullptr);
+            if (r) {
+                BuildErrorString(localPath, "lstat", errno, errStr);
+            }
+
+            mode = req.statbuf.st_mode;
             uv_fs_req_cleanup(&req);
-            if (r == 0 && req.statbuf.st_mode & S_IFREG) {  // is file
+
+            if ((r == 0) && (mode & S_IFREG)) {  // is file
                 uv_fs_access(nullptr, &req, localPath, readWrite ? R_OK : W_OK, nullptr);
+                if (req.result) {
+                    const char *op = readWrite ? "access R_OK" : "access W_OK";
+                    BuildErrorString(localPath, op, errno, errStr);
+                }
                 uv_fs_req_cleanup(&req);
                 if (req.result == 0)
                     return true;
+            } else if (r == 0) {
+                const char *type = GetFileType(mode);
+                errStr = "Not support ";
+                errStr += type;
+                errStr += ": ";
+                errStr += localPath;
             }
         } else {  // dir
+            errStr = "Not support dir: ";
+            errStr += localPath;
         }
         return false;
+    }
+
+    bool CheckDirectoryOrPath(const char *localPath, bool pathOrDir, bool readWrite)
+    {
+        string strUnused;
+        return CheckDirectoryOrPath(localPath, pathOrDir, readWrite, strUnused);
     }
 
     // Using openssl encryption and decryption method, high efficiency; when encrypting more than 64 bytes,

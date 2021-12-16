@@ -22,8 +22,8 @@ Runtime::Runtime()
     bCheckResult = false;
     checkFinish = false;
     hashInitialize = false;
-    // UintTest Running log level LOG_INFO/LOG_FULL
-    // Base::SetLogLevel(Hdc::LOG_FULL);  // LOG_INFO
+    // UintTest Running log level LOG_INFO/LOG_ALL
+    // Base::SetLogLevel(Hdc::LOG_ALL);  // LOG_INFO
     Base::SetLogLevel(Hdc::LOG_INFO);
     // three nodes all run host, at least 5+(reserve:2)=7 threads for use
     // client 1 + (server+daemon)= SIZE_THREAD_POOL*2+1
