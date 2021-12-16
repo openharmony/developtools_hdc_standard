@@ -241,6 +241,17 @@ inline bool HdcDaemonUnity::ListJdwpProcess(void *daemonIn)
     return true;
 }
 
+inline bool HdcDaemonUnity::TrackJdwpProcess(void *daemonIn)
+{
+    HdcDaemon *daemon = (HdcDaemon *)daemonIn;
+    if (!(((HdcJdwp *)daemon->clsJdwp)->CreateJdwpTracker(taskInfo))) {
+        string result = MESSAGE_FAIL;
+        LogMsg(MSG_OK, result.c_str());
+        return false;
+    }
+    return true;
+}
+
 bool HdcDaemonUnity::CommandDispatch(const uint16_t command, uint8_t *payload, const int payloadSize)
 {
     bool ret = true;
@@ -293,6 +304,12 @@ bool HdcDaemonUnity::CommandDispatch(const uint16_t command, uint8_t *payload, c
         case CMD_UNITY_JPID: {
             ret = false;
             ListJdwpProcess(daemon);
+            break;
+        }
+        case CMD_TRACK_JPID: {
+            if (!TrackJdwpProcess(daemon)) {
+                ret = false;
+            }
             break;
         }
         default:

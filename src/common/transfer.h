@@ -106,7 +106,7 @@ private:
     };
     const uint8_t payloadPrefixReserve = 64;
     static void OnFileIO(uv_fs_t *req);
-    int SimpleFileIO(CtxFile *context, uint64_t index, uint8_t *sendBuf, int bytesIO);
+    int SimpleFileIO(CtxFile *context, uint64_t index, uint8_t *sendBuf, int bytes);
     bool SendIOPayload(CtxFile *context, int index, uint8_t *data, int dataSize);
     bool RecvIOPayload(CtxFile *context, uint8_t *data, int dataSize);
     double maxTransferBufFactor = 0.8;  // Make the data sent by each IO in one hdc packet

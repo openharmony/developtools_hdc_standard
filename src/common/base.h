@@ -68,6 +68,9 @@ namespace Base {
     int CreateSocketPair(int *fds);
     void CloseSocketPair(const int *fds);
     int StringEndsWith(string s, string sub);
+    void BuildErrorString(const char *localPath, const char *op, errno_t err, string &str);
+    const char *GetFileType(mode_t mode);
+    bool CheckDirectoryOrPath(const char *localPath, bool pathOrDir, bool readWrite, string &errStr);
     bool CheckDirectoryOrPath(const char *localPath, bool pathOrDir, bool readWrite);
     int Base64EncodeBuf(const uint8_t *input, const int length, uint8_t *bufOut);
     vector<uint8_t> Base64Encode(const uint8_t *input, const int length);

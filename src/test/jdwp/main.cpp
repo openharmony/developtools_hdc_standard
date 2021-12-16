@@ -119,7 +119,7 @@ int main(int argc, const char *argv[])
     if (signal(SIGINT, Stop) == SIG_ERR) {
         PrintMessage("jdwp_test_process signal fail.");
     }
-    clsHdcJdwpSimulator = new HdcJdwpSimulator(&loopMain);
+    clsHdcJdwpSimulator = new HdcJdwpSimulator(&loopMain, "com.example.myapplication");
     if (!clsHdcJdwpSimulator->Connect()) {
         PrintMessage("Connect fail.");
         return -1;

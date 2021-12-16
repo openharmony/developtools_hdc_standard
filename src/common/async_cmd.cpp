@@ -109,6 +109,7 @@ int AsyncCmd::Popen(string command, bool readWrite, int &pid)
             close(fd[PIPE_WRITE]);
             dup2(fd[PIPE_READ], STDIN_FILENO);
         }
+        setsid();
         setpgid(childPid, childPid);
         string shellPath = Base::GetShellPath();
         execl(shellPath.c_str(), shellPath.c_str(), "-c", command.c_str(), NULL);

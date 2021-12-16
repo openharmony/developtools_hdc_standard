@@ -48,7 +48,7 @@ constexpr uint16_t DEVICE_CHECK_INTERVAL = 3000;  // ms
 constexpr uint16_t MAX_SIZE_IOBUF = 15360;
 constexpr uint16_t MAX_USBFFS_BULK = 16384;
 // double-word(hex)=[0]major[1][2]minor[3][4]version[5]fix(a-p)[6][7]reserve
-constexpr uint32_t HDC_VERSION_NUMBER = 0x10101900;  // 1.1.1b=0x10101100
+constexpr uint32_t HDC_VERSION_NUMBER = 0x10101a00;  // 1.1.1b=0x10101100
 constexpr uint32_t HDC_BUF_MAX_BYTES = INT_MAX;
 
 const string WHITE_SPACES = " \t\n\r";
@@ -92,6 +92,7 @@ const string CMDSTR_APP_INSTALL = "install";
 const string CMDSTR_APP_UNINSTALL = "uninstall";
 const string CMDSTR_APP_SIDELOAD = "sideload";
 const string CMDSTR_LIST_JDWP = "jpid";
+const string CMDSTR_TRACK_JDWP = "track-jpid";
 const string CMDSTR_INNER_ENABLE_KEEPALIVE = "alive";
 }  // namespace Hdc
 #endif  // HDC_DEFINE_H
