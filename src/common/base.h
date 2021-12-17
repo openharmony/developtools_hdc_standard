@@ -147,7 +147,7 @@ namespace Base {
     {
         return MAX_USBFFS_BULK;
     }
-
+#ifdef HDC_SUPPORT_FLASHD
     // deprecated, remove later
     inline bool SetHdcProperty(const char *key, const char *value)
     {
@@ -158,7 +158,22 @@ namespace Base {
     {
         return false;
     }
+#endif
 }  // namespace base
+
+#ifdef HDC_SUPPORT_FLASHD
+   // deprecated, remove later
+namespace SystemDepend {
+    inline bool GetHdcProperty(const char *key, char *value, uint16_t sizeOutBuf)
+    {
+        return false;
+    };
+    inline bool SetHdcProperty(const char *key, const char *value)
+    {
+        return false;
+    };
+}  // namespace SystemDepend
+#endif
 }  // namespace Hdc
 
 #endif  // HDC_BASE_H

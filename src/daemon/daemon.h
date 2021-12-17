@@ -39,7 +39,12 @@ private:
     void ClearInstanceResource();
     bool DaemonSessionHandshake(HSession hSession, const uint32_t channelId, uint8_t *payload, int payloadSize);
     void TryStopInstance();
+// deprecated, remove later
+#ifdef HDC_SUPPORT_FLASHD
+// null
+#else
     void NotifyInstanceSessionFree(HSession hSession, bool freeOrClear);
+#endif
 
     bool enableSecure;
 };
