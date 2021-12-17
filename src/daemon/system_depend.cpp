@@ -25,6 +25,7 @@ envirments
 ############
 */
 #include "system_depend.h"
+#include "../common/base.h"
 #if defined __MUSL__ && defined HARMONY_PROJECT
 extern "C" {
 #include "init_reboot.h"
