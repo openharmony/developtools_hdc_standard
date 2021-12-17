@@ -147,6 +147,17 @@ namespace Base {
     {
         return MAX_USBFFS_BULK;
     }
+
+    // deprecated, remove later
+    inline bool SetHdcProperty(const char *key, const char *value)
+    {
+        return false;
+    }
+    // deprecated, remove later
+    inline bool GetHdcProperty(const char *key, char *value, uint16_t sizeOutBuf)
+    {
+        return false;
+    }
 }  // namespace base
 }  // namespace Hdc
 
