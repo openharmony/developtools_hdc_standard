@@ -18,8 +18,20 @@
 
 namespace Hdc {
 namespace SystemDepend {
-    bool GetHdcProperty(const char *key, char *value, uint16_t sizeOutBuf);
-    bool SetHdcProperty(const char *key, const char *value);
+#ifdef HDC_SUPPORT_FLASHD
+    // deprecated, remove later
+    inline bool GetProperty(const char *key, string value)
+    {
+        return false;
+    };
+    inline bool SetProperty(const char *key, const char *value)
+    {
+        return false;
+    };
+#else
+    bool GetProperty(const char *key, string &out, string preDefine = "");
+    bool SetProperty(const char *key, const char *value);
+#endif
     bool RebootDevice(const string &cmd);
 }  // namespace SystemDepend
 }  // namespace Hdc

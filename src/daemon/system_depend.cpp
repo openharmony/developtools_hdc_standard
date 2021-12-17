@@ -35,46 +35,60 @@ extern "C" {
 
 namespace Hdc {
 namespace SystemDepend {
-    bool SetHdcProperty(const char *key, const char *value)
+    bool SetProperty(const char *key, const char *value)
     {
+        bool ret = true;
 #if defined __MUSL__
 #ifdef HARMONY_PROJECT
-        SetParameter(key, value);
+        ret = SetParameter(key, value) == 0;
 #else
         char outBuf[256] = "";
-        string sBuf = Base::StringFormat("param set %s %s", key, value);
-        Base::RunPipeComand(sBuf.c_str(), outBuf, sizeof(outBuf), true);
+        string stringBuf = Base::StringFormat("param set %s %s", key, value);
+        Base::RunPipeComand(stringBuf.c_str(), outBuf, sizeof(outBuf), true);
 #endif  // HARMONY_PROJECT
 #else   // not __MUSL__
 #ifdef HDC_PCDEBUG
         WRITE_LOG(LOG_DEBUG, "Setproperty, key:%s value:%s", key, value);
 #else
-        string sKey = key;
-        string sValue = value;
-        string sBuf = "setprop " + sKey + " " + value;
-        system(sBuf.c_str());
+        string keyValue = key;
+        string stringBuf = "setprop " + keyValue + " " + value;
+        system(stringBuf.c_str());
 #endif  // HDC_PCDEBUG
 #endif  // __MUSL__
-        return true;
+        return ret;
     }
 
-    bool GetHdcProperty(const char *key, char *value, uint16_t sizeOutBuf)
+    bool GetProperty(const char *key, string &out, string preDefine)
     {
+        bool ret = true;
+        char tmpStringBuf[BUF_SIZE_MEDIUM] = "";
 #if defined __MUSL__
-        string sKey = key;
-        string sBuf = "param get " + sKey;
-        Base::RunPipeComand(sBuf.c_str(), value, sizeOutBuf, true);
+#ifdef HARMONY_PROJECT
+        const string strKey(key);
+        if (GetParameter(key, preDefine.c_str(), tmpStringBuf, BUF_SIZE_MEDIUM) < 0) {
+            ret = false;
+            Base::ZeroStruct(tmpStringBuf);
+        }
+#else
+        string sFailString = Base::StringFormat("Get parameter \"%s\" fail", key);
+        string stringBuf = "param get " + string(key);
+        Base::RunPipeComand(stringBuf.c_str(), tmpStringBuf, BUF_SIZE_MEDIUM - 1, true);
+        if (!strcmp(sFailString.c_str(), tmpStringBuf)) {
+            // failed
+            ret = false;
+            Base::ZeroStruct(tmpStringBuf);
+        }
+#endif
 #else  // not __MUSL__
 #ifdef HDC_PCDEBUG
-        WRITE_LOG(LOG_DEBUG, "Getproperty, key:%s value:%s", key, value);
+        WRITE_LOG(LOG_DEBUG, "Getproperty, key:%s", key);
 #else
-        string sKey = key;
-        string sBuf = "getprop " + sKey;
-        Base::RunPipeComand(sBuf.c_str(), value, sizeOutBuf, true);
+        string stringBuf = "getprop " + string(key);
+        Base::RunPipeComand(stringBuf.c_str(), tmpStringBuf, BUF_SIZE_MEDIUM - 1, true);
 #endif  // HDC_PCDEBUG
 #endif  //__MUSL__
-        value[sizeOutBuf - 1] = '\0';
-        return true;
+        out = tmpStringBuf;
+        return ret;
     }
 
     bool CallDoReboot(const char *reason)
@@ -106,7 +120,7 @@ namespace SystemDepend {
         } else {
             propertyVal = Base::StringFormat("reboot,%s", cmd.c_str());
         }
-        return SetHdcProperty(rebootProperty.c_str(), propertyVal.c_str());
+        return SetProperty(rebootProperty.c_str(), propertyVal.c_str());
 #endif
     }
 }

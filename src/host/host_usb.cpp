@@ -554,16 +554,16 @@ bool HdcHostUSB::ReadyForWorkThread(HSession hSession)
 void HdcHostUSB::SessionUsbWorkThread(void *arg)
 {
     HSession hSession = (HSession)arg;
-    constexpr uint8_t USB_HANDLE_TIMEOUT = DEVICE_CHECK_INTERVAL / TIME_BASE;
-    constexpr uint8_t USB_SESSION_IDLE_COMMMON_REFERENCE = 2;
+    constexpr uint8_t usbHandleTimeOut = DEVICE_CHECK_INTERVAL / TIME_BASE;
+    constexpr uint8_t usbSessionIdleCommonReference = 2;
     WRITE_LOG(LOG_DEBUG, "SessionUsbWorkThread work thread:%p", uv_thread_self());
     // run until all USB callback finish(ref == 1, I'm the only one left)
     while (!hSession->isDead || hSession->ref > 1) {
-        if (hSession->ref != USB_SESSION_IDLE_COMMMON_REFERENCE) {
+        if (hSession->ref != usbSessionIdleCommonReference) {
             WRITE_LOG(LOG_DEBUG, "Session usb workthread session-ref:%u", uint32_t(hSession->ref));
         }
         struct timeval zerotime;
-        zerotime.tv_sec = USB_HANDLE_TIMEOUT;
+        zerotime.tv_sec = usbHandleTimeOut;
         zerotime.tv_usec = 0;  // if == 0,windows will be high CPU load
         libusb_handle_events_timeout(hSession->hUSB->ctxUSB, &zerotime);
     }

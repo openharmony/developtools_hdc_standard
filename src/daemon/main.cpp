@@ -34,10 +34,9 @@ bool ForkChildCheck(int argc, const char *argv[])
     // hdcd        #service start forground
     // hdcd -b     #service start backgroundRun
     // hdcd -fork  #fork
-    char modeSet[BUF_SIZE_TINY] = "";
-    SystemDepend::GetHdcProperty("persist.hdc.mode", modeSet, BUF_SIZE_TINY);
     Base::PrintMessage("Background mode, persist.hdc.mode");
-    string workMode = modeSet;
+    string workMode;
+    SystemDepend::GetProperty("persist.hdc.mode", workMode);
     workMode = Base::Trim(workMode);
     if (workMode == CMDSTR_TMODE_TCP) {
         WRITE_LOG(LOG_DEBUG, "Property enable TCP");
@@ -134,10 +133,8 @@ bool GetDaemonCommandlineOptions(int argc, const char *argv[])
 
 void NeedDropPriv()
 {
-    char droprootSet[BUF_SIZE_TINY] = "";
-    SystemDepend::GetHdcProperty("persist.hdc.root", droprootSet, BUF_SIZE_TINY);
-    droprootSet[sizeof(droprootSet) - 1] = '\0';
-    string rootMode = droprootSet;
+    string rootMode;
+    SystemDepend::GetProperty("persist.hdc.root", rootMode);
     if (Base::Trim(rootMode) == "1") {
         setuid(0);
         g_rootRun = true;

@@ -785,7 +785,7 @@ int HdcSessionBase::FetchIOBuf(HSession hSession, uint8_t *ioBuf, int read)
 void HdcSessionBase::AllocCallback(uv_handle_t *handle, size_t sizeWanted, uv_buf_t *buf)
 {
     HSession context = (HSession)handle->data;
-    Base::ReallocBuf(&context->ioBuf, &context->bufSize, Base::GetMaxBufSize() * 10);
+    Base::ReallocBuf(&context->ioBuf, &context->bufSize, HDC_SOCKETPAIR_SIZE);
     buf->base = (char *)context->ioBuf + context->availTailIndex;
     int size = context->bufSize - context->availTailIndex;
     buf->len = std::min(size, static_cast<int>(sizeWanted));
