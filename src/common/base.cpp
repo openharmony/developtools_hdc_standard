@@ -191,7 +191,7 @@ namespace Base {
         uv_tcp_keepalive(tcpHandle, 1, GLOBAL_TIMEOUT);
         // if MAX_SIZE_IOBUF==5k,bufMaxSize at least 40k. It must be set to io 8 times is more appropriate,
         // otherwise asynchronous IO is too fast, a lot of IO is wasted on IOloop, transmission speed will decrease
-        int bufMaxSize = GetMaxBufSize() * 10;
+        int bufMaxSize = HDC_SOCKETPAIR_SIZE;
         uv_recv_buffer_size((uv_handle_t *)tcpHandle, &bufMaxSize);
         uv_send_buffer_size((uv_handle_t *)tcpHandle, &bufMaxSize);
     }
@@ -1156,16 +1156,6 @@ namespace Base {
         return ret;
     }
 
-    int open_osfhandle(uv_os_fd_t os_fd)
-    {
-        // equal libuv's uv_open_osfhandle, libuv 1.23 added. old libuv not impl...
-#ifdef _WIN32
-        return _open_osfhandle((intptr_t)os_fd, 0);
-#else
-        return os_fd;
-#endif
-    }
-
     uv_os_sock_t DuplicateUvSocket(uv_tcp_t *tcp)
     {
         uv_os_sock_t dupFd = -1;
@@ -1181,7 +1171,7 @@ namespace Base {
         if (uv_fileno((const uv_handle_t *)tcp, &fdOs) < 0) {
             return ERR_API_FAIL;
         }
-        dupFd = dup(open_osfhandle(fdOs));
+        dupFd = dup(uv_open_osfhandle(fdOs));
 #endif
         return dupFd;
     }

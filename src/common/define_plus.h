@@ -160,7 +160,7 @@ enum HdcCommand {
     CMD_APP_UNINSTALL,
 
     // deprecated, remove later
-    CMD_UNITY_JPID,
+    CMD_UNITY_JPID = CMD_JDWP_LIST,
 };
 
 enum UsbProtocolOption {

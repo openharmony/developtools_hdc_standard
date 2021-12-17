@@ -23,7 +23,8 @@
 #include "../common/async_cmd.h"
 #include "../common/serial_struct.h"
 
-#ifndef HDC_HOST //daemon used
+#ifndef HDC_HOST // daemon used
+#include "system_depend.h"
 #include "jdwp.h"
 #include "daemon.h"
 #include "daemon_unity.h"
@@ -32,7 +33,6 @@
 #include "daemon_usb.h"
 #include "daemon_forward.h"
 #include "shell.h"
-#include "system_depend.h"
 #endif
 // clang-format on
 

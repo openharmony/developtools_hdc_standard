@@ -168,7 +168,7 @@ int HdcDaemonUSB::ConnectEPPoint(HUSB hUSB)
                 break;
             }
             // active usbrc，Send USB initialization singal
-            SystemDepend::SetHdcProperty("sys.usb.ffs.ready", "1");
+            SystemDepend::SetProperty("sys.usb.ffs.ready", "1");
             WRITE_LOG(LOG_DEBUG, "ConnectEPPoint ctrl init finish, set usb-ffs ready");
         }
         string outPath = basePath + "/ep1";

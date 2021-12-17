@@ -80,14 +80,11 @@ void HdcDaemon::InitMod(bool bEnableTCP, bool bEnableUSB)
         clsUSBServ = new HdcDaemonUSB(false, this);
         ((HdcDaemonUSB *)clsUSBServ)->Initial();
     }
-
     clsJdwp = new HdcJdwp(&loopMain);
     ((HdcJdwp *)clsJdwp)->Initial();
-
     // enable security
-    char value[4] = "0";
-    SystemDepend::GetHdcProperty("ro.hdc.secure", value, sizeof(value));
-    string secure = value;
+    string secure;
+    SystemDepend::GetProperty("ro.hdc.secure", secure);
     enableSecure = (Base::Trim(secure) == "1");
 }
 
