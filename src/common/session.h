@@ -47,13 +47,11 @@ public:
     virtual ~HdcSessionBase();
     virtual void AttachChannel(HSession hSession, const uint32_t channelId) {};
     virtual void DeatchChannel(HSession hSession, const uint32_t channelId) {};
+    virtual void NotifyInstanceSessionFree(HSession hSession, bool freeOrClear) {};
     virtual bool RedirectToTask(HTaskInfo hTaskInfo, HSession hSession, const uint32_t channelId,
                                 const uint16_t command, uint8_t *payload, const int payloadSize)
     {
         return true;
-    }
-    virtual void NotifyInstanceSessionFree(HSession hSession, bool freeOrClear)
-    {
     }
     // Thread security interface for global stop programs
     void PostStopInstanceMessage(bool restart = false);

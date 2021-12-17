@@ -14,7 +14,7 @@
  */
 #ifndef HDC_SYSTEM_DEPEND_H
 #define HDC_SYSTEM_DEPEND_H
-#include "../common/base.h"
+#include "daemon_common.h"
 
 namespace Hdc {
 namespace SystemDepend {
