@@ -35,7 +35,7 @@ extern "C" {
 
 namespace Hdc {
 namespace SystemDepend {
-    bool SetOhosParameter(const char *key, const char *value)
+    bool SetDevItem(const char *key, const char *value)
     {
         bool ret = true;
 #if defined __MUSL__
@@ -48,7 +48,7 @@ namespace SystemDepend {
 #endif  // HARMONY_PROJECT
 #else   // not __MUSL__
 #ifdef HDC_PCDEBUG
-        WRITE_LOG(LOG_DEBUG, "SetOhosParameter, key:%s value:%s", key, value);
+        WRITE_LOG(LOG_DEBUG, "SetDevItem, key:%s value:%s", key, value);
 #else
         string keyValue = key;
         string stringBuf = "setprop " + keyValue + " " + value;
@@ -58,7 +58,7 @@ namespace SystemDepend {
         return ret;
     }
 
-    bool GetOhosParameter(const char *key, string &out, string preDefine)
+    bool GetDevItem(const char *key, string &out, string preDefine)
     {
         bool ret = true;
         char tmpStringBuf[BUF_SIZE_MEDIUM] = "";
@@ -81,7 +81,7 @@ namespace SystemDepend {
 #endif
 #else  // not __MUSL__
 #ifdef HDC_PCDEBUG
-        WRITE_LOG(LOG_DEBUG, "GetOhosParameter, key:%s", key);
+        WRITE_LOG(LOG_DEBUG, "GetDevItem, key:%s", key);
 #else
         string stringBuf = "getprop " + string(key);
         Base::RunPipeComand(stringBuf.c_str(), tmpStringBuf, BUF_SIZE_MEDIUM - 1, true);
@@ -120,7 +120,7 @@ namespace SystemDepend {
         } else {
             propertyVal = Base::StringFormat("reboot,%s", cmd.c_str());
         }
-        return SetOhosParameter(rebootProperty.c_str(), propertyVal.c_str());
+        return SetDevItem(rebootProperty.c_str(), propertyVal.c_str());
 #endif
     }
 }

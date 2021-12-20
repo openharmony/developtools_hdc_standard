@@ -84,7 +84,7 @@ void HdcDaemon::InitMod(bool bEnableTCP, bool bEnableUSB)
     ((HdcJdwp *)clsJdwp)->Initial();
     // enable security
     string secure;
-    SystemDepend::GetOhosParameter("ro.hdc.secure", secure);
+    SystemDepend::GetDevItem("ro.hdc.secure", secure);
     enableSecure = (Base::Trim(secure) == "1");
 }
 
