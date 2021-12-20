@@ -36,7 +36,7 @@ bool ForkChildCheck(int argc, const char *argv[])
     // hdcd -fork  #fork
     Base::PrintMessage("Background mode, persist.hdc.mode");
     string workMode;
-    SystemDepend::GetOhosParameter("persist.hdc.mode", workMode);
+    SystemDepend::GetDevItem("persist.hdc.mode", workMode);
     workMode = Base::Trim(workMode);
     if (workMode == CMDSTR_TMODE_TCP) {
         WRITE_LOG(LOG_DEBUG, "Property enable TCP");
@@ -134,7 +134,7 @@ bool GetDaemonCommandlineOptions(int argc, const char *argv[])
 void NeedDropPriv()
 {
     string rootMode;
-    SystemDepend::GetOhosParameter("persist.hdc.root", rootMode);
+    SystemDepend::GetDevItem("persist.hdc.root", rootMode);
     if (Base::Trim(rootMode) == "1") {
         setuid(0);
         g_rootRun = true;

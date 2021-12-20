@@ -179,12 +179,12 @@ bool HdcDaemonUnity::SetDeviceRunMode(void *daemonIn, const char *cmd)
     HdcDaemon *daemon = (HdcDaemon *)daemonIn;
     WRITE_LOG(LOG_DEBUG, "Set run mode:%s", cmd);
     if (!strcmp(CMDSTR_TMODE_USB.c_str(), cmd)) {
-        SystemDepend::SetOhosParameter("persist.hdc.mode", CMDSTR_TMODE_USB.c_str());
+        SystemDepend::SetDevItem("persist.hdc.mode", CMDSTR_TMODE_USB.c_str());
     } else if (!strncmp("port", cmd, strlen("port"))) {
-        SystemDepend::SetOhosParameter("persist.hdc.mode", CMDSTR_TMODE_TCP.c_str());
+        SystemDepend::SetDevItem("persist.hdc.mode", CMDSTR_TMODE_TCP.c_str());
         if (!strncmp("port ", cmd, strlen("port "))) {
             const char *port = cmd + 5;
-            SystemDepend::SetOhosParameter("persist.hdc.port", port);
+            SystemDepend::SetDevItem("persist.hdc.port", port);
         }
     } else {
         LogMsg(MSG_FAIL, "Unknow command");
@@ -263,9 +263,9 @@ bool HdcDaemonUnity::CommandDispatch(const uint16_t command, uint8_t *payload, c
         case CMD_UNITY_ROOTRUN: {
             ret = false;
             if (payloadSize != 0 && !strcmp((char *)strPayload.c_str(), "r")) {
-                SystemDepend::SetOhosParameter("persist.hdc.root", "0");
+                SystemDepend::SetDevItem("persist.hdc.root", "0");
             } else {
-                SystemDepend::SetOhosParameter("persist.hdc.root", "1");
+                SystemDepend::SetDevItem("persist.hdc.root", "1");
             }
             daemon->PostStopInstanceMessage(true);
             break;
