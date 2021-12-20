@@ -30,13 +30,12 @@ public:
 private:
     struct CtxUvFileCommonIo {
         void *thisClass;
-        uv_fs_t req;
+        void *data;
         uint8_t *buf;
         int bufSizeMax;
-        // dynamic below
-        bool atPollQueue;
         int bufSize;
-        void *data;
+        bool atPollQueue;
+        uv_fs_t req;
     };
     static void OnUSBRead(uv_fs_t *req);
     static void WatchEPTimer(uv_timer_t *handle);
