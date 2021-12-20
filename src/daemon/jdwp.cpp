@@ -31,6 +31,8 @@ HdcJdwp::HdcJdwp(uv_loop_t *loopIn)
     refCount = 0;
     uv_rwlock_init(&lockMapContext);
     uv_rwlock_init(&lockJdwpTrack);
+    awakenPollFd = -1;
+    stop = false;
 }
 
 HdcJdwp::~HdcJdwp()
