@@ -20,17 +20,17 @@ namespace Hdc {
 namespace SystemDepend {
 #ifdef HDC_SUPPORT_FLASHD
     // deprecated, remove later
-    inline bool GetProperty(const char *key, string value)
+    inline bool GetOhosParameter(const char *key, string value)
     {
         return false;
     };
-    inline bool SetProperty(const char *key, const char *value)
+    inline bool SetOhosParameter(const char *key, const char *value)
     {
         return false;
     };
 #else
-    bool GetProperty(const char *key, string &out, string preDefine = "");
-    bool SetProperty(const char *key, const char *value);
+    bool GetOhosParameter(const char *key, string &out, string preDefine = "");
+    bool SetOhosParameter(const char *key, const char *value);
 #endif
     bool RebootDevice(const string &cmd);
 }  // namespace SystemDepend

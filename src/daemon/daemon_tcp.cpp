@@ -20,7 +20,7 @@ HdcDaemonTCP::HdcDaemonTCP(const bool serverOrDaemonIn, void *ptrMainBase)
 {
     // If the listening value for the property setting is obtained, it will be 0 randomly assigned.
     string strTCPPort;
-    SystemDepend::GetProperty("persist.hdc.port", strTCPPort);
+    SystemDepend::GetOhosParameter("persist.hdc.port", strTCPPort);
     tcpListenPort = atoi(strTCPPort.c_str());
     if (tcpListenPort <= 0) {
         tcpListenPort = 0;
