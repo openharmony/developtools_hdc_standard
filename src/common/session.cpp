@@ -750,20 +750,15 @@ int HdcSessionBase::FetchIOBuf(HSession hSession, uint8_t *ioBuf, int read)
         return ERR_IO_FAIL;
     }
     hSession->availTailIndex += read;
-    WRITE_LOG(LOG_ALL, "FetchIOBuf begin, IOSize:%d availTailIndex:%d", read, hSession->availTailIndex);
     while (!hSession->isDead && hSession->availTailIndex > static_cast<int>(sizeof(PayloadHead))) {
         childRet = ptrConnect->OnRead(hSession, ioBuf + indexBuf, hSession->availTailIndex);
         if (childRet > 0) {
             hSession->availTailIndex -= childRet;
             indexBuf += childRet;
-            WRITE_LOG(LOG_ALL, "FetchIOBuf loop read indexBuf:%d availTailIndex:%d", indexBuf,
-                      hSession->availTailIndex);
         } else if (childRet == 0) {
             // Not enough a IO
-            WRITE_LOG(LOG_ALL, "FetchIOBuf loop read not enough, availTailIndex:%d", hSession->availTailIndex);
             break;
-        } else {
-            // <0
+        } else {                           // <0
             hSession->availTailIndex = 0;  // Preventing malicious data packages
             indexBuf = ERR_BUF_SIZE;
             break;
@@ -778,7 +773,6 @@ int HdcSessionBase::FetchIOBuf(HSession hSession, uint8_t *ioBuf, int read)
         uint8_t *bufToZero = (uint8_t *)(hSession->ioBuf + hSession->availTailIndex);
         Base::ZeroBuf(bufToZero, hSession->bufSize - hSession->availTailIndex);
     }
-    WRITE_LOG(LOG_ALL, "FetchIOBuf Finish, IOSize:%d availTailIndex:%d", read, hSession->availTailIndex);
     return indexBuf;
 }
 
