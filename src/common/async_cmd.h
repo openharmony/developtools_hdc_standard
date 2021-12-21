@@ -47,7 +47,7 @@ private:
 
     uint32_t options = 0;
     int fd = 0;
-    int pid;
+    int pid = 0;
     HdcFileDescriptor *childShell = nullptr;
     uint32_t refCount = 0;
     CmdResultCallback resultCallback;
