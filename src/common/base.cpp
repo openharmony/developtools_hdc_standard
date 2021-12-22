@@ -1176,16 +1176,6 @@ namespace Base {
         return dupFd;
     }
 
-    vector<uint8_t> Md5Sum(uint8_t *buf, int size)
-    {
-        vector<uint8_t> ret;
-        uint8_t md5Hash[MD5_DIGEST_LENGTH] = { 0 };
-        if (EVP_Digest(buf, size, md5Hash, NULL, EVP_md5(), NULL)) {
-            ret.insert(ret.begin(), md5Hash, md5Hash + sizeof(md5Hash));
-        }
-        return ret;
-    }
-
     string GetCwd()
     {
         char path[PATH_MAX] = "";

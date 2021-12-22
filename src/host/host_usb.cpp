@@ -14,6 +14,7 @@
  */
 #include "host_usb.h"
 #include "server.h"
+#include <thread>
 
 namespace Hdc {
 HdcHostUSB::HdcHostUSB(const bool serverOrDaemonIn, void *ptrMainBase, void *ctxUSBin)
@@ -334,12 +335,11 @@ int HdcHostUSB::CheckActiveConfig(libusb_device *device, HUSB hUSB)
 void HdcHostUSB::CancelUsbLoopRead(HSession hSession)
 {
     HUSB hUSB = hSession->hUSB;
-    hUSB->lockTransferRecv.lock();
+    std::unique_lock<std::mutex> lock(hUSB->lockTransferRecv);
     if (hUSB->transferRecv != nullptr && !hUSB->recvIOComplete) {
         WRITE_LOG(LOG_DEBUG, "HostUSB CancelUsbLoopRead, ref:%u", uint32_t(hSession->ref));
         libusb_cancel_transfer(hUSB->transferRecv);
     }
-    hUSB->lockTransferRecv.unlock();
 }
 
 // 3rd write child-hdc-workthread
@@ -374,76 +374,39 @@ int HdcHostUSB::UsbToHdcProtocol(uv_stream_t *stream, uint8_t *appendData, int d
     return index;
 }
 
-bool HdcHostUSB::SubmitUsbWorkthread(HSession hSession, libusb_transfer *transfer, const int nextReadSize,
-                                     const int timeout)
-{
-    HUSB hUSB = hSession->hUSB;
-    ++hSession->ref;
-    libusb_fill_bulk_transfer(transfer, hUSB->devHandle, hUSB->epDevice, hUSB->bufDevice, nextReadSize,
-                              ReadUSBBulkCallback, hSession, timeout);
-    int childRet = libusb_submit_transfer(transfer);
-    if (childRet < 0) {
-        --hSession->ref;
-        WRITE_LOG(LOG_FATAL, "libusb_submit_transfer failed, err:%d", childRet);
-        return false;
-    }
-    return true;
-}
-
-// at usb 3rd thread
-void LIBUSB_CALL HdcHostUSB::ReadUSBBulkCallback(struct libusb_transfer *transfer)
-{
-    HSession hSession = (HSession)transfer->user_data;
-    HdcHostUSB *thisClass = (HdcHostUSB *)hSession->classModule;
-    HUSB hUSB = hSession->hUSB;
-    bool bOK = false;
-    int childRet = 0;
-    constexpr int infinity = 0;  // ignore timeout
-    hUSB->lockTransferRecv.lock();
-    while (true) {
-        if (!thisClass->modRunning || hUSB->recvIOComplete) {
-            WRITE_LOG(LOG_WARN, "Hostusb read break");
-            break;
-        }
-        if (LIBUSB_TRANSFER_COMPLETED != transfer->status) {
-            WRITE_LOG(LOG_FATAL, "Hostusb not LIBUSB_TRANSFER_COMPLETED, status:%d", transfer->status);
-            break;
-        }
-        childRet
-            = thisClass->SendToHdcStream(hSession, reinterpret_cast<uv_stream_t *>(&hSession->dataPipe[STREAM_MAIN]),
-                                         hUSB->bufDevice, transfer->actual_length);
-        if (childRet < 0) {
-            break;
-        }
-        // loop self
-        int nextReadSize = childRet == 0 ? hUSB->wMaxPacketSizeSend : std::min(childRet, Base::GetUsbffsBulkSize());
-        if (!thisClass->SubmitUsbWorkthread(hSession, transfer, nextReadSize, infinity)) {
-            break;
-        }
-        bOK = true;
-        break;
-    }
-    if (!bOK) {
-        auto server = reinterpret_cast<HdcServer *>(thisClass->clsMainBase);
-        server->FreeSession(hSession->sessionId);
-        hUSB->recvIOComplete = true;
-        WRITE_LOG(LOG_WARN, "ReadUSBBulkCallback failed");
-    }
-    --hSession->ref;  // until function finsh, dec ref
-    hUSB->lockTransferRecv.unlock();
-}
-
 void HdcHostUSB::RegisterReadCallback(HSession hSession)
 {
     HUSB hUSB = hSession->hUSB;
-    if (hSession->isDead || !modRunning) {
-        return;
-    }
-    hSession->hUSB->transferRecv->user_data = hSession;
-    if (SubmitUsbWorkthread(hSession, hUSB->transferRecv, hUSB->wMaxPacketSizeSend, GLOBAL_TIMEOUT * TIME_BASE)) {
-        // success
-        hSession->hUSB->recvIOComplete = false;
-    }
+    ++hSession->ref;
+    hUSB->transferRecv->user_data = hSession;
+    hUSB->recvIOComplete = false;
+    std::thread([this, hSession, hUSB]() {
+        int childRet = 0;
+        int nextReadSize = 0;
+        int reallySize = 0;
+        while (!hSession->isDead) {
+            nextReadSize = childRet == 0 ? hUSB->wMaxPacketSizeSend : std::min(childRet, Base::GetUsbffsBulkSize());
+            hUSB->lockTransferRecv.lock();
+            childRet
+                = libusb_bulk_transfer(hUSB->devHandle, hUSB->epDevice, hUSB->bufDevice, nextReadSize, &reallySize, 0);
+            hUSB->lockTransferRecv.unlock();
+            if (childRet < 0) {
+                WRITE_LOG(LOG_FATAL, "Recv usb failed, ret:%d reallySize:%d", childRet, reallySize);
+                break;
+            }
+            childRet = SendToHdcStream(hSession, reinterpret_cast<uv_stream_t *>(&hSession->dataPipe[STREAM_MAIN]),
+                                       hUSB->bufDevice, reallySize);
+            if (childRet < 0) {
+                WRITE_LOG(LOG_FATAL, "SendToHdcStream failed, ret:%d", childRet);
+                break;
+            }
+        }
+        --hSession->ref;
+        auto server = reinterpret_cast<HdcServer *>(clsMainBase);
+        server->FreeSession(hSession->sessionId);
+        hUSB->recvIOComplete = true;
+        WRITE_LOG(LOG_WARN, "ReadUSBBulkCallback failed");
+    }).detach();
 }
 
 // ==0 Represents new equipment and is what we need,<0  my need

@@ -39,7 +39,6 @@ private:
     static void SessionUsbWorkThread(void *arg);  // 3rd thread
     static void WatchUsbNodeChange(uv_timer_t *handle);
     static void KickoutZombie(HSession hSession);
-    static void LIBUSB_CALL ReadUSBBulkCallback(struct libusb_transfer *transfer);
     int StartupUSBWork();
     int CheckActiveConfig(libusb_device *device, HUSB hUSB);
     int OpenDeviceMyNeed(HUSB hUSB);
@@ -61,7 +60,6 @@ private:
     map<string, UsbCheckStatus> mapIgnoreDevice;
 
 private:
-    bool SubmitUsbWorkthread(HSession hSession, libusb_transfer *transfer, const int nextReadSize, const int timeout);
     uv_thread_t threadUsbWork;
 };
 }  // namespace Hdc
