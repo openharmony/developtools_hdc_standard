@@ -16,7 +16,6 @@
 #define DEFINE_PLUS_H
 
 namespace Hdc {
-constexpr uint8_t LOG_LEVEL_FULL = 5;
 // ############################# enum define ###################################
 enum LogLevel {
     LOG_OFF,

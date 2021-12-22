@@ -22,6 +22,12 @@ HdcDaemonUSB::HdcDaemonUSB(const bool serverOrDaemonIn, void *ptrMainBase)
     Base::ZeroStruct(sendEP);
     Base::ZeroStruct(usbHandle);
     uv_mutex_init(&sendEP);
+
+    // ignre signal alarm to avoid usb async-read EINTR?
+    struct sigaction action;
+    action.sa_handler = SIG_IGN;
+    sigemptyset(&action.sa_mask);
+    sigaction(SIGALRM, &action, NULL);
 }
 
 HdcDaemonUSB::~HdcDaemonUSB()
@@ -447,14 +453,20 @@ void HdcDaemonUSB::OnUSBRead(uv_fs_t *req)
         // Don't care is module running, first deal with this
         if (bytesIOBytes < 0) {
             // logic alive and EINTER is gdb attach
-            // logic unalive and EINTER maybe close fd
+            //
+            // [about gdb attach known issue]
+            // When GDB debugging is loaded, the number of USB read interrupts of libuv will increase. Multiple
+            // interrupts will increase the correctness of USB data reading. Setting GDB to asynchronous mode or using
+            // log debugging can avoid this problem
             if (bytesIOBytes != -EINTR) {  // Epoll will be broken when gdb attach
                 WRITE_LOG(LOG_WARN, "USBIO failed1 %s", uv_strerror(bytesIOBytes));
                 ret = false;
                 break;
+            } else {
+                WRITE_LOG(LOG_ALL, "OnUSBRead singal EINTR");
             }
         } else if (bytesIOBytes == 0) {  // zero packet
-            WRITE_LOG(LOG_WARN, "Zero packet received");
+            WRITE_LOG(LOG_ALL, "Zero packet received");
         } else {
             if (thisClass->JumpAntiquePacket(*bufPtr, bytesIOBytes)) {
                 WRITE_LOG(LOG_DEBUG, "JumpAntiquePacket auto jump");

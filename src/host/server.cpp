@@ -95,7 +95,7 @@ bool HdcServer::PullupServerWin32(const char *path, const char *listenString)
         runPath = uvPath.substr(uvPath.find_last_of("/\\") + 1);
     }
     WRITE_LOG(LOG_DEBUG, "server shortpath:[%s] runPath:[%s]", shortPath, runPath.c_str());
-    if (sprintf_s(buf, sizeof(buf), "%s -l5 -s %s -m", runPath.c_str(), listenString) < 0) {
+    if (sprintf_s(buf, sizeof(buf), "%s -s %s -m", runPath.c_str(), listenString) < 0) {
         return false;
     }
     WRITE_LOG(LOG_DEBUG, "Run server in debug-forground, cmd:%s", buf);

@@ -162,7 +162,7 @@ int main(int argc, const char *argv[])
     }
     if (argc == 1 || (argc == CMD_ARG1_COUNT && (!strcmp(argv[1], "-forkchild") || !strcmp(argv[1], "-b")))) {
         Hdc::Base::RemoveLogFile();
-        Base::SetLogLevel(LOG_LEVEL_FULL);
+        Base::SetLogLevel(LOG_DEBUG);  // tmp set
         ForkChildCheck(argc, argv);
     } else {
         GetDaemonCommandlineOptions(argc, argv);
