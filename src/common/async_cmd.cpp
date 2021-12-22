@@ -101,6 +101,12 @@ int AsyncCmd::Popen(string command, bool readWrite, int &pid)
         return ERR_GENERIC;
     }
     if (childPid == 0) {
+        // // ignre signal alarm to avoid usb async-read EINTR?
+        struct sigaction action;
+        action.sa_handler = SIG_IGN;
+        sigemptyset(&action.sa_mask);
+        sigaction(SIGALRM, &action, NULL);
+
         if (readWrite) {
             close(fd[PIPE_READ]);
             dup2(fd[PIPE_WRITE], STDOUT_FILENO);

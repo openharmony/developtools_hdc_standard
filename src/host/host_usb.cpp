@@ -523,7 +523,7 @@ void HdcHostUSB::SessionUsbWorkThread(void *arg)
     // run until all USB callback finish(ref == 1, I'm the only one left)
     while (!hSession->isDead || hSession->ref > 1) {
         if (hSession->ref != usbSessionIdleCommonReference) {
-            WRITE_LOG(LOG_DEBUG, "Session usb workthread session-ref:%u", uint32_t(hSession->ref));
+            WRITE_LOG(LOG_ALL, "Session usb workthread session-ref:%u", uint32_t(hSession->ref));
         }
         struct timeval zerotime;
         zerotime.tv_sec = usbHandleTimeOut;
