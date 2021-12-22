@@ -30,7 +30,7 @@ void HdcJdwpSimulator::FinishWriteCallback(uv_write_t *req, int status)
 {
     HiLog::Info(LABEL, "FinishWriteCallback:%{public}d error:%{public}s", status,
                 uv_err_name(status));
-    delete[]((uint8_t *)req->data);
+    delete[](static_cast<uint8_t *>(req->data));
     delete req;
 }
 
@@ -57,15 +57,17 @@ RetErrCode HdcJdwpSimulator::SendToStream(uv_stream_t *handleStream, const uint8
     uv_write_t *reqWrite = new uv_write_t();
     if (!reqWrite) {
         HiLog::Error(LABEL, "HdcJdwpSimulator::SendToStream alloc reqWrite fail.");
+        delete[] pDynBuf;
         return RetErrCode::ERR_GENERIC;
     }
     uv_buf_t bfr;
     while (true) {
-        reqWrite->data = (void *)pDynBuf;
-        bfr.base = (char *)pDynBuf;
+        reqWrite->data = static_cast<void *>(pDynBuf);
+        bfr.base = reinterpret_cast<char *>(pDynBuf);
         bfr.len = bufLen;
         if (!uv_is_writable(handleStream)) {
             HiLog::Info(LABEL, "SendToStream uv_is_unwritable!");
+            delete[] pDynBuf;
             delete reqWrite;
             break;
         }
@@ -92,44 +94,52 @@ void HdcJdwpSimulator::alloc_buffer(uv_handle_t *handle, size_t suggested_size, 
 void HdcJdwpSimulator::ProcessIncoming(uv_stream_t *client, ssize_t nread, const uv_buf_t *buf)
 {
     HiLog::Debug(LABEL, "ProcessIncoming :%{public}d", nread);
-    if (nread > 0) {
-        std::unique_ptr<char[]> recv = std::make_unique<char[]>(nread + 1);
-        memset_s(recv.get(), nread + 1, 0, nread + 1);
-        memcpy_s(recv.get(), nread, buf->base, nread);
-        for (int i = 0; i < (nread + 1); i++) {
-            HiLog::Info(LABEL, "ProcessIncoming recv2[%{public}d] :%{public}c", i, recv[i]);
-        }
+    do {
+        if (nread > 0) {
+            std::unique_ptr<char[]> recv = std::make_unique<char[]>(nread + 1);
+            if (memset_s(recv.get(), nread, 0, nread) != EOK) {
+                HiLog::Error(LABEL, "ProcessIncoming memset_s fail.");
+                break;
+            }
+            if (memcpy_s(recv.get(), nread, buf->base, nread) != EOK) {
+                HiLog::Error(LABEL, "ProcessIncoming memcpy_s fail.");
+                break;
+            }
+            for (int i = 0; i < (nread + 1); i++) {
+                HiLog::Info(LABEL, "ProcessIncoming recv2[%{public}d] :%{public}c", i, recv[i]);
+            }
 
-        vector<uint8_t> reply;
-        reply.clear();
-        reply.insert(reply.end(), HANDSHAKE_MESSAGE.c_str(),
-                     HANDSHAKE_MESSAGE.c_str() + HANDSHAKE_MESSAGE.size());
-        reply.insert(reply.end(), buf->base, buf->base + nread);
-        HiLog::Info(LABEL, "ProcessIncoming--reply server");
-        uint8_t *buf = reply.data();
+            vector<uint8_t> reply;
+            reply.clear();
+            reply.insert(reply.end(), HANDSHAKE_MESSAGE.c_str(),
+                         HANDSHAKE_MESSAGE.c_str() + HANDSHAKE_MESSAGE.size());
+            reply.insert(reply.end(), buf->base, buf->base + nread);
+            HiLog::Info(LABEL, "ProcessIncoming--reply server");
+            uint8_t *buf = reply.data();
 
-        for (int i = 0; i < (HANDSHAKE_MESSAGE.size() + nread + 1); i++) {
-            HiLog::Info(LABEL, "ProcessIncoming reply%{public}d :%{public}c", i, reply[i]);
+            for (int i = 0; i < (HANDSHAKE_MESSAGE.size() + nread + 1); i++) {
+                HiLog::Info(LABEL, "ProcessIncoming reply%{public}d :%{public}c", i, reply[i]);
+            }
+            SendToStream(client, buf, HANDSHAKE_MESSAGE.size() + nread + 1,
+                         (void *)FinishWriteCallback);
+        } else {
+            if (nread != UV_EOF) {
+                HiLog::Debug(LABEL, "ProcessIncoming error %s\n", uv_err_name(nread));
+            }
+            uv_close((uv_handle_t *)client, NULL);
         }
-        SendToStream(client, buf, HANDSHAKE_MESSAGE.size() + nread + 1,
-                     (void *)FinishWriteCallback);
-    } else {
-        if (nread != UV_EOF) {
-            HiLog::Debug(LABEL, "ProcessIncoming error %s\n", uv_err_name(nread));
-        }
-        uv_close((uv_handle_t *)client, NULL);
-    }
+    } while (false);
     free(buf->base);
 }
 
 // Get new socket fd passed from jdwp control
 void HdcJdwpSimulator::ReceiveNewFd(uv_stream_t *q, ssize_t nread, const uv_buf_t *buf)
 {
-    HCtxJdwpSimulator ctxJdwp = (HCtxJdwpSimulator)q->data;
+    HCtxJdwpSimulator ctxJdwp = static_cast<HCtxJdwpSimulator>(q->data);
     HdcJdwpSimulator *thisClass = static_cast<HdcJdwpSimulator *>(ctxJdwp->thisClass);
-    int pid_curr = static_cast<int>(getpid());
+    int pidCurr = static_cast<int>(getpid());
     HiLog::Debug(LABEL, "HdcJdwpSimulator::ReceiveNewFd pid: %{public}d, nread: %{public}d\n",
-                 pid_curr, nread);
+                 pidCurr, nread);
     if (nread < 0) {
         if (nread != UV_EOF) {
             HiLog::Error(LABEL, "Read error %s\n", uv_err_name(nread));
@@ -138,7 +148,7 @@ void HdcJdwpSimulator::ReceiveNewFd(uv_stream_t *q, ssize_t nread, const uv_buf_
         return;
     }
 
-    uv_pipe_t *pipe = (uv_pipe_t *)q;
+    uv_pipe_t *pipe = reinterpret_cast<uv_pipe_t *>(q);
     if (!uv_pipe_pending_count(pipe)) {
         HiLog::Error(LABEL, "No pending count\n");
         return;
@@ -148,15 +158,16 @@ void HdcJdwpSimulator::ReceiveNewFd(uv_stream_t *q, ssize_t nread, const uv_buf_
         HiLog::Debug(LABEL, "None TCP type: %{public}d", pending);
     }
     uv_tcp_init(thisClass->loop, &ctxJdwp->newFd);
-    if (uv_accept(q, (uv_stream_t *)&ctxJdwp->newFd) == 0) {
+    if (uv_accept(q, reinterpret_cast<uv_stream_t *>(&ctxJdwp->newFd)) == 0) {
         uv_os_fd_t fd;
         ctxJdwp->hasNewFd = true;
-        uv_fileno((const uv_handle_t *)&ctxJdwp->newFd, &fd);
+        uv_fileno(reinterpret_cast<const uv_handle_t *>(&ctxJdwp->newFd), &fd);
         HiLog::Debug(LABEL, "Jdwp forward pid %{public}d: new fd %{public}d\n", getpid(), fd);
-        uv_read_start((uv_stream_t *)&ctxJdwp->newFd, alloc_buffer, ProcessIncoming);
+        uv_read_start(reinterpret_cast<uv_stream_t *>(&ctxJdwp->newFd), alloc_buffer,
+                      ProcessIncoming);
     } else {
         ctxJdwp->hasNewFd = false;
-        uv_close((uv_handle_t *)&ctxJdwp->newFd, NULL);
+        uv_close(reinterpret_cast<uv_handle_t *>(&ctxJdwp->newFd), NULL);
     }
 }
 #endif // JS_JDWP_CONNECT
@@ -164,9 +175,11 @@ void HdcJdwpSimulator::ReceiveNewFd(uv_stream_t *q, ssize_t nread, const uv_buf_
 void HdcJdwpSimulator::ConnectJdwp(uv_connect_t *connection, int status)
 {
     HiLog::Debug(LABEL, "ConnectJdwp:%{public}d error:%{public}s", status, uv_err_name(status));
-    uint32_t pid_curr = static_cast<uint32_t>(getpid());
-    HCtxJdwpSimulator ctxJdwp = (HCtxJdwpSimulator)connection->data;
+    uint32_t pidCurr = static_cast<uint32_t>(getpid());
+    HCtxJdwpSimulator ctxJdwp = static_cast<HCtxJdwpSimulator>(connection->data);
     HdcJdwpSimulator *thisClass = static_cast<HdcJdwpSimulator *>(ctxJdwp->thisClass);
+    delete connection;
+
 #ifdef JS_JDWP_CONNECT
     string pkgName = thisClass->pkgName;
     uint32_t pkgSize = pkgName.size() + sizeof(JsMsgHeader); // JsMsgHeader pkgName;
@@ -175,37 +188,46 @@ void HdcJdwpSimulator::ConnectJdwp(uv_connect_t *connection, int status)
         HiLog::Error(LABEL, "ConnectJdwp new info fail.");
         return;
     }
-    memset_s(info, pkgSize, 0, pkgSize);
-    JsMsgHeader *jsMsg = (JsMsgHeader *)info;
-    jsMsg->pid = pid_curr;
-    jsMsg->msgLen = pkgSize;
-    HiLog::Info(LABEL, "ConnectJdwp send pid:%{public}d, pkgName:%{public}s, msgLen:%{public}d,",
-                jsMsg->pid, pkgName.c_str(), jsMsg->msgLen);
-    bool retFail = false;
-    if (memcpy_s(info + sizeof(JsMsgHeader), pkgName.size(), &pkgName[0], pkgName.size()) != 0) {
-        HiLog::Error(LABEL, "ConnectJdwp memcpy_s fail :%{public}s.", pkgName.c_str());
-        retFail = true;
-    }
-    if (!retFail) {
-        HiLog::Info(LABEL, "ConnectJdwp send JS msg:%{public}s", info);
-        thisClass->SendToStream((uv_stream_t *)connection->handle, (uint8_t *)info, pkgSize,
-                                (void *)FinishWriteCallback);
-    }
+    do {
+        if (memset_s(info, pkgSize, 0, pkgSize) != EOK) {
+            HiLog::Error(LABEL, "ConnectJdwp memset_s fail.");
+            break;
+        }
+        JsMsgHeader *jsMsg = reinterpret_cast<JsMsgHeader *>(info);
+        jsMsg->pid = pidCurr;
+        jsMsg->msgLen = pkgSize;
+        HiLog::Info(LABEL,
+                    "ConnectJdwp send pid:%{public}d, pkgName:%{public}s, msgLen:%{public}d,",
+                    jsMsg->pid, pkgName.c_str(), jsMsg->msgLen);
+        bool retFail = false;
+        if (memcpy_s(info + sizeof(JsMsgHeader), pkgName.size(), &pkgName[0], pkgName.size()) !=
+            EOK) {
+            HiLog::Error(LABEL, "ConnectJdwp memcpy_s fail :%{public}s.", pkgName.c_str());
+            retFail = true;
+        }
+        if (!retFail) {
+            HiLog::Info(LABEL, "ConnectJdwp send JS msg:%{public}s", info);
+            thisClass->SendToStream(reinterpret_cast<uv_stream_t *>(&ctxJdwp->pipe), info, pkgSize,
+                                    (void *)FinishWriteCallback);
+        }
+    } while (false);
     if (info) {
         delete[] info;
         info = nullptr;
     }
 #else
     char pid[5] = {0};
-    if (sprintf_s(pid, sizeof(pid), "%d", pid_curr) < 0) {
-        HiLog::Info(LABEL, "ConnectJdwp trans pid fail :%{public}d.", pid_curr);
+    if (sprintf_s(pid, sizeof(pid), "%d", pidCurr) < 0) {
+        HiLog::Info(LABEL, "ConnectJdwp trans pid fail :%{public}d.", pidCurr);
         return;
     }
     HiLog::Info(LABEL, "ConnectJdwp send pid:%{public}s", pid);
-    thisClass->SendToStream((uv_stream_t *)connection->handle, (uint8_t *)pid, sizeof(pid_curr),
+    thisClass->SendToStream(reinterpret_cast<uv_stream_t *>(&ctxJdwp->pipe),
+                            reinterpret_cast<uint8_t *>(pid), sizeof(pidCurr),
                             (void *)FinishWriteCallback);
     HiLog::Info(LABEL, "ConnectJdwp reading.");
-    uv_read_start((uv_stream_t *)&ctxJdwp->pipe, thisClass->alloc_buffer, ReceiveNewFd);
+    uv_read_start(reinterpret_cast<uv_stream_t *>(&ctxJdwp->pipe), thisClass->alloc_buffer,
+                  ReceiveNewFd);
 #endif // JS_JDWP_CONNECT
 }
 
@@ -227,12 +249,12 @@ void HdcJdwpSimulator::FreeContext()
     if (!ctxPoint) {
         return;
     }
-
-    if (loop && !uv_is_closing((uv_handle_t *)&ctxPoint->pipe)) {
-        uv_close((uv_handle_t *)&ctxPoint->pipe, nullptr);
+    if (loop && !uv_is_closing(reinterpret_cast<uv_handle_t *>(&ctxPoint->pipe))) {
+        uv_close(reinterpret_cast<uv_handle_t *>(&ctxPoint->pipe), nullptr);
     }
-    if (ctxPoint->hasNewFd && loop && !uv_is_closing((uv_handle_t *)&ctxPoint->newFd)) {
-        uv_close((uv_handle_t *)&ctxPoint->newFd, nullptr);
+    if (ctxPoint->hasNewFd && loop &&
+        !uv_is_closing(reinterpret_cast<uv_handle_t *>(&ctxPoint->newFd))) {
+        uv_close(reinterpret_cast<uv_handle_t *>(&ctxPoint->newFd), nullptr);
     }
     delete ctxPoint;
     ctxPoint = nullptr;
@@ -243,13 +265,13 @@ bool HdcJdwpSimulator::Connect()
 {
     string jdwpCtrlName = "\0jdwp-control";
     uv_connect_t *connect = new uv_connect_t();
-    ctxPoint = (HCtxJdwpSimulator)MallocContext();
+    ctxPoint = static_cast<HCtxJdwpSimulator>(MallocContext());
     if (!ctxPoint) {
         HiLog::Info(LABEL, "MallocContext failed");
         return false;
     }
     connect->data = ctxPoint;
-    uv_pipe_init(loop, (uv_pipe_t *)&ctxPoint->pipe, 1);
+    uv_pipe_init(loop, static_cast<uv_pipe_t *>(&ctxPoint->pipe), 1);
     HiLog::Info(LABEL, " HdcJdwpSimulator Connect begin");
     uv_pipe_connect(connect, &ctxPoint->pipe, jdwpCtrlName.c_str(), ConnectJdwp);
     return true;
