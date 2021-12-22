@@ -17,18 +17,14 @@
 #include <sys/eventfd.h>
 
 namespace Hdc {
-#ifdef JS_JDWP_CONNECT
-static constexpr uint32_t JPID_TRACK_LIST_SIZE = 1024 * 4;
-#else
-static constexpr uint32_t JPID_TRACK_LIST_SIZE = 1024;
-#endif // JS_JDWP_CONNECT
-
 HdcJdwp::HdcJdwp(uv_loop_t *loopIn)
 {
     Base::ZeroStruct(listenPipe);
     listenPipe.data = this;
     loop = loopIn;
     refCount = 0;
+    stop = false;
+    awakenPollFd = -1;
     uv_rwlock_init(&lockMapContext);
     uv_rwlock_init(&lockJdwpTrack);
     awakenPollFd = -1;
@@ -96,6 +92,17 @@ void HdcJdwp::FreeContext(HCtxJdwp ctx)
     Base::IdleUvTask(loop, ctx, funcReqClose);
 }
 
+void HdcJdwp::RemoveFdFromPollList(uint32_t pid)
+{
+    for (auto &&pair : pollNodeMap) {
+        if (pair.second.ppid == pid) {
+            WRITE_LOG(LOG_INFO, "RemoveFdFromPollList for pid:%d.", pid);
+            pollNodeMap.erase(pair.second.pollfd.fd);
+            break;
+        }
+    }
+}
+
 void HdcJdwp::ReadStream(uv_stream_t *pipe, ssize_t nread, const uv_buf_t *buf)
 {
     bool ret = true;
@@ -105,7 +112,7 @@ void HdcJdwp::ReadStream(uv_stream_t *pipe, ssize_t nread, const uv_buf_t *buf)
     } else if (nread == 0) {
         return;
 #ifdef JS_JDWP_CONNECT
-    } else if (nread < 0 || nread < JS_PKG_MIN_SIZE) {
+    } else if (nread < JS_PKG_MIN_SIZE || nread > JS_PKG_MX_SIZE) { // valid Js package size
 #else
     } else if (nread < 0 || nread != 4) { // 4 : 4 bytes
 #endif // JS_JDWP_CONNECT
@@ -113,8 +120,8 @@ void HdcJdwp::ReadStream(uv_stream_t *pipe, ssize_t nread, const uv_buf_t *buf)
         WRITE_LOG(LOG_DEBUG, "HdcJdwp::ReadStream invalid package nread:%d.", nread);
     }
 
-    HCtxJdwp ctxJdwp = (HCtxJdwp)pipe->data;
-    HdcJdwp *thisClass = (HdcJdwp *)ctxJdwp->thisClass;
+    HCtxJdwp ctxJdwp = static_cast<HCtxJdwp>(pipe->data);
+    HdcJdwp *thisClass = static_cast<HdcJdwp *>(ctxJdwp->thisClass);
     if (ret) {
         uint32_t pid = 0;
         char *p = ctxJdwp->buf;
@@ -122,7 +129,7 @@ void HdcJdwp::ReadStream(uv_stream_t *pipe, ssize_t nread, const uv_buf_t *buf)
             pid = atoi(p);
         } else { // JS:pid PkgName
 #ifdef JS_JDWP_CONNECT
-            struct JsMsgHeader *jsMsg = (struct JsMsgHeader *)p;
+            struct JsMsgHeader *jsMsg = reinterpret_cast<struct JsMsgHeader *>(p);
             if (jsMsg->msgLen == nread) {
                 pid = jsMsg->pid;
                 string pkgName =
@@ -145,7 +152,7 @@ void HdcJdwp::ReadStream(uv_stream_t *pipe, ssize_t nread, const uv_buf_t *buf)
             thisClass->AdminContext(OP_ADD, pid, ctxJdwp);
             ret = true;
             int fd = -1;
-            if (uv_fileno((uv_handle_t *)&(ctxJdwp->pipe), &fd) < 0) {
+            if (uv_fileno(reinterpret_cast<uv_handle_t *>(&(ctxJdwp->pipe)), &fd) < 0) {
                 WRITE_LOG(LOG_DEBUG, "HdcJdwp::ReadStream uv_fileno fail.");
             } else {
                 thisClass->pollNodeMap.emplace(fd, PollNode(fd, pid));
@@ -155,6 +162,7 @@ void HdcJdwp::ReadStream(uv_stream_t *pipe, ssize_t nread, const uv_buf_t *buf)
     }
     Base::ZeroArray(ctxJdwp->buf);
     if (!ret) {
+        WRITE_LOG(LOG_INFO, "ReadStream proc:%d err, free it.", ctxJdwp->pid);
         thisClass->FreeContext(ctxJdwp);
     }
 }
@@ -241,6 +249,7 @@ void *HdcJdwp::AdminContext(const uint8_t op, const uint32_t pid, HCtxJdwp ctxJd
         case OP_REMOVE:
             uv_rwlock_wrlock(&lockMapContext);
             mapCtxJdwp.erase(pid);
+            RemoveFdFromPollList(pid);
             uv_rwlock_wrunlock(&lockMapContext);
             break;
         case OP_QUERY: {
@@ -262,9 +271,9 @@ void *HdcJdwp::AdminContext(const uint8_t op, const uint32_t pid, HCtxJdwp ctxJd
             break;
     }
     if (op == OP_ADD || op == OP_REMOVE || op == OP_CLEAR) {
-        uv_rwlock_rdlock(&lockJdwpTrack);
+        uv_rwlock_wrlock(&lockJdwpTrack);
         ProcessListUpdated();
-        uv_rwlock_rdunlock(&lockJdwpTrack);
+        uv_rwlock_wrunlock(&lockJdwpTrack);
     }
     return hRet;
 }
@@ -358,49 +367,96 @@ size_t HdcJdwp::JdwpProcessListMsg(char *buffer, size_t bufferlen)
         WRITE_LOG(LOG_WARN, " JdwpProcessListMsg head fail.");
         return 0;
     }
-    if (memcpy_s(buffer, bufferlen, head, headerLen) != 0) {
+    if (memcpy_s(buffer, bufferlen, head, headerLen) != EOK) {
         WRITE_LOG(LOG_WARN, " JdwpProcessListMsg get head fail.");
         return 0;
     }
-    if (memcpy_s(buffer + headerLen, (bufferlen - headerLen), result.c_str(), len) != 0) {
+    if (memcpy_s(buffer + headerLen, (bufferlen - headerLen), result.c_str(), len) != EOK) {
         WRITE_LOG(LOG_WARN, " JdwpProcessListMsg get data  fail.");
         return 0;
     }
     return len + headerLen;
 }
 
-void HdcJdwp::ProcessListUpdated(void)
+void HdcJdwp::SendProcessList(HTaskInfo t, string data)
 {
-    if (jdwpTrackers.size() <= 0) {
+    if (t == nullptr || data.size() == 0) {
+        WRITE_LOG(LOG_WARN, " SendProcessList, Nothing needs to be sent.");
         return;
     }
+    void *clsSession = t->ownerSessionClass;
+    HdcSessionBase *sessionBase = static_cast<HdcSessionBase *>(clsSession);
+    sessionBase->LogMsg(t->sessionId, t->channelId, MSG_OK, data.c_str());
+}
+
+void HdcJdwp::ProcessListUpdated(HTaskInfo task)
+{
+    if (jdwpTrackers.size() <= 0) {
+        WRITE_LOG(LOG_DEBUG, "None jdwpTrackers.");
+        return;
+    }
+#ifdef JS_JDWP_CONNECT
+    static constexpr uint32_t jpidTrackListSize = 1024 * 4;
+#else
+    static constexpr uint32_t jpidTrackListSize = 1024;
+#endif // JS_JDWP_CONNECT
     std::string data;
-    data.resize(JPID_TRACK_LIST_SIZE);
+    data.resize(jpidTrackListSize);
     size_t len = JdwpProcessListMsg(&data[0], data.size());
     if (len <= 0) {
         return;
     }
     data.resize(len);
-    for (auto &t : jdwpTrackers) {
-        if (t->taskStop || t->taskFree || !t->taskClass) {
-            jdwpTrackers.erase(remove(jdwpTrackers.begin(), jdwpTrackers.end(), t),
-                                jdwpTrackers.end());
-        } else {
-            void *clsSession = t->ownerSessionClass;
-            HdcSessionBase *sessionBase = reinterpret_cast<HdcSessionBase *>(clsSession);
-            sessionBase->LogMsg(t->sessionId, t->channelId, MSG_OK, data.c_str());
+    if (task != nullptr) {
+        SendProcessList(task, data);
+    } else {
+        for (auto &t : jdwpTrackers) {
+            if (t == nullptr) {
+                continue;
+            }
+            if (t->taskStop || t->taskFree ||
+                !t->taskClass) { // The channel for the track-jpid has been stopped.
+                jdwpTrackers.erase(remove(jdwpTrackers.begin(), jdwpTrackers.end(), t),
+                                   jdwpTrackers.end());
+                if (jdwpTrackers.size() <= 0) {
+                    return;
+                }
+            } else {
+                SendProcessList(t, data);
+            }
         }
     }
 }
 
-bool HdcJdwp::CreateJdwpTracker(HTaskInfo hTaskInfo)
+bool HdcJdwp::CreateJdwpTracker(HTaskInfo taskInfo)
 {
-    if (hTaskInfo == nullptr) {
+    if (taskInfo == nullptr) {
         return false;
     }
-    jdwpTrackers.push_back(hTaskInfo);
-    ProcessListUpdated();
+    uv_rwlock_wrlock(&lockJdwpTrack);
+    auto it = std::find(jdwpTrackers.begin(), jdwpTrackers.end(), taskInfo);
+    if (it == jdwpTrackers.end()) {
+        jdwpTrackers.push_back(taskInfo);
+    }
+    ProcessListUpdated(taskInfo);
+    uv_rwlock_wrunlock(&lockJdwpTrack);
     return true;
+}
+
+void HdcJdwp::RemoveJdwpTracker(HTaskInfo taskInfo)
+{
+    if (taskInfo == nullptr) {
+        return;
+    }
+    uv_rwlock_wrlock(&lockJdwpTrack);
+    auto it = std::find(jdwpTrackers.begin(), jdwpTrackers.end(), taskInfo);
+    if (it != jdwpTrackers.end()) {
+        WRITE_LOG(LOG_DEBUG, "RemoveJdwpTracker channelId:%d, taskType:%d.", taskInfo->channelId,
+                  taskInfo->taskType);
+        jdwpTrackers.erase(remove(jdwpTrackers.begin(), jdwpTrackers.end(), *it),
+                           jdwpTrackers.end());
+    }
+    uv_rwlock_wrunlock(&lockJdwpTrack);
 }
 
 void HdcJdwp::DrainAwakenPollThread() const
@@ -455,14 +511,13 @@ void *HdcJdwp::FdEventPollThread(void *args)
                 if (it != thisClass->pollNodeMap.end()) {
                     uint32_t targetPID = it->second.ppid;
                     HCtxJdwp ctx =
-                        (HCtxJdwp)(thisClass->AdminContext(OP_QUERY, targetPID, nullptr));
+                        static_cast<HCtxJdwp>(thisClass->AdminContext(OP_QUERY, targetPID, nullptr));
                     if (ctx != nullptr) {
                         WRITE_LOG(LOG_INFO, "FreeContext for targetPID :%d", targetPID);
                         uv_read_stop((uv_stream_t *)&ctx->pipe);
                         thisClass->FreeContext(ctx);
                     }
                 }
-                thisClass->pollNodeMap.erase(it);
             } else if (pollfdsing.revents & POLLIN) {
                 if (pollfdsing.fd == thisClass->awakenPollFd) {
                     thisClass->DrainAwakenPollThread();
@@ -503,7 +558,6 @@ int HdcJdwp::Initial()
     if (CreateFdEventPoll() < 0) {
         return ERR_MODULE_JDWP_FAILED;
     }
-    stop = false;
     return RET_SUCCESS;
 }
 }
