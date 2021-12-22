@@ -440,6 +440,9 @@ void HdcDaemonUSB::OnUSBRead(uv_fs_t *req)
     uint32_t sessionId = 0;
     bool ret = false;
     int childRet = 0;
+    if (bytesIOBytes > 512 && bytesIOBytes != thisClass->saveNextReadSize) {
+        WRITE_LOG(LOG_FATAL, "Issue packet");
+    }
     while (thisClass->isAlive) {
         // Don't care is module running, first deal with this
         if (bytesIOBytes < 0) {
@@ -475,6 +478,7 @@ void HdcDaemonUSB::OnUSBRead(uv_fs_t *req)
             }
         }
         int nextReadSize = childRet == 0 ? hUSB->wMaxPacketSizeSend : std::min(childRet, Base::GetUsbffsBulkSize());
+        thisClass->saveNextReadSize = nextReadSize;
         if (thisClass->LoopUSBRead(hUSB, nextReadSize) < 0) {
             WRITE_LOG(LOG_FATAL, "LoopUSBRead failed");
             break;

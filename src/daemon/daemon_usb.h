@@ -63,6 +63,7 @@ private:
     bool isAlive = false;
     int controlEp = 0;  // EP0
     CtxUvFileCommonIo ctxRecv = {};
+    int saveNextReadSize = 0;
 };
 }  // namespace Hdc
 #endif
