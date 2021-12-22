@@ -75,9 +75,9 @@ void HdcHostUSB::SendUsbSoftReset(HSession hSession, uint32_t sessionIdOld)
     usbPayloadHeader.option = USB_OPTION_RESET;
     usbPayloadHeader.dataSize = 0;
     usbPayloadHeader.sessionId = htonl(sessionIdOld);
-    if (memcpy_s(usbPayloadHeader.flag, sizeof(usbPayloadHeader.flag), USB_PACKET_FLAG.c_str(),
-                 sizeof(usbPayloadHeader.flag))
-        != EOK) {
+    bool resultCopy = memcpy_s(usbPayloadHeader.flag, sizeof(usbPayloadHeader.flag), USB_PACKET_FLAG.c_str(),
+                               sizeof(usbPayloadHeader.flag));
+    if (resultCopy != EOK) {
         WRITE_LOG(LOG_FATAL, "SendUsbSoftReset memcpy failed");
         delete ctxReset;
         return;

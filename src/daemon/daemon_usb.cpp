@@ -446,7 +446,7 @@ void HdcDaemonUSB::OnUSBRead(uv_fs_t *req)
     uint32_t sessionId = 0;
     bool ret = false;
     int childRet = 0;
-    if (bytesIOBytes > 512 && bytesIOBytes != thisClass->saveNextReadSize) {
+    if (bytesIOBytes > hUSB->wMaxPacketSizeSend && bytesIOBytes != thisClass->saveNextReadSize) {
         WRITE_LOG(LOG_FATAL, "Issue packet");
     }
     while (thisClass->isAlive) {
