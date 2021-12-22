@@ -427,8 +427,6 @@ bool HdcForwardBase::SetupFilePoint(HCtxForward ctxPoint)
             return false;
         }
     } else {
-        uv_connect_t *connect = new uv_connect_t();
-        connect->data = ctxPoint;
         if (ctxPoint->type == FORWARD_ABSTRACT) {
             bool abstractRet = LocalAbstractConnect(&ctxPoint->pipe, sNodeCfg);
             SetupPointContinue(ctxPoint, abstractRet ? 0 : -1);
@@ -437,6 +435,8 @@ bool HdcForwardBase::SetupFilePoint(HCtxForward ctxPoint)
                 return false;
             }
         } else {
+            uv_connect_t *connect = new uv_connect_t();
+            connect->data = ctxPoint;
             uv_pipe_connect(connect, &ctxPoint->pipe, sNodeCfg.c_str(), ConnectTarget);
         }
     }

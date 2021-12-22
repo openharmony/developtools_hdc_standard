@@ -83,6 +83,7 @@ bool HdcServer::Initial(const char *listenString)
 
 bool HdcServer::PullupServerWin32(const char *path, const char *listenString)
 {
+    bool retVal = false;
 #ifdef _WIN32
     char buf[BUF_SIZE_SMALL] = "";
     char shortPath[MAX_PATH] = "";
@@ -98,7 +99,7 @@ bool HdcServer::PullupServerWin32(const char *path, const char *listenString)
     if (sprintf_s(buf, sizeof(buf), "%s -s %s -m", runPath.c_str(), listenString) < 0) {
         return false;
     }
-    WRITE_LOG(LOG_DEBUG, "Run server in debug-forground, cmd:%s", buf);
+    WRITE_LOG(LOG_DEBUG, "Run server in debug-forground, cmd:%s, args:%s", runPath.c_str(), buf);
     STARTUPINFO si;
     Base::ZeroStruct(si);
     si.cb = sizeof(STARTUPINFO);
@@ -108,11 +109,17 @@ bool HdcServer::PullupServerWin32(const char *path, const char *listenString)
     si.dwFlags = STARTF_USESHOWWINDOW;
     si.wShowWindow = SW_HIDE;
 #endif
-    CreateProcess(nullptr, buf, nullptr, nullptr, true, CREATE_NEW_CONSOLE, nullptr, nullptr, &si, &pi);
+    if (!CreateProcess(runPath.c_str(), buf, nullptr, nullptr, true, CREATE_NEW_CONSOLE, nullptr, nullptr, &si, &pi)) {
+        WRITE_LOG(LOG_WARN, "CreateProcess failed with cmd:%s, args:%s, Error Code %d", runPath.c_str(), buf,
+                  GetLastError());
+        retVal = false;
+    } else {
+        retVal = true;
+    }
     CloseHandle(pi.hThread);
     CloseHandle(pi.hProcess);
 #endif
-    return true;
+    return retVal;
 }
 
 // Only detects that the default call is in the loop address, the other tubes are not

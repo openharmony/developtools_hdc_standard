@@ -29,8 +29,11 @@ HdcDaemonUnity::~HdcDaemonUnity()
 
 void HdcDaemonUnity::StopTask()
 {
+    // Remove jpid tracker when stopping task
+    RemoveJdwpTracker();
+
     asyncCommand.DoRelease();
-};
+}
 
 bool HdcDaemonUnity::ReadyForRelease()
 {
@@ -221,13 +224,19 @@ inline bool HdcDaemonUnity::ListJdwpProcess(void *daemonIn)
 
 inline bool HdcDaemonUnity::TrackJdwpProcess(void *daemonIn)
 {
-    HdcDaemon *daemon = (HdcDaemon *)daemonIn;
-    if (!(((HdcJdwp *)daemon->clsJdwp)->CreateJdwpTracker(taskInfo))) {
+    HdcDaemon *daemon = static_cast<HdcDaemon *>(daemonIn);
+    if (!((static_cast<HdcJdwp *>(daemon->clsJdwp))->CreateJdwpTracker(taskInfo))) {
         string result = MESSAGE_FAIL;
         LogMsg(MSG_OK, result.c_str());
         return false;
     }
     return true;
+}
+
+inline void HdcDaemonUnity::RemoveJdwpTracker()
+{
+    HdcDaemon *daemon = static_cast<HdcDaemon *>(taskInfo->ownerSessionClass);
+    (static_cast<HdcJdwp *>(daemon->clsJdwp))->RemoveJdwpTracker(taskInfo);
 }
 
 bool HdcDaemonUnity::CommandDispatch(const uint16_t command, uint8_t *payload, const int payloadSize)
