@@ -96,8 +96,8 @@ bool HdcServer::PullupServerWin32(const char *path, const char *listenString)
         runPath = uvPath.substr(uvPath.find_last_of("/\\") + 1);
     }
     WRITE_LOG(LOG_DEBUG, "server shortpath:[%s] runPath:[%s]", shortPath, runPath.c_str());
-    if (sprintf_s(buf, sizeof(buf), "%s -s %s -m", runPath.c_str(), listenString) < 0) {
-        return false;
+    if (sprintf_s(buf, sizeof(buf), "-s %s -m", listenString) < 0) {
+        return retVal;
     }
     WRITE_LOG(LOG_DEBUG, "Run server in debug-forground, cmd:%s, args:%s", runPath.c_str(), buf);
     STARTUPINFO si;
@@ -110,8 +110,8 @@ bool HdcServer::PullupServerWin32(const char *path, const char *listenString)
     si.wShowWindow = SW_HIDE;
 #endif
     if (!CreateProcess(runPath.c_str(), buf, nullptr, nullptr, true, CREATE_NEW_CONSOLE, nullptr, nullptr, &si, &pi)) {
-        WRITE_LOG(LOG_WARN, "CreateProcess failed with cmd:%s, args:%s, Error Code %d", runPath.c_str(), buf,
-                  GetLastError());
+        WRITE_LOG(LOG_WARN, "CreateProcess failed with cmd:%s, args:%s, Error Code %d",
+                  runPath.c_str(), buf, GetLastError());
         retVal = false;
     } else {
         retVal = true;

@@ -18,6 +18,8 @@
 namespace Hdc {
 HdcSessionBase::HdcSessionBase(bool serverOrDaemonIn)
 {
+    // print version pid
+    WRITE_LOG(LOG_INFO, "Program running. %s Pid:%u", Base::GetVersion().c_str(), getpid());
     // server/daemon common initialization code
     string threadNum = std::to_string(SIZE_THREAD_POOL);
     uv_os_setenv("UV_THREADPOOL_SIZE", threadNum.c_str());

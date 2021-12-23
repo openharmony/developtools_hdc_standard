@@ -22,12 +22,6 @@ HdcDaemonUSB::HdcDaemonUSB(const bool serverOrDaemonIn, void *ptrMainBase)
     Base::ZeroStruct(sendEP);
     Base::ZeroStruct(usbHandle);
     uv_mutex_init(&sendEP);
-
-    // ignre signal alarm to avoid usb async-read EINTR?
-    struct sigaction action;
-    action.sa_handler = SIG_IGN;
-    sigemptyset(&action.sa_mask);
-    sigaction(SIGALRM, &action, NULL);
 }
 
 HdcDaemonUSB::~HdcDaemonUSB()
@@ -463,7 +457,7 @@ void HdcDaemonUSB::OnUSBRead(uv_fs_t *req)
                 ret = false;
                 break;
             } else {
-                WRITE_LOG(LOG_ALL, "OnUSBRead singal EINTR");
+                WRITE_LOG(LOG_ALL, "OnUSBRead signal EINTR");
             }
         } else if (bytesIOBytes == 0) {  // zero packet
             WRITE_LOG(LOG_ALL, "Zero packet received");
