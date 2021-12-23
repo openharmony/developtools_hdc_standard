@@ -28,7 +28,6 @@ static bool g_isServerMode = false;
 static bool g_isPullServer = true;
 static bool g_isPcDebugRun = false;
 static bool g_isTCPorUSB = false;
-static auto g_logLevel = 0;
 static int g_isTestMethod = 0;
 static string g_connectKey = "";
 static string g_serverListenString = DEFAULT_SERVER_ADDR;
@@ -322,7 +321,6 @@ int main(int argc, const char *argv[])
     if (g_isServerMode) {
         // -m server.Run alone in the background, no -s will be listen loopback address
         Hdc::Base::RemoveLogFile();
-        Base::SetLogLevel(LOG_DEBUG);  // tmp set
         Hdc::RunServerMode(g_serverListenString);
     } else if (g_isPcDebugRun) {
         Hdc::RunPcDebugMode(g_isPullServer, g_isTCPorUSB, g_isTestMethod);

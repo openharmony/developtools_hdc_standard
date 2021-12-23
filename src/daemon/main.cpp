@@ -99,7 +99,7 @@ bool GetDaemonCommandlineOptions(int argc, const char *argv[])
 {
     int ch;
     // hdcd -l4 ...
-    WRITE_LOG(LOG_DEBUG, "Fgcli mode");
+    WRITE_LOG(LOG_DEBUG, "Forground cli-mode");
     // Both settings are running with parameters
     while ((ch = getopt(argc, (char *const *)argv, "utl:")) != -1) {
         switch (ch) {
@@ -162,7 +162,6 @@ int main(int argc, const char *argv[])
     }
     if (argc == 1 || (argc == CMD_ARG1_COUNT && (!strcmp(argv[1], "-forkchild") || !strcmp(argv[1], "-b")))) {
         Hdc::Base::RemoveLogFile();
-        Base::SetLogLevel(LOG_DEBUG);  // tmp set
         ForkChildCheck(argc, argv);
     } else {
         GetDaemonCommandlineOptions(argc, argv);
@@ -178,6 +177,7 @@ int main(int argc, const char *argv[])
     umask(0);
     signal(SIGPIPE, SIG_IGN);
     signal(SIGCHLD, SIG_IGN);
+    signal(SIGALRM, SIG_IGN);
     WRITE_LOG(LOG_DEBUG, "HdcDaemon main run");
     HdcDaemon daemon(false);
     daemon.InitMod(g_enableTcp, g_enableUsb);

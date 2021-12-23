@@ -27,7 +27,7 @@ using namespace std::chrono;
 
 namespace Hdc {
 namespace Base {
-    uint8_t g_logLevel = 0;
+    uint8_t g_logLevel = LOG_DEBUG;  // tmp set,now debugmode.LOG_OFF when release;;
     void SetLogLevel(const uint8_t logLevel)
     {
         g_logLevel = logLevel;
