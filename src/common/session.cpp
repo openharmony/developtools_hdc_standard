@@ -316,16 +316,6 @@ int HdcSessionBase::MallocSessionByConnectType(HSession hSession)
             }
             hSession->hUSB = hUSB;
             hSession->hUSB->wMaxPacketSizeSend = MAX_PACKET_SIZE_HISPEED;
-#ifdef HDC_HOST
-            int max = Base::GetUsbffsBulkSize();
-            hUSB->sizeEpBuf = max;
-            hUSB->bufDevice = new uint8_t[max]();
-            hUSB->bufHost = new uint8_t[max]();
-            hUSB->transferRecv = libusb_alloc_transfer(0);
-            hUSB->recvIOComplete = true;
-            hUSB->sendIOComplete = true;
-#else
-#endif
             break;
         }
         default:
@@ -412,11 +402,6 @@ void HdcSessionBase::FreeSessionByConnectType(HSession hSession)
             libusb_close(hUSB->devHandle);
             hUSB->devHandle = nullptr;
         }
-
-        delete[] hUSB->bufDevice;
-        delete[] hUSB->bufHost;
-        libusb_free_transfer(hUSB->transferRecv);
-        libusb_exit(hUSB->ctxUSB);
 #else
         if (hUSB->bulkIn > 0) {
             close(hUSB->bulkIn);
@@ -487,12 +472,10 @@ void HdcSessionBase::FreeSessionOpeate(uv_timer_t *handle)
     }
     WRITE_LOG(LOG_DEBUG, "FreeSessionOpeate ref:%u", uint32_t(hSession->ref));
 #ifdef HDC_HOST
-    if (hSession->hUSB != nullptr && (!hSession->hUSB->recvIOComplete || !hSession->hUSB->sendIOComplete)) {
-        if (!hSession->hUSB->recvIOComplete) {
-            HdcUSBBase *pUSB = ((HdcUSBBase *)hSession->classModule);
-            pUSB->CancelUsbLoopRead(hSession);
-        }
-        // send will be end with timeout
+    if (hSession->hUSB != nullptr
+        && (!hSession->hUSB->hostBulkIn.isShutdown || !hSession->hUSB->hostBulkOut.isShutdown)) {
+        HdcUSBBase *pUSB = ((HdcUSBBase *)hSession->classModule);
+        pUSB->CancelUsbIo(hSession);
         return;
     }
 #endif
