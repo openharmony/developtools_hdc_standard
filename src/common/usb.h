@@ -22,7 +22,7 @@ public:
     HdcUSBBase(const bool serverOrDaemonIn, void *ptrMainBase);
     virtual ~HdcUSBBase();
     virtual bool ReadyForWorkThread(HSession hSession);
-    virtual void CancelUsbLoopRead(HSession hSession) {};
+    virtual void CancelUsbIo(HSession hSession) {};
     int SendUSBBlock(HSession hSession, uint8_t *data, const int length);
 
 protected:
@@ -44,7 +44,6 @@ protected:
     const string USB_PACKET_FLAG = "UB";  // must 2bytes
 
 private:
-    virtual void SendUsbSoftReset(HSession hSession, uint32_t sessionIdOld) {};
     static void ReadUSB(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf);
     vector<uint8_t> BuildPacketHeader(uint32_t sessionId, uint8_t option, uint32_t dataSize);
     int CheckPacketOption(HSession hSession, uint8_t *appendData, int dataSize);

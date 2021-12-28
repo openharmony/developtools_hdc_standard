@@ -35,10 +35,10 @@ private:
     };
     static int LIBUSB_CALL HotplugHostUSBCallback(libusb_context *ctx, libusb_device *device,
                                                   libusb_hotplug_event event, void *userData);
-    static void UsbWorkThread(void *arg);         // 3rd thread
-    static void SessionUsbWorkThread(void *arg);  // 3rd thread
+    static void UsbWorkThread(void *arg);  // 3rd thread
     static void WatchUsbNodeChange(uv_timer_t *handle);
     static void KickoutZombie(HSession hSession);
+    static void LIBUSB_CALL USBBulkCallback(struct libusb_transfer *transfer);
     int StartupUSBWork();
     int CheckActiveConfig(libusb_device *device, HUSB hUSB);
     int OpenDeviceMyNeed(HUSB hUSB);
@@ -47,13 +47,13 @@ private:
     bool ReadyForWorkThread(HSession hSession);
     bool FindDeviceByID(HUSB hUSB, const char *usbMountPoint, libusb_context *ctxUSB);
     bool DetectMyNeed(libusb_device *device, string &sn);
-    void SendUsbSoftReset(HSession hSession, uint32_t sessionIdOld);
     void RestoreHdcProtocol(HUSB hUsb, const uint8_t *buf, int bufSize);
     void UpdateUSBDaemonInfo(HUSB hUSB, HSession hSession, uint8_t connStatus);
-    void RegisterReadCallback(HSession hSession);
+    void BeginUsbRead(HSession hSession);
     void ReviewUsbNodeLater(string &nodeKey);
-    void CancelUsbLoopRead(HSession hSession);
+    void CancelUsbIo(HSession hSession);
     int UsbToHdcProtocol(uv_stream_t *stream, uint8_t *appendData, int dataSize);
+    int SubmitUsbBio(HSession hSession, bool sendOrRecv, uint8_t *buf, int bufSize);
 
     libusb_context *ctxUSB;
     uv_timer_t devListWatcher;

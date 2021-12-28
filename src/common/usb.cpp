@@ -76,7 +76,7 @@ int HdcUSBBase::SendUSBBlock(HSession hSession, uint8_t *data, const int length)
     int childRet = 0;
     int ret = ERR_IO_FAIL;
     auto header = BuildPacketHeader(hSession->sessionId, USB_OPTION_HEADER, length);
-    hSession->hUSB->lockDeviceHandle.lock();
+    hSession->hUSB->lockSendUsbBlock.lock();
     do {
         if ((childRet = SendUSBRaw(hSession, header.data(), header.size())) <= 0) {
             WRITE_LOG(LOG_FATAL, "SendUSBRaw index failed");
@@ -97,7 +97,7 @@ int HdcUSBBase::SendUSBBlock(HSession hSession, uint8_t *data, const int length)
         }
         ret = length;
     } while (false);
-    hSession->hUSB->lockDeviceHandle.unlock();
+    hSession->hUSB->lockSendUsbBlock.unlock();
     return ret;
 }
 
@@ -129,13 +129,16 @@ bool HdcUSBBase::IsUsbPacketHeader(uint8_t *ioBuf, int ioBytes)
 void HdcUSBBase::PreSendUsbSoftReset(HSession hSession, uint32_t sessionIdOld)
 {
     HUSB hUSB = hSession->hUSB;
+    int childRet = 0;
     if (hSession->serverOrDaemon && !hUSB->resetIO) {
-        uint32_t sid = sessionIdOld;
-        // or we can sendmsg to childthread send?
-        hUSB->lockDeviceHandle.lock();
+        hUSB->lockSendUsbBlock.lock();
         WRITE_LOG(LOG_WARN, "SendToHdcStream check, sessionId not matched");
-        SendUsbSoftReset(hSession, sid);
-        hUSB->lockDeviceHandle.unlock();
+        auto header = BuildPacketHeader(sessionIdOld, USB_OPTION_RESET, 0);
+        if ((childRet = SendUSBRaw(hSession, header.data(), header.size())) <= 0) {
+            WRITE_LOG(LOG_FATAL, "PreSendUsbSoftReset send failed");
+        }
+        hUSB->lockSendUsbBlock.unlock();
+        hUSB->resetIO = true;
     }
 }
 
@@ -157,10 +160,10 @@ int HdcUSBBase::CheckPacketOption(HSession hSession, uint8_t *appendData, int da
     }
     if (header->option & USB_OPTION_HEADER) {
         // header packet
-        hUSB->bulkinDataSize = header->dataSize;
+        hUSB->payloadSize = header->dataSize;
     }
     // soft ZLP
-    return hUSB->bulkinDataSize;
+    return hUSB->payloadSize;
 }
 
 // return value: <0 error; = 0 all finish; >0 need size
@@ -171,7 +174,7 @@ int HdcUSBBase::SendToHdcStream(HSession hSession, uv_stream_t *stream, uint8_t 
     if (IsUsbPacketHeader(appendData, dataSize)) {
         return CheckPacketOption(hSession, appendData, dataSize);
     }
-    if (hUSB->bulkinDataSize <= (uint32_t)childRet) {
+    if (hUSB->payloadSize <= (uint32_t)childRet) {
         // last session data
         PreSendUsbSoftReset(hSession, 0);  // 0 == reset current
         return 0;
@@ -180,8 +183,8 @@ int HdcUSBBase::SendToHdcStream(HSession hSession, uv_stream_t *stream, uint8_t 
         WRITE_LOG(LOG_FATAL, "Error usb send to stream dataSize:%d", dataSize);
         return ERR_IO_FAIL;
     }
-    hUSB->bulkinDataSize -= childRet;
-    return hUSB->bulkinDataSize;
+    hUSB->payloadSize -= childRet;
+    return hUSB->payloadSize;
 }
 
 }

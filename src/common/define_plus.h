@@ -205,39 +205,58 @@ using HTaskInfo = TaskInformation *;
 
 #pragma pack(pop)
 
+#ifdef HDC_HOST
+struct HostUSBEndpoint {
+    HostUSBEndpoint()
+    {
+        endpoint = 0;
+        sizeEpBuf = 16384;  // MAX_USBFFS_BULK
+        transfer = libusb_alloc_transfer(0);
+        isShutdown = false;
+        isComplete = false;
+    }
+    ~HostUSBEndpoint()
+    {
+        libusb_free_transfer(transfer);
+    }
+    uint8_t endpoint;
+    uint8_t buf[16384];  // MAX_USBFFS_BULK
+    bool isComplete;
+    bool isShutdown;
+    bool bulkInOut;  // true is bulkIn
+    uint16_t sizeEpBuf;
+    mutex mutexIo;
+    mutex mutexCb;
+    condition_variable cv;
+    libusb_transfer *transfer;
+};
+#endif
+
 struct HdcUSB {
 #ifdef HDC_HOST
     libusb_context *ctxUSB = nullptr;  // child-use, main null
     libusb_device *device;
     libusb_device_handle *devHandle;
-    uint8_t interfaceNumber;
     uint16_t retryCount;
-    // D2H device to host endpoint's address
-    uint8_t epDevice;
-    // H2D host to device endpoint's address
-    uint8_t epHost;
     uint8_t devId;
     uint8_t busId;
-    uint16_t sizeEpBuf;
+    uint8_t interfaceNumber;
     string serialNumber;
     string usbMountPoint;
-    uint8_t *bufDevice;
-    uint8_t *bufHost;
-    libusb_transfer *transferRecv;
-    mutex lockTransferRecv;
-    bool recvIOComplete;
-    bool sendIOComplete;
-    uv_thread_t threadUsbChildWork;
+    HostUSBEndpoint hostBulkIn;
+    HostUSBEndpoint hostBulkOut;
+
 #else
     // usb accessory FunctionFS
     // USB main thread use, sub-thread disable, sub-thread uses the main thread USB handle
     int bulkOut;  // EP1 device recv
     int bulkIn;   // EP2 device send
 #endif
-    mutex lockDeviceHandle;
+    uint32_t payloadSize;
     uint16_t wMaxPacketSizeSend;
-    uint32_t bulkinDataSize;
     bool resetIO;  // if true, must break write and read,default false
+    mutex lockDeviceHandle;
+    mutex lockSendUsbBlock;
 };
 using HUSB = struct HdcUSB *;
 
