@@ -1,0 +1,60 @@
+{
+    "name": "@ohos/developtools_hdc_standard",
+    "version": "",
+    "description": "开发人员用于调试的命令行工具，通过该工具可以在windows/linux等系统上与鸿蒙真实设备或者模拟器进行交互。",
+    "homePage": "https://gitee.com/openharmony",
+    "license": "Apache V2",
+    "repository": "https://gitee.com/openharmony/developtools_hdc_standard",
+    "domain": "os",
+    "language": "",
+    "publishAs": "code-segment",
+    "private": false,
+    "scripts": {},
+    "tags": [
+        "developtools"
+    ],
+    "keywords": [
+        "developtools",
+        "hdc",
+        "standard"
+    ],
+    "envs": [],
+    "dirs": [],
+    "author": {
+        "name": "",
+        "email": "",
+        "url": ""
+    },
+    "contributors": [
+        {
+            "name": "",
+            "email": "",
+            "url": ""
+        }
+    ],
+    "segment": {
+        "destPath": "developtools/hdc_standard"
+    },
+    "component": {
+        "name": "hdc",
+        "subsystem": "hdc",
+        "syscap": [
+            "SysPart.Developtools.Hdc"
+        ],
+        "features": [],
+        "adapted_system_type": [
+            "standard"
+        ],
+        "rom": "",
+        "ram": "",
+        "deps": {
+            "components": [],
+            "third_party": []
+        },
+        "build": {
+            "sub_component": [],
+            "inner_kits": [],
+            "test": []
+        }
+    }
+}
