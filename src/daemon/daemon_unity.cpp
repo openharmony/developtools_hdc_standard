@@ -31,7 +31,6 @@ void HdcDaemonUnity::StopTask()
 {
     // Remove jpid tracker when stopping task
     RemoveJdwpTracker();
-
     asyncCommand.DoRelease();
 }
 

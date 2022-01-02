@@ -19,15 +19,12 @@ namespace Hdc {
 HdcDaemonUSB::HdcDaemonUSB(const bool serverOrDaemonIn, void *ptrMainBase)
     : HdcUSBBase(serverOrDaemonIn, ptrMainBase)
 {
-    Base::ZeroStruct(sendEP);
     Base::ZeroStruct(usbHandle);
-    uv_mutex_init(&sendEP);
 }
 
 HdcDaemonUSB::~HdcDaemonUSB()
 {
     // Closed in the IO loop, no longer closing CLOSE ENDPOINT
-    uv_mutex_destroy(&sendEP);
     if (controlEp > 0) {
         close(controlEp);
     }
@@ -225,7 +222,6 @@ void HdcDaemonUSB::ResetOldSession(uint32_t sessionId)
     if (hSession == nullptr) {
         return;
     }
-    hSession->hUSB->resetIO = true;
     // The Host side is restarted, but the USB cable is still connected
     WRITE_LOG(LOG_WARN, "Hostside softreset to restart daemon, old sessionId:%u", sessionId);
     daemon->FreeSession(sessionId);
@@ -293,7 +289,7 @@ int HdcDaemonUSB::SendUSBIOSync(HSession hSession, HUSB hMainUSB, const uint8_t 
     int childRet = 0;
     int ret = ERR_IO_FAIL;
     int offset = 0;
-    while (modRunning && isAlive && !hSession->isDead && !hSession->hUSB->resetIO) {
+    while (modRunning && isAlive && !hSession->isDead) {
         childRet = write(bulkIn, (uint8_t *)data + offset, length - offset);
         if (childRet <= 0) {
             int err = errno;
@@ -314,9 +310,8 @@ int HdcDaemonUSB::SendUSBIOSync(HSession hSession, HUSB hMainUSB, const uint8_t 
     if (offset == length) {
         ret = length;
     } else {
-        WRITE_LOG(LOG_FATAL,
-                  "BulkinWrite write failed, nsize:%d really:%d modRunning:%d isAlive:%d SessionDead:%d usbReset:%d",
-                  length, offset, modRunning, isAlive, hSession->isDead, hSession->hUSB->resetIO);
+        WRITE_LOG(LOG_FATAL, "BulkinWrite write failed, nsize:%d really:%d modRunning:%d isAlive:%d SessionDead:%d",
+                  length, offset, modRunning, isAlive, hSession->isDead);
     }
     return ret;
 }
@@ -324,7 +319,7 @@ int HdcDaemonUSB::SendUSBIOSync(HSession hSession, HUSB hMainUSB, const uint8_t 
 int HdcDaemonUSB::SendUSBRaw(HSession hSession, uint8_t *data, const int length)
 {
     HdcDaemon *daemon = (HdcDaemon *)hSession->classInstance;
-    uv_mutex_lock(&sendEP);
+    std::unique_lock<std::mutex> lock(mutexUsbFfs);
     ++hSession->ref;
     int ret = SendUSBIOSync(hSession, &usbHandle, data, length);
     --hSession->ref;
@@ -332,7 +327,6 @@ int HdcDaemonUSB::SendUSBRaw(HSession hSession, uint8_t *data, const int length)
         daemon->FreeSession(hSession->sessionId);
         WRITE_LOG(LOG_DEBUG, "SendUSBRaw try to freesession");
     }
-    uv_mutex_unlock(&sendEP);
     return ret;
 }
 
@@ -441,7 +435,7 @@ void HdcDaemonUSB::OnUSBRead(uv_fs_t *req)
     bool ret = false;
     int childRet = 0;
     if (bytesIOBytes > hUSB->wMaxPacketSizeSend && bytesIOBytes != thisClass->saveNextReadSize) {
-        WRITE_LOG(LOG_FATAL, "Issue packet");
+        WRITE_LOG(LOG_WARN, "Not full packet, wanted:%d really:%d", thisClass->saveNextReadSize, bytesIOBytes);
     }
     while (thisClass->isAlive) {
         // Don't care is module running, first deal with this
@@ -453,7 +447,7 @@ void HdcDaemonUSB::OnUSBRead(uv_fs_t *req)
             // interrupts will increase the correctness of USB data reading. Setting GDB to asynchronous mode or using
             // log debugging can avoid this problem
             if (bytesIOBytes != -EINTR) {  // Epoll will be broken when gdb attach
-                WRITE_LOG(LOG_WARN, "USBIO failed1 %s", uv_strerror(bytesIOBytes));
+                WRITE_LOG(LOG_WARN, "USBIO ret:%d failed:%s", bytesIOBytes, uv_strerror(bytesIOBytes));
                 ret = false;
                 break;
             } else {

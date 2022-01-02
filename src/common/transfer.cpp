@@ -47,6 +47,8 @@ bool HdcTransferBase::ResetCtx(CtxFile *context, bool full)
     }
     context->closeNotify = false;
     context->indexIO = 0;
+    context->lastErrno = 0;
+    context->ioFinish = false;
     return true;
 }
 
@@ -58,6 +60,11 @@ int HdcTransferBase::SimpleFileIO(CtxFile *context, uint64_t index, uint8_t *sen
     bool ret = false;
     while (true) {
         if (!buf || !ioContext || bytes < 0) {
+            WRITE_LOG(LOG_DEBUG, "SimpleFileIO param check failed");
+            break;
+        }
+        if (context->ioFinish) {
+            WRITE_LOG(LOG_DEBUG, "SimpleFileIO to closed IOStream");
             break;
         }
         uv_fs_t *req = &ioContext->fs;
@@ -102,6 +109,7 @@ void HdcTransferBase::OnFileClose(uv_fs_t *req)
     HdcTransferBase *thisClass = (HdcTransferBase *)context->thisClass;
     if (context->closeNotify) {
         // close-step2
+        // maybe successful finish or failed finish
         thisClass->WhenTransferFinish(context);
     }
     --thisClass->refCount;
@@ -174,24 +182,23 @@ bool HdcTransferBase::SendIOPayload(CtxFile *context, int index, uint8_t *data, 
 
 void HdcTransferBase::OnFileIO(uv_fs_t *req)
 {
-    bool tryFinishIO = false;
     CtxFileIO *contextIO = (CtxFileIO *)req->data;
     CtxFile *context = (CtxFile *)contextIO->context;
     HdcTransferBase *thisClass = (HdcTransferBase *)context->thisClass;
     uint8_t *bufIO = contextIO->bufIO;
     uv_fs_req_cleanup(req);
-    --thisClass->refCount;
     while (true) {
         if (req->result < 0) {
             WRITE_LOG(LOG_DEBUG, "OnFileIO error: %s", uv_strerror((int)req->result));
             context->closeNotify = true;
-            tryFinishIO = true;
+            context->lastErrno = abs(req->result);
+            context->ioFinish = true;
             break;
         }
         context->indexIO += req->result;
         if (req->fs_type == UV_FS_READ) {
             if (!thisClass->SendIOPayload(context, context->indexIO - req->result, bufIO, req->result)) {
-                tryFinishIO = true;
+                context->ioFinish = true;
                 break;
             }
             if (context->indexIO < context->fileSize) {
@@ -203,22 +210,23 @@ void HdcTransferBase::OnFileIO(uv_fs_t *req)
                 // The active end must first read it first, but you can't make Finish first, because Slave may not
                 // end.Only slave receives complete talents Finish
                 context->closeNotify = true;
-                tryFinishIO = true;
+                context->ioFinish = true;
                 thisClass->SetFileTime(context);
             }
         } else {
-            tryFinishIO = true;
+            context->ioFinish = true;
         }
         break;
     }
-    delete[] bufIO;
-    delete contextIO;  // Req is part of the Contextio structure, no free release
-    if (tryFinishIO) {
+    if (context->ioFinish) {
         // close-step1
         ++thisClass->refCount;
-        uv_fs_fsync(thisClass->loopTask, &context->fsCloseReq, context->fsOpenReq.result, nullptr);
+        uv_fs_fsync(nullptr, &context->fsCloseReq, context->fsOpenReq.result, nullptr);
         uv_fs_close(thisClass->loopTask, &context->fsCloseReq, context->fsOpenReq.result, OnFileClose);
     }
+    --thisClass->refCount;
+    delete[] bufIO;
+    delete contextIO;  // Req is part of the Contextio structure, no free release
 }
 
 void HdcTransferBase::OnFileOpen(uv_fs_t *req)

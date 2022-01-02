@@ -767,7 +767,7 @@ bool HdcServer::RedirectToTask(HTaskInfo hTaskInfo, HSession hSession, const uin
             ret = TaskCommandDispatch<HdcHostApp>(hTaskInfo, TASK_APP, command, payload, payloadSize);
             break;
         default:
-            ret = false;
+            // ignore unknow command
             break;
     }
     return ret;

@@ -117,18 +117,22 @@ enum HdcCommand {
     CMD_KERNEL_ECHO,
     CMD_KERNEL_ECHO_RAW,
     CMD_KERNEL_ENABLE_KEEPALIVE,
+    CMD_KERNEL_WAKEUP_SLAVETASK,
     // One-pass simple commands
-    CMD_UNITY_EXECUTE = 1000,
+    CMD_UNITY_COMMAND_HEAD = 1000,  // not use
+    CMD_UNITY_EXECUTE,
     CMD_UNITY_REMOUNT,
     CMD_UNITY_REBOOT,
     CMD_UNITY_RUNMODE,
     CMD_UNITY_HILOG,
     CMD_UNITY_TERMINATE,
     CMD_UNITY_ROOTRUN,
-    CMD_UNITY_BUGREPORT_INIT,
-    CMD_UNITY_BUGREPORT_DATA,
     CMD_JDWP_LIST,
     CMD_JDWP_TRACK,
+    CMD_UNITY_COMMAND_TAIL,  // not use
+    // It will be separated from unity in the near future
+    CMD_UNITY_BUGREPORT_INIT,
+    CMD_UNITY_BUGREPORT_DATA,
     // Shell commands types
     CMD_SHELL_INIT = 2000,
     CMD_SHELL_DATA,
@@ -197,6 +201,7 @@ struct TaskInformation {
     bool taskStop;
     bool taskFree;
     bool serverOrDaemon;
+    bool masterSlave;
     uv_loop_t *runLoop;
     void *taskClass;
     void *ownerSessionClass;
@@ -212,8 +217,8 @@ struct HostUSBEndpoint {
         endpoint = 0;
         sizeEpBuf = 16384;  // MAX_USBFFS_BULK
         transfer = libusb_alloc_transfer(0);
-        isShutdown = false;
-        isComplete = false;
+        isShutdown = true;
+        isComplete = true;
     }
     ~HostUSBEndpoint()
     {
