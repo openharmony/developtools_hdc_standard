@@ -204,6 +204,8 @@ void HdcTransferBase::OnFileIO(uv_fs_t *req)
             if (context->indexIO < context->fileSize) {
                 thisClass->SimpleFileIO(context, context->indexIO, nullptr,
                                         Base::GetMaxBufSize() * thisClass->maxTransferBufFactor);
+            } else {
+                tryFinishIO = true;
             }
         } else if (req->fs_type == UV_FS_WRITE) {  // write
             if (context->indexIO >= context->fileSize) {
@@ -221,7 +223,9 @@ void HdcTransferBase::OnFileIO(uv_fs_t *req)
     if (context->ioFinish) {
         // close-step1
         ++thisClass->refCount;
-        uv_fs_fsync(nullptr, &context->fsCloseReq, context->fsOpenReq.result, nullptr);
+        if (req->fs_type == UV_FS_WRITE) {
+            uv_fs_fsync(thisClass->loopTask, &context->fsCloseReq, context->fsOpenReq.result, nullptr);
+        }
         uv_fs_close(thisClass->loopTask, &context->fsCloseReq, context->fsOpenReq.result, OnFileClose);
     }
     --thisClass->refCount;
