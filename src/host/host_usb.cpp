@@ -342,6 +342,8 @@ void LIBUSB_CALL HdcHostUSB::USBBulkCallback(struct libusb_transfer *transfer)
 {
     auto *ep = static_cast<HostUSBEndpoint *>(transfer->user_data);
     std::unique_lock<std::mutex> lock(ep->mutexIo);
+    bool retrySumit = false;
+    int childRet = 0;
     do {
         if (transfer->status != LIBUSB_TRANSFER_COMPLETED) {
             WRITE_LOG(LOG_FATAL, "USBBulkCallback1 failed, ret:%d", transfer->status);
@@ -350,15 +352,19 @@ void LIBUSB_CALL HdcHostUSB::USBBulkCallback(struct libusb_transfer *transfer)
         if (!ep->bulkInOut && transfer->actual_length != transfer->length) {
             transfer->length -= transfer->actual_length;
             transfer->buffer += transfer->actual_length;
-            int rc = libusb_submit_transfer(transfer);
-            if (rc != 0) {
-                WRITE_LOG(LOG_FATAL, "USBBulkCallback2 failed, ret:%d", rc);
-                transfer->status = LIBUSB_TRANSFER_ERROR;
-                break;
-            }
-            return;
+            retrySumit = true;
+            break;
         }
     } while (false);
+    while (retrySumit) {
+        childRet = libusb_submit_transfer(transfer);
+        if (childRet != 0) {
+            WRITE_LOG(LOG_FATAL, "USBBulkCallback2 failed, ret:%d", childRet);
+            transfer->status = LIBUSB_TRANSFER_ERROR;
+            break;
+        }
+        return;
+    }
     ep->isComplete = true;
     ep->cv.notify_one();
 }
@@ -403,6 +409,8 @@ int HdcHostUSB::SubmitUsbBio(HSession hSession, bool sendOrRecv, uint8_t *buf, i
 void HdcHostUSB::BeginUsbRead(HSession hSession)
 {
     HUSB hUSB = hSession->hUSB;
+    hUSB->hostBulkIn.isShutdown = false;
+    hUSB->hostBulkOut.isShutdown = false;
     ++hSession->ref;
     // loop read
     std::thread([this, hSession, hUSB]() {

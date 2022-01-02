@@ -1031,35 +1031,65 @@ void HdcSessionBase::LogMsg(const uint32_t sessionId, const uint32_t channelId,
     ServerCommand(sessionId, channelId, CMD_KERNEL_ECHO, buf.data(), buf.size());
 }
 
+bool HdcSessionBase::NeedNewTaskInfo(const uint16_t command, bool &masterTask)
+{
+    // referer from HdcServerForClient::DoCommandRemote
+    bool ret = false;
+    bool taskMasterInit = false;
+    masterTask = false;
+    switch (command) {
+        case CMD_FILE_INIT:
+        case CMD_FORWARD_INIT:
+        case CMD_APP_INIT:
+        case CMD_APP_UNINSTALL:
+        case CMD_UNITY_BUGREPORT_INIT:
+        case CMD_APP_SIDELOAD:
+            taskMasterInit = true;
+            break;
+        default:
+            break;
+    }
+    if (!serverOrDaemon
+        && (command == CMD_SHELL_INIT || (command > CMD_UNITY_COMMAND_HEAD && command < CMD_UNITY_COMMAND_TAIL))) {
+        // daemon's single side command
+        ret = true;
+    } else if (command == CMD_KERNEL_WAKEUP_SLAVETASK) {
+        // slave tasks
+        ret = true;
+    } else if (taskMasterInit) {
+        // task init command
+        masterTask = true;
+        ret = true;
+    }
+    return ret;
+}
 // Heavy and time-consuming work was putted in the new thread to do, and does
 // not occupy the main thread
 bool HdcSessionBase::DispatchTaskData(HSession hSession, const uint32_t channelId, const uint16_t command,
                                       uint8_t *payload, int payloadSize)
 {
     bool ret = true;
+    HTaskInfo hTaskInfo = nullptr;
+    bool masterTask = false;
     while (true) {
-        HTaskInfo hTaskInfo = AdminTask(OP_QUERY, hSession, channelId, nullptr);
-        if (!hTaskInfo) {
+        // Some basic commands do not have a local task constructor. example: Interactive shell, some uinty commands
+        if (NeedNewTaskInfo(command, masterTask)) {
             WRITE_LOG(LOG_DEBUG, "New HTaskInfo");
             hTaskInfo = new TaskInformation();
             hTaskInfo->channelId = channelId;
             hTaskInfo->sessionId = hSession->sessionId;
             hTaskInfo->runLoop = &hSession->childLoop;
             hTaskInfo->serverOrDaemon = serverOrDaemon;
+            hTaskInfo->masterSlave = masterTask;
+            AdminTask(OP_ADD, hSession, channelId, hTaskInfo);
+        } else {
+            hTaskInfo = AdminTask(OP_QUERY, hSession, channelId, nullptr);
         }
-        if (hTaskInfo->taskStop) {
-            WRITE_LOG(LOG_DEBUG, "RedirectToTask jump stopped task:%u", channelId);
-            break;
-        }
-        if (hTaskInfo->taskFree) {
-            WRITE_LOG(LOG_DEBUG, "Jump delete HTaskInfo");
+        if (!hTaskInfo || hTaskInfo->taskStop || hTaskInfo->taskFree) {
+            WRITE_LOG(LOG_ALL, "Dead HTaskInfo, ignore, channelId:%u command:%u", channelId, command);
             break;
         }
         ret = RedirectToTask(hTaskInfo, hSession, channelId, command, payload, payloadSize);
-        if (!hTaskInfo->hasInitial) {
-            AdminTask(OP_ADD, hSession, channelId, hTaskInfo);
-            hTaskInfo->hasInitial = true;
-        }
         break;
     }
     return ret;

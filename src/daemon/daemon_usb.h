@@ -59,7 +59,7 @@ private:
     string basePath;                // usb device's base path
     uint32_t currentSessionId = 0;  // USB mode,limit only one session
     uv_timer_t checkEP;             // server-use
-    uv_mutex_t sendEP;
+    mutex mutexUsbFfs;
     bool isAlive = false;
     int controlEp = 0;  // EP0
     CtxUvFileCommonIo ctxRecv = {};
