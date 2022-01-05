@@ -13,6 +13,8 @@
  * limitations under the License.
  */
 #include "ut_mod.h"
+#include <openssl/evp.h>
+#include <openssl/md5.h>
 using namespace Hdc;
 
 namespace HdcTest {
@@ -109,6 +111,16 @@ bool TestShellExecute(void *runtimePtr)
     return ret;
 }
 
+vector<uint8_t> Md5Sum(uint8_t *buf, int size)
+{
+    vector<uint8_t> ret;
+    uint8_t md5Hash[MD5_DIGEST_LENGTH] = { 0 };
+    if (EVP_Digest(buf, size, md5Hash, NULL, EVP_md5(), NULL)) {
+        ret.insert(ret.begin(), md5Hash, md5Hash + sizeof(md5Hash));
+    }
+    return ret;
+}
+
 // file send like recv in our code, so just test send is enough
 bool TestFileCommand(void *runtimePtr)
 {
@@ -132,8 +144,8 @@ bool TestFileCommand(void *runtimePtr)
         if ((sizeRemote = Base::ReadBinFile(remoteFile.c_str(), (void **)&bufRemote, 0)) < 0) {
             break;
         };
-        auto localHash = Base::Md5Sum(bufLocal, sizeLocal);
-        auto remoteHash = Base::Md5Sum(bufRemote, sizeRemote);
+        auto localHash = Md5Sum(bufLocal, sizeLocal);
+        auto remoteHash = Md5Sum(bufRemote, sizeRemote);
         if (memcmp(localHash.data(), remoteHash.data(), localHash.size())) {
             break;
         }

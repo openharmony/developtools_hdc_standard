@@ -19,18 +19,19 @@ namespace Hdc {
 HdcDaemonUSB::HdcDaemonUSB(const bool serverOrDaemonIn, void *ptrMainBase)
     : HdcUSBBase(serverOrDaemonIn, ptrMainBase)
 {
-    Base::ZeroStruct(sendEP);
     Base::ZeroStruct(usbHandle);
-    uv_mutex_init(&sendEP);
 }
 
 HdcDaemonUSB::~HdcDaemonUSB()
 {
     // Closed in the IO loop, no longer closing CLOSE ENDPOINT
-    uv_mutex_destroy(&sendEP);
     if (controlEp > 0) {
         close(controlEp);
     }
+    if (ctxRecv.buf) {
+        delete[] ctxRecv.buf;
+    }
+    uv_fs_req_cleanup(&ctxRecv.req);
 }
 
 void HdcDaemonUSB::Stop()
@@ -87,8 +88,16 @@ int HdcDaemonUSB::Initial()
     basePath = GetDevPath(USB_FFS_BASE);
     if (access((basePath + "/ep0").c_str(), F_OK) != 0) {
         WRITE_LOG(LOG_DEBUG, "Only support usb-ffs, make sure kernel3.8+ and usb-ffs enabled, usbmode disabled");
-        return -1;
+        return ERR_API_FAIL;
     }
+    ctxRecv.thisClass = this;
+    ctxRecv.bufSizeMax = Base::GetUsbffsBulkSize();
+    ctxRecv.buf = new uint8_t[ctxRecv.bufSizeMax]();
+    if (!ctxRecv.buf) {
+        WRITE_LOG(LOG_FATAL, "Init alloc memory failed");
+        return ERR_BUF_ALLOC;
+    }
+
     HdcDaemon *daemon = (HdcDaemon *)clsMainBase;
     WRITE_LOG(LOG_DEBUG, "HdcDaemonUSB::Initiall");
     uv_timer_init(&daemon->loopMain, &checkEP);
@@ -97,10 +106,45 @@ int HdcDaemonUSB::Initial()
     return 0;
 }
 
+// make gnuc++ happy. Clang support direct assignment value to structure, buf g++ weakness
+void HdcDaemonUSB::FillUsbV2Head(usb_functionfs_desc_v2 &descUsbFfs)
+{
+    descUsbFfs.head.magic = LONG_LE(FUNCTIONFS_DESCRIPTORS_MAGIC_V2);
+    descUsbFfs.head.length = LONG_LE(sizeof(descUsbFfs));
+    descUsbFfs.head.flags
+        = FUNCTIONFS_HAS_FS_DESC | FUNCTIONFS_HAS_HS_DESC | FUNCTIONFS_HAS_SS_DESC | FUNCTIONFS_HAS_MS_OS_DESC;
+    descUsbFfs.config1Count = 3;
+    descUsbFfs.config2Count = 3;
+    descUsbFfs.config3Count = 5;
+    descUsbFfs.configWosCount = 1;
+    descUsbFfs.config1Desc = config1;
+    descUsbFfs.config2Desc = config2;
+    descUsbFfs.config3Desc = config3;
+    descUsbFfs.wosHead.interface = 1;
+    descUsbFfs.wosHead.dwLength = LONG_LE(sizeof(descUsbFfs.wosHead) + sizeof(descUsbFfs.wosDesc));
+    descUsbFfs.wosHead.bcdVersion = SHORT_LE(1);
+    descUsbFfs.wosHead.wIndex = SHORT_LE(4);
+    descUsbFfs.wosHead.bCount = 1;
+    descUsbFfs.wosHead.Reserved = 0;
+    descUsbFfs.wosDesc.bFirstInterfaceNumber = 0;
+    descUsbFfs.wosDesc.Reserved1 = 1;
+    descUsbFfs.wosDesc.CompatibleID[0] = 'W';
+    descUsbFfs.wosDesc.CompatibleID[1] = 'I';
+    descUsbFfs.wosDesc.CompatibleID[2] = 'N';
+    descUsbFfs.wosDesc.CompatibleID[3] = 'U';
+    descUsbFfs.wosDesc.CompatibleID[4] = 'S';
+    descUsbFfs.wosDesc.CompatibleID[5] = 'B';
+    descUsbFfs.wosDesc.CompatibleID[6] = '\0';
+    Base::ZeroArray(descUsbFfs.wosDesc.SubCompatibleID);
+    Base::ZeroArray(descUsbFfs.wosDesc.Reserved2);
+}
+
 // DAEMON end USB module USB-FFS EP port connection
 int HdcDaemonUSB::ConnectEPPoint(HUSB hUSB)
 {
     int ret = ERR_GENERIC;
+    struct usb_functionfs_desc_v2 descUsbFfs = {};
+    FillUsbV2Head(descUsbFfs);
     while (true) {
         if (controlEp <= 0) {
             // After the control port sends the instruction, the device is initialized by the device to the HOST host,
@@ -112,7 +156,7 @@ int HdcDaemonUSB::ConnectEPPoint(HUSB hUSB)
                 WRITE_LOG(LOG_WARN, "%s: cannot open control endpoint: errno=%d", ep0Path.c_str(), errno);
                 break;
             }
-            if (write(controlEp, &USB_FFS_DESC, sizeof(USB_FFS_DESC)) < 0) {
+            if (write(controlEp, &descUsbFfs, sizeof(descUsbFfs)) < 0) {
                 WRITE_LOG(LOG_WARN, "%s: write ffs configs failed: errno=%d", ep0Path.c_str(), errno);
                 break;
             }
@@ -121,7 +165,7 @@ int HdcDaemonUSB::ConnectEPPoint(HUSB hUSB)
                 break;
             }
             // active usbrc，Send USB initialization singal
-            Base::SetHdcProperty("sys.usb.ffs.ready", "1");
+            SystemDepend::SetDevItem("sys.usb.ffs.ready", "1");
             WRITE_LOG(LOG_DEBUG, "ConnectEPPoint ctrl init finish, set usb-ffs ready");
         }
         string outPath = basePath + "/ep1";
@@ -178,7 +222,6 @@ void HdcDaemonUSB::ResetOldSession(uint32_t sessionId)
     if (hSession == nullptr) {
         return;
     }
-    hSession->hUSB->resetIO = true;
     // The Host side is restarted, but the USB cable is still connected
     WRITE_LOG(LOG_WARN, "Hostside softreset to restart daemon, old sessionId:%u", sessionId);
     daemon->FreeSession(sessionId);
@@ -228,12 +271,12 @@ int HdcDaemonUSB::CloseBulkEp(bool bulkInOut, int bulkFd, uv_loop_t *loop)
     isAlive = false;
     uv_fs_close(loop, req, bulkFd, [](uv_fs_t *req) {
         auto ctx = (CtxCloseBulkEp *)req->data;
+        WRITE_LOG(LOG_DEBUG, "Try to abort blukin write callback %s", ctx->bulkInOut ? "bulkin" : "bulkout");
         if (ctx->bulkInOut) {
             ctx->thisClass->usbHandle.bulkIn = 0;
         } else {
             ctx->thisClass->usbHandle.bulkOut = 0;
         }
-        WRITE_LOG(LOG_DEBUG, "Try to abort blukin write callback %s", ctx->bulkInOut ? "bulkin" : "bulkout");
         uv_fs_req_cleanup(req);
         delete ctx;
     });
@@ -246,7 +289,7 @@ int HdcDaemonUSB::SendUSBIOSync(HSession hSession, HUSB hMainUSB, const uint8_t 
     int childRet = 0;
     int ret = ERR_IO_FAIL;
     int offset = 0;
-    while (modRunning && isAlive && !hSession->isDead && !hSession->hUSB->resetIO) {
+    while (modRunning && isAlive && !hSession->isDead) {
         childRet = write(bulkIn, (uint8_t *)data + offset, length - offset);
         if (childRet <= 0) {
             int err = errno;
@@ -267,9 +310,8 @@ int HdcDaemonUSB::SendUSBIOSync(HSession hSession, HUSB hMainUSB, const uint8_t 
     if (offset == length) {
         ret = length;
     } else {
-        WRITE_LOG(LOG_FATAL,
-                  "BulkinWrite write failed, nsize:%d really:%d modRunning:%d isAlive:%d SessionDead:%d usbReset:%d",
-                  length, offset, modRunning, isAlive, hSession->isDead, hSession->hUSB->resetIO);
+        WRITE_LOG(LOG_FATAL, "BulkinWrite write failed, nsize:%d really:%d modRunning:%d isAlive:%d SessionDead:%d",
+                  length, offset, modRunning, isAlive, hSession->isDead);
     }
     return ret;
 }
@@ -277,12 +319,7 @@ int HdcDaemonUSB::SendUSBIOSync(HSession hSession, HUSB hMainUSB, const uint8_t 
 int HdcDaemonUSB::SendUSBRaw(HSession hSession, uint8_t *data, const int length)
 {
     HdcDaemon *daemon = (HdcDaemon *)hSession->classInstance;
-    // Prevent memory stacking, send temporary way to use asynchronous
-    // Generally sent in the same thread, but when new session is created, there is a possibility that the old
-    // session is not retired. At present, the radical transmission method is currently opened directly in various
-    // threads, and it can be used exclusive File-DESC transmission mode in each thread. The late stage can be used
-    // as asynchronous + SendPipe to the main thread transmission.
-    uv_mutex_lock(&sendEP);
+    std::unique_lock<std::mutex> lock(mutexUsbFfs);
     ++hSession->ref;
     int ret = SendUSBIOSync(hSession, &usbHandle, data, length);
     --hSession->ref;
@@ -290,7 +327,6 @@ int HdcDaemonUSB::SendUSBRaw(HSession hSession, uint8_t *data, const int length)
         daemon->FreeSession(hSession->sessionId);
         WRITE_LOG(LOG_DEBUG, "SendUSBRaw try to freesession");
     }
-    uv_mutex_unlock(&sendEP);
     return ret;
 }
 
@@ -298,6 +334,15 @@ int HdcDaemonUSB::SendUSBRaw(HSession hSession, uint8_t *data, const int length)
 void HdcDaemonUSB::OnNewHandshakeOK(const uint32_t sessionId)
 {
     currentSessionId = sessionId;  // sync with server, and set server's real Id
+}
+
+// MainThreadCall, when seession was freeed
+void HdcDaemonUSB::OnSessionFreeFinally(const HSession hSession)
+{
+    if (currentSessionId == hSession->sessionId) {
+        isAlive = false;
+        // uv_cancel ctxRecv.req == UV_EBUSY, not effect immediately. It must be close by logic
+    }
 }
 
 HSession HdcDaemonUSB::PrepareNewSession(uint32_t sessionId, uint8_t *pRecvBuf, int recvBytesIO)
@@ -333,8 +378,6 @@ int HdcDaemonUSB::UsbToHdcProtocol(uv_stream_t *stream, uint8_t *appendData, int
 
 int HdcDaemonUSB::DispatchToWorkThread(uint32_t sessionId, uint8_t *readBuf, int readBytes)
 {
-    // Format:USBPacket1 payload1...USBPacketn
-    // payloadn-[USBHead1(PayloadHead1+Payload1)]+[USBHead2(Payload2)]+...+[USBHeadN(PayloadN)]
     HSession hChildSession = nullptr;
     HdcDaemon *daemon = reinterpret_cast<HdcDaemon *>(clsMainBase);
     int childRet = RET_SUCCESS;
@@ -391,39 +434,51 @@ void HdcDaemonUSB::OnUSBRead(uv_fs_t *req)
     uint32_t sessionId = 0;
     bool ret = false;
     int childRet = 0;
-    --thisClass->ref;
+    if (bytesIOBytes > hUSB->wMaxPacketSizeSend && bytesIOBytes != thisClass->saveNextReadSize) {
+        WRITE_LOG(LOG_WARN, "Not full packet, wanted:%d really:%d", thisClass->saveNextReadSize, bytesIOBytes);
+    }
     while (thisClass->isAlive) {
         // Don't care is module running, first deal with this
         if (bytesIOBytes < 0) {
-            WRITE_LOG(LOG_WARN, "USBIO failed1 %s", uv_strerror(bytesIOBytes));
-            break;
-        } else if (bytesIOBytes == 0) {
-            // zero packet
-            WRITE_LOG(LOG_WARN, "Zero packet received");
-            ret = true;
-            break;
-        }
-        if (thisClass->JumpAntiquePacket(*bufPtr, bytesIOBytes)) {
-            WRITE_LOG(LOG_DEBUG, "JumpAntiquePacket auto jump");
-            ret = true;
-            break;
-        }
-        // guess is head of packet
-        if ((childRet = thisClass->AvailablePacket((uint8_t *)bufPtr, bytesIOBytes, &sessionId)) != RET_SUCCESS) {
-            if (childRet != ERR_IO_SOFT_RESET) {
-                WRITE_LOG(LOG_WARN, "AvailablePacket check failed, ret:%d buf:%-50s", bytesIOBytes, bufPtr);
+            // logic alive and EINTER is gdb attach
+            //
+            // [about gdb attach known issue]
+            // When GDB debugging is loaded, the number of USB read interrupts of libuv will increase. Multiple
+            // interrupts will increase the correctness of USB data reading. Setting GDB to asynchronous mode or using
+            // log debugging can avoid this problem
+            if (bytesIOBytes != -EINTR) {  // Epoll will be broken when gdb attach
+                WRITE_LOG(LOG_WARN, "USBIO ret:%d failed:%s", bytesIOBytes, uv_strerror(bytesIOBytes));
+                ret = false;
+                break;
+            } else {
+                WRITE_LOG(LOG_ALL, "OnUSBRead signal EINTR");
+            }
+        } else if (bytesIOBytes == 0) {  // zero packet
+            WRITE_LOG(LOG_ALL, "Zero packet received");
+        } else {
+            if (thisClass->JumpAntiquePacket(*bufPtr, bytesIOBytes)) {
+                WRITE_LOG(LOG_DEBUG, "JumpAntiquePacket auto jump");
+                ret = true;
                 break;
             }
-            // reset packet
-            childRet = 0;  // need max size
-        } else {
-            // AvailablePacket case
-            if ((childRet = thisClass->DispatchToWorkThread(sessionId, bufPtr, bytesIOBytes)) < 0) {
-                WRITE_LOG(LOG_FATAL, "DispatchToWorkThread failed");
-                break;
+            // guess is head of packet
+            if ((childRet = thisClass->AvailablePacket((uint8_t *)bufPtr, bytesIOBytes, &sessionId)) != RET_SUCCESS) {
+                if (childRet != ERR_IO_SOFT_RESET) {
+                    WRITE_LOG(LOG_WARN, "AvailablePacket check failed, ret:%d buf:%-50s", bytesIOBytes, bufPtr);
+                    break;
+                }
+                // reset packet
+                childRet = 0;  // need max size
+            } else {
+                // AvailablePacket case
+                if ((childRet = thisClass->DispatchToWorkThread(sessionId, bufPtr, bytesIOBytes)) < 0) {
+                    WRITE_LOG(LOG_FATAL, "DispatchToWorkThread failed");
+                    break;
+                }
             }
         }
         int nextReadSize = childRet == 0 ? hUSB->wMaxPacketSizeSend : std::min(childRet, Base::GetUsbffsBulkSize());
+        thisClass->saveNextReadSize = nextReadSize;
         if (thisClass->LoopUSBRead(hUSB, nextReadSize) < 0) {
             WRITE_LOG(LOG_FATAL, "LoopUSBRead failed");
             break;
@@ -433,45 +488,28 @@ void HdcDaemonUSB::OnUSBRead(uv_fs_t *req)
     }
     if (!ret) {
         thisClass->isAlive = false;
+        thisClass->ctxRecv.atPollQueue = false;
     }
-    delete[] ctxIo->buf;
-    uv_fs_req_cleanup(req);
-    delete ctxIo;
 }
 
 int HdcDaemonUSB::LoopUSBRead(HUSB hUSB, int readMaxWanted)
 {
     int ret = ERR_GENERIC;
     HdcDaemon *daemon = reinterpret_cast<HdcDaemon *>(clsMainBase);
-    auto ctxIo = new CtxUvFileCommonIo();
-    auto buf = new uint8_t[readMaxWanted]();
-    uv_fs_t *req = nullptr;
     uv_buf_t iov;
-    if (ctxIo == nullptr || buf == nullptr) {
-        goto FAILED;
-    }
-    ctxIo->buf = buf;
-    ctxIo->bufSize = readMaxWanted;
-    ctxIo->data = hUSB;
-    ctxIo->thisClass = this;
-    req = &ctxIo->req;
-    req->data = ctxIo;
-    iov = uv_buf_init(reinterpret_cast<char *>(ctxIo->buf), ctxIo->bufSize);
+    ctxRecv.data = hUSB;
+    ctxRecv.bufSize = readMaxWanted;
+    ctxRecv.req = {};
+    uv_fs_t *req = &ctxRecv.req;
+    req->data = &ctxRecv;
+    iov = uv_buf_init(reinterpret_cast<char *>(ctxRecv.buf), ctxRecv.bufSize);
     ret = uv_fs_read(&daemon->loopMain, req, hUSB->bulkOut, &iov, 1, -1, OnUSBRead);
     if (ret < 0) {
         WRITE_LOG(LOG_FATAL, "uv_fs_read < 0");
-        goto FAILED;
+        return ERR_API_FAIL;
     }
-    ++this->ref;
-    return 0;
-FAILED:
-    if (ctxIo != nullptr) {
-        delete ctxIo;
-    }
-    if (buf != nullptr) {
-        delete[] buf;
-    }
-    return ERR_GENERIC;
+    ctxRecv.atPollQueue = true;
+    return RET_SUCCESS;
 }
 
 // Because USB can connect to only one host，daemonUSB is only one Session by default
@@ -480,16 +518,18 @@ void HdcDaemonUSB::WatchEPTimer(uv_timer_t *handle)
     HdcDaemonUSB *thisClass = (HdcDaemonUSB *)handle->data;
     HUSB hUSB = &thisClass->usbHandle;
     HdcDaemon *daemon = reinterpret_cast<HdcDaemon *>(thisClass->clsMainBase);
-    if (thisClass->isAlive || thisClass->ref > 0) {
+    if (thisClass->isAlive || thisClass->ctxRecv.atPollQueue) {
         return;
     }
     bool resetEp = false;
     do {
         if (hUSB->bulkIn > 0) {
+            WRITE_LOG(LOG_DEBUG, "Watchdog close bulkin");
             thisClass->CloseBulkEp(true, thisClass->usbHandle.bulkIn, &daemon->loopMain);
             resetEp = true;
         }
         if (hUSB->bulkOut > 0) {
+            WRITE_LOG(LOG_DEBUG, "Watchdog close bulkout");
             thisClass->CloseBulkEp(false, thisClass->usbHandle.bulkOut, &daemon->loopMain);
             resetEp = true;
         }

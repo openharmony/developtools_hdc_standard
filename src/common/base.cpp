@@ -23,16 +23,11 @@
 #include <random>
 #include <sstream>
 #include <thread>
-#ifdef __MUSL__
-extern "C" {
-#include "parameter.h"
-}
-#endif
 using namespace std::chrono;
 
 namespace Hdc {
 namespace Base {
-    uint8_t g_logLevel = 0;
+    uint8_t g_logLevel = LOG_DEBUG;  // tmp set,now debugmode.LOG_OFF when release;;
     void SetLogLevel(const uint8_t logLevel)
     {
         g_logLevel = logLevel;
@@ -45,7 +40,7 @@ namespace Base {
     {
         string tmpString = GetFileNameAny(debugInfo);
         debugInfo = StringFormat("%s:%d", tmpString.c_str(), line);
-        if (g_logLevel < LOG_ALL) {
+        if (g_logLevel < LOG_DEBUG) {
             debugInfo = "";
             threadIdString = "";
         } else {
@@ -108,7 +103,7 @@ namespace Base {
             logLevelString = std::to_string(logLevel);
         }
         string msTimeSurplus;
-        if (g_logLevel > LOG_DEBUG) {
+        if (g_logLevel >= LOG_DEBUG) {
             const auto sSinceUnix0Rest = duration_cast<microseconds>(sinceUnix0).count() % (TIME_BASE * TIME_BASE);
             msTimeSurplus = StringFormat(".%06llu", sSinceUnix0Rest);
         }
@@ -196,7 +191,7 @@ namespace Base {
         uv_tcp_keepalive(tcpHandle, 1, GLOBAL_TIMEOUT);
         // if MAX_SIZE_IOBUF==5k,bufMaxSize at least 40k. It must be set to io 8 times is more appropriate,
         // otherwise asynchronous IO is too fast, a lot of IO is wasted on IOloop, transmission speed will decrease
-        int bufMaxSize = GetMaxBufSize() * 10;
+        int bufMaxSize = HDC_SOCKETPAIR_SIZE;
         uv_recv_buffer_size((uv_handle_t *)tcpHandle, &bufMaxSize);
         uv_send_buffer_size((uv_handle_t *)tcpHandle, &bufMaxSize);
     }
@@ -542,42 +537,6 @@ namespace Base {
         }
         pclose(pipeHandle);
         return bytesRead;
-    }
-
-    bool SetHdcProperty(const char *key, const char *value)
-    {
-#ifndef __MUSL__
-#ifdef HDC_PCDEBUG
-        WRITE_LOG(LOG_DEBUG, "Setproperty, key:%s value:%s", key, value);
-#else
-        string sKey = key;
-        string sValue = value;
-        string sBuf = "setprop " + sKey + " " + value;
-        system(sBuf.c_str());
-#endif
-#else
-        SetParameter(key, value);
-#endif
-        return true;
-    }
-
-    bool GetHdcProperty(const char *key, char *value, uint16_t sizeOutBuf)
-    {
-#ifndef __MUSL__
-#ifdef HDC_PCDEBUG
-        WRITE_LOG(LOG_DEBUG, "Getproperty, key:%s value:%s", key, value);
-#else
-        string sKey = key;
-        string sBuf = "getprop " + sKey;
-        RunPipeComand(sBuf.c_str(), value, sizeOutBuf, true);
-#endif
-#else
-        string sKey = key;
-        string sBuf = "param get " + sKey;
-        RunPipeComand(sBuf.c_str(), value, sizeOutBuf, true);
-#endif
-        value[sizeOutBuf - 1] = '\0';
-        return true;
     }
 
     // bufLen == 0: alloc buffer in heap, need free it later
@@ -1197,16 +1156,6 @@ namespace Base {
         return ret;
     }
 
-    int open_osfhandle(uv_os_fd_t os_fd)
-    {
-        // equal libuv's uv_open_osfhandle, libuv 1.23 added. old libuv not impl...
-#ifdef _WIN32
-        return _open_osfhandle((intptr_t)os_fd, 0);
-#else
-        return os_fd;
-#endif
-    }
-
     uv_os_sock_t DuplicateUvSocket(uv_tcp_t *tcp)
     {
         uv_os_sock_t dupFd = -1;
@@ -1222,19 +1171,9 @@ namespace Base {
         if (uv_fileno((const uv_handle_t *)tcp, &fdOs) < 0) {
             return ERR_API_FAIL;
         }
-        dupFd = dup(open_osfhandle(fdOs));
+        dupFd = dup(uv_open_osfhandle(fdOs));
 #endif
         return dupFd;
-    }
-
-    vector<uint8_t> Md5Sum(uint8_t *buf, int size)
-    {
-        vector<uint8_t> ret;
-        uint8_t md5Hash[MD5_DIGEST_LENGTH] = { 0 };
-        if (EVP_Digest(buf, size, md5Hash, NULL, EVP_md5(), NULL)) {
-            ret.insert(ret.begin(), md5Hash, md5Hash + sizeof(md5Hash));
-        }
-        return ret;
     }
 
     string GetCwd()
