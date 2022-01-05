@@ -59,10 +59,13 @@ void HdcShell::StopTask()
     if (childShell) {
         childShell->StopWork(false, nullptr);
     }
-    kill(pidShell, SIGKILL);
-    int status;
-    waitpid(pidShell, &status, 0);
-    WRITE_LOG(LOG_DEBUG, "StopTask, kill pidshell:%d", pidShell);
+
+    if (pidShell > 1) {
+        kill(pidShell, SIGKILL);
+        int status;
+        waitpid(pidShell, &status, 0);
+        WRITE_LOG(LOG_DEBUG, "StopTask, kill pidshell:%d", pidShell);
+    }
 };
 
 bool HdcShell::SpecialSignal(uint8_t ch)
@@ -71,8 +74,13 @@ bool HdcShell::SpecialSignal(uint8_t ch)
     bool ret = true;
     switch (ch) {
         case TXT_SIGNAL_ETX: {  // Ctrl+C
+            if (fdPTY <= 0) {
+                break;
+            }
             pid_t tpgid = tcgetpgrp(fdPTY);
-            kill(tpgid, SIGINT);
+            if (tpgid > 1) {
+                kill(tpgid, SIGINT);
+            }
             break;
         }
         default:
