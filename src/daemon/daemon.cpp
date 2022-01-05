@@ -80,14 +80,11 @@ void HdcDaemon::InitMod(bool bEnableTCP, bool bEnableUSB)
         clsUSBServ = new HdcDaemonUSB(false, this);
         ((HdcDaemonUSB *)clsUSBServ)->Initial();
     }
-
     clsJdwp = new HdcJdwp(&loopMain);
     ((HdcJdwp *)clsJdwp)->Initial();
-
     // enable security
-    char value[4] = "0";
-    Base::GetHdcProperty("ro.hdc.secure", value, sizeof(value));
-    string secure = value;
+    string secure;
+    SystemDepend::GetDevItem("ro.hdc.secure", secure);
     enableSecure = (Base::Trim(secure) == "1");
 }
 
@@ -106,8 +103,8 @@ bool HdcDaemon::RedirectToTask(HTaskInfo hTaskInfo, HSession hSession, const uin
         case CMD_UNITY_ROOTRUN:
         case CMD_UNITY_TERMINATE:
         case CMD_UNITY_BUGREPORT_INIT:
-        case CMD_UNITY_JPID:
-        case CMD_TRACK_JPID:
+        case CMD_JDWP_LIST:
+        case CMD_JDWP_TRACK:
             ret = TaskCommandDispatch<HdcDaemonUnity>(hTaskInfo, TYPE_UNITY, command, payload, payloadSize);
             break;
         case CMD_SHELL_INIT:
@@ -137,7 +134,7 @@ bool HdcDaemon::RedirectToTask(HTaskInfo hTaskInfo, HSession hSession, const uin
             ret = TaskCommandDispatch<HdcDaemonForward>(hTaskInfo, TASK_FORWARD, command, payload, payloadSize);
             break;
         default:
-            ret = false;
+            //ignore unknow command
             break;
     }
     return ret;
@@ -298,4 +295,15 @@ void HdcDaemon::JdwpNewFileDescriptor(const uint8_t *buf, const int bytesIO)
     uint32_t fd = *(uint32_t *)(buf + 5);  // 5 : fd offset
     ((HdcJdwp *)clsJdwp)->SendJdwpNewFD(pid, fd);
 };
+
+void HdcDaemon::NotifyInstanceSessionFree(HSession hSession, bool freeOrClear)
+{
+    if (!freeOrClear) {
+        return;  // ignore step 1
+    }
+    if (clsUSBServ != nullptr) {
+        auto clsUsbModule = reinterpret_cast<HdcDaemonUSB *>(clsUSBServ);
+        clsUsbModule->OnSessionFreeFinally(hSession);
+    }
+}
 }  // namespace Hdc

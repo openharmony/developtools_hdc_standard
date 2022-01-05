@@ -56,7 +56,7 @@ void AsyncCmd::DoRelease()
 bool AsyncCmd::Initial(uv_loop_t *loopIn, const CmdResultCallback callback, uint32_t optionsIn)
 {
 #if defined _WIN32 || defined HDC_HOST
-    WRITE_LOG(LOG_FATAL, "Not support for win32-host");
+    WRITE_LOG(LOG_FATAL, "Not support for win32 or host side");
     return false;
 #endif
     loop = loopIn;

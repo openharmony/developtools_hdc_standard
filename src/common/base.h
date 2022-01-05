@@ -18,6 +18,7 @@
 
 namespace Hdc {
 namespace Base {
+    extern uint8_t g_logLevel;
     void SetLogLevel(const uint8_t logLevel);
     void PrintLogEx(const char *functionName, int line, uint8_t logLevel, const char *msg, ...);
     void PrintMessage(const char *fmt, ...);
@@ -49,9 +50,6 @@ namespace Base {
     void TryCloseHandle(const uv_handle_t *handle, uv_close_cb closeCallBack);
     void TryCloseHandle(const uv_handle_t *handle, bool alwaysCallback, uv_close_cb closeCallBack);
     char **SplitCommandToArgs(const char *cmdStringLine, int *slotIndex);
-    bool SetHdcProperty(const char *key, const char *value);
-    // value needs to save results which can't be const
-    bool GetHdcProperty(const char *key, char *value, uint16_t sizeOutBuf);
     bool RunPipeComand(const char *cmdString, char *outBuf, uint16_t sizeOutBuf, bool ignoreTailLF);
     // results need to save in buf which can't be const
     int ReadBinFile(const char *pathName, void **buf, const int bufLen);
@@ -138,7 +136,6 @@ namespace Base {
     string GetTmpDir();
     void RemoveLogFile();
     uv_os_sock_t DuplicateUvSocket(uv_tcp_t *tcp);
-    vector<uint8_t> Md5Sum(uint8_t *buf, int size);
     bool IsRoot();
     char GetPathSep();
     bool IsAbsolutePath(string &path);
@@ -150,6 +147,18 @@ namespace Base {
     {
         return MAX_USBFFS_BULK;
     }
+#ifdef HDC_SUPPORT_FLASHD
+    // deprecated, remove later
+    inline bool SetHdcProperty(const char *key, const char *value)
+    {
+        return false;
+    }
+    // deprecated, remove later
+    inline bool GetHdcProperty(const char *key, char *value, uint16_t sizeOutBuf)
+    {
+        return false;
+    }
+#endif
 }  // namespace base
 }  // namespace Hdc
 

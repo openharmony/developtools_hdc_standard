@@ -49,6 +49,7 @@ ohos_executable("hdcd") {
     "src/daemon/jdwp.cpp",
     "src/daemon/main.cpp",
     "src/daemon/shell.cpp",
+    "src/daemon/system_depend.cpp",
   ]
   sources += hdc_common_sources
 

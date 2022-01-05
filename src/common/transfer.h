@@ -52,20 +52,23 @@ public:
 
 protected:
     // Static file context
-    struct CtxFile {  // The structure cannot be initialized by MEMSET
-        bool master;  // Document transmission initiative
-        bool closeNotify;
-        void *thisClass;
+    struct CtxFile {  // The structure cannot be initialized by MEMSET, will rename to CtxTransfer
         uint64_t fileSize;
         uint64_t indexIO;  // Id or written IO bytes
-        uv_loop_t *loop;
-        uv_fs_cb cb;
+        uint64_t transferBegin;
         string localName;
         string localPath;
         string remotePath;
+        bool master;  // Document transmission initiative
+        bool closeNotify;
+        bool ioFinish;
+        void *thisClass;
+        uint32_t lastErrno;
+
+        uv_loop_t *loop;
         uv_fs_t fsOpenReq;
         uv_fs_t fsCloseReq;
-        uint64_t transferBegin;
+        uv_fs_cb cb;
         vector<string> taskQueue;
         TransferConfig transferConfig;  // Used for network IO configuration initialization
     };
