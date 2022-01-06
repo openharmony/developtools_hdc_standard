@@ -164,7 +164,7 @@ int RunClientMode(string &commands, string &serverListenString, string &connectK
     uv_loop_init(&loopMain);
     HdcClient client(false, serverListenString, &loopMain);
     if (!commands.size()) {
-        Base::PrintMessage("Unknow operation command...");
+        Base::PrintMessage("Unknown operation command...");
         TranslateCommand::Usage();
         return 0;
     }
@@ -188,7 +188,7 @@ int RunClientMode(string &commands, string &serverListenString, string &connectK
 bool ParseServerListenString(string &serverListenString, char *optarg)
 {
     if (strlen(optarg) > 24) {
-        Base::PrintMessage("Unknow content of parament '-s'");
+        Base::PrintMessage("Unknown content of parament '-s'");
         return false;
     }
     char buf[BUF_SIZE_TINY] = "";

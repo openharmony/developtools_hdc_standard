@@ -102,7 +102,7 @@ void HdcClient::DoCtrlServiceWork(uv_check_t *handle)
             string keyPath = strCmd.substr(CMDSTR_GENERATE_KEY.size() + 1, strCmd.size());
             HdcAuth::GenerateKey(keyPath.c_str());
         } else {
-            Base::PrintMessage("Unknow command");
+            Base::PrintMessage("Unknown command");
         }
         break;
     }
