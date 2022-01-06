@@ -37,8 +37,8 @@ private:
     bool ListJdwpProcess(void *daemonIn);
     bool AsyncCmdOut(bool finish, int64_t exitStatus, const string result);
     bool TrackJdwpProcess(void *daemonIn);
+    void RemoveJdwpTracker();
 
-    const string rebootProperty = "sys.powerctl";
     AsyncCmd asyncCommand;
     uint16_t currentDataCommand;
 #ifdef UNIT_TEST

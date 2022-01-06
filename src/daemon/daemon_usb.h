@@ -25,14 +25,17 @@ public:
     void Stop();
     int SendUSBRaw(HSession hSession, uint8_t *data, const int length);
     void OnNewHandshakeOK(const uint32_t sessionId);
+    void OnSessionFreeFinally(const HSession hSession);
 
 private:
     struct CtxUvFileCommonIo {
-        uv_fs_t req;
-        uint8_t *buf;
-        int bufSize;
         void *thisClass;
         void *data;
+        uint8_t *buf;
+        int bufSizeMax;
+        int bufSize;
+        bool atPollQueue;
+        uv_fs_t req;
     };
     static void OnUSBRead(uv_fs_t *req);
     static void WatchEPTimer(uv_timer_t *handle);
@@ -50,15 +53,17 @@ private:
     void ResetOldSession(uint32_t sessionId);
     int GetMaxPacketSize(int fdFfs);
     int UsbToHdcProtocol(uv_stream_t *stream, uint8_t *appendData, int dataSize);
+    void FillUsbV2Head(struct usb_functionfs_desc_v2 &descUsbFfs);
 
     HdcUSB usbHandle;
     string basePath;                // usb device's base path
     uint32_t currentSessionId = 0;  // USB mode,limit only one session
-    std::atomic<uint32_t> ref = 0;
-    uv_timer_t checkEP;  // server-use
-    uv_mutex_t sendEP;
+    uv_timer_t checkEP;             // server-use
+    mutex mutexUsbFfs;
     bool isAlive = false;
     int controlEp = 0;  // EP0
+    CtxUvFileCommonIo ctxRecv = {};
+    int saveNextReadSize = 0;
 };
 }  // namespace Hdc
 #endif

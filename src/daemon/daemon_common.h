@@ -24,6 +24,7 @@
 #include "../common/serial_struct.h"
 
 #ifndef HDC_HOST // daemon used
+#include "system_depend.h"
 #include "jdwp.h"
 #include "daemon.h"
 #include "daemon_unity.h"

@@ -18,6 +18,8 @@
 namespace Hdc {
 HdcSessionBase::HdcSessionBase(bool serverOrDaemonIn)
 {
+    // print version pid
+    WRITE_LOG(LOG_INFO, "Program running. %s Pid:%u", Base::GetVersion().c_str(), getpid());
     // server/daemon common initialization code
     string threadNum = std::to_string(SIZE_THREAD_POOL);
     uv_os_setenv("UV_THREADPOOL_SIZE", threadNum.c_str());
@@ -314,16 +316,6 @@ int HdcSessionBase::MallocSessionByConnectType(HSession hSession)
             }
             hSession->hUSB = hUSB;
             hSession->hUSB->wMaxPacketSizeSend = MAX_PACKET_SIZE_HISPEED;
-#ifdef HDC_HOST
-            int max = Base::GetUsbffsBulkSize();
-            hUSB->sizeEpBuf = max;
-            hUSB->bufDevice = new uint8_t[max]();
-            hUSB->bufHost = new uint8_t[max]();
-            hUSB->transferRecv = libusb_alloc_transfer(0);
-            hUSB->recvIOComplete = true;
-            hUSB->sendIOComplete = true;
-#else
-#endif
             break;
         }
         default:
@@ -410,11 +402,6 @@ void HdcSessionBase::FreeSessionByConnectType(HSession hSession)
             libusb_close(hUSB->devHandle);
             hUSB->devHandle = nullptr;
         }
-
-        delete[] hUSB->bufDevice;
-        delete[] hUSB->bufHost;
-        libusb_free_transfer(hUSB->transferRecv);
-        libusb_exit(hUSB->ctxUSB);
 #else
         if (hUSB->bulkIn > 0) {
             close(hUSB->bulkIn);
@@ -485,12 +472,10 @@ void HdcSessionBase::FreeSessionOpeate(uv_timer_t *handle)
     }
     WRITE_LOG(LOG_DEBUG, "FreeSessionOpeate ref:%u", uint32_t(hSession->ref));
 #ifdef HDC_HOST
-    if (hSession->hUSB != nullptr && (!hSession->hUSB->recvIOComplete || !hSession->hUSB->sendIOComplete)) {
-        if (!hSession->hUSB->recvIOComplete) {
-            HdcUSBBase *pUSB = ((HdcUSBBase *)hSession->classModule);
-            pUSB->CancelUsbLoopRead(hSession->hUSB);
-        }
-        // send will be end with timeout
+    if (hSession->hUSB != nullptr
+        && (!hSession->hUSB->hostBulkIn.isShutdown || !hSession->hUSB->hostBulkOut.isShutdown)) {
+        HdcUSBBase *pUSB = ((HdcUSBBase *)hSession->classModule);
+        pUSB->CancelUsbIo(hSession);
         return;
     }
 #endif
@@ -758,8 +743,7 @@ int HdcSessionBase::FetchIOBuf(HSession hSession, uint8_t *ioBuf, int read)
         } else if (childRet == 0) {
             // Not enough a IO
             break;
-        } else {
-            // <0
+        } else {                           // <0
             hSession->availTailIndex = 0;  // Preventing malicious data packages
             indexBuf = ERR_BUF_SIZE;
             break;
@@ -780,7 +764,7 @@ int HdcSessionBase::FetchIOBuf(HSession hSession, uint8_t *ioBuf, int read)
 void HdcSessionBase::AllocCallback(uv_handle_t *handle, size_t sizeWanted, uv_buf_t *buf)
 {
     HSession context = (HSession)handle->data;
-    Base::ReallocBuf(&context->ioBuf, &context->bufSize, Base::GetMaxBufSize() * 4);
+    Base::ReallocBuf(&context->ioBuf, &context->bufSize, HDC_SOCKETPAIR_SIZE);
     buf->base = (char *)context->ioBuf + context->availTailIndex;
     int size = context->bufSize - context->availTailIndex;
     buf->len = std::min(size, static_cast<int>(sizeWanted));
@@ -1047,35 +1031,65 @@ void HdcSessionBase::LogMsg(const uint32_t sessionId, const uint32_t channelId,
     ServerCommand(sessionId, channelId, CMD_KERNEL_ECHO, buf.data(), buf.size());
 }
 
+bool HdcSessionBase::NeedNewTaskInfo(const uint16_t command, bool &masterTask)
+{
+    // referer from HdcServerForClient::DoCommandRemote
+    bool ret = false;
+    bool taskMasterInit = false;
+    masterTask = false;
+    switch (command) {
+        case CMD_FILE_INIT:
+        case CMD_FORWARD_INIT:
+        case CMD_APP_INIT:
+        case CMD_APP_UNINSTALL:
+        case CMD_UNITY_BUGREPORT_INIT:
+        case CMD_APP_SIDELOAD:
+            taskMasterInit = true;
+            break;
+        default:
+            break;
+    }
+    if (!serverOrDaemon
+        && (command == CMD_SHELL_INIT || (command > CMD_UNITY_COMMAND_HEAD && command < CMD_UNITY_COMMAND_TAIL))) {
+        // daemon's single side command
+        ret = true;
+    } else if (command == CMD_KERNEL_WAKEUP_SLAVETASK) {
+        // slave tasks
+        ret = true;
+    } else if (taskMasterInit) {
+        // task init command
+        masterTask = true;
+        ret = true;
+    }
+    return ret;
+}
 // Heavy and time-consuming work was putted in the new thread to do, and does
 // not occupy the main thread
 bool HdcSessionBase::DispatchTaskData(HSession hSession, const uint32_t channelId, const uint16_t command,
                                       uint8_t *payload, int payloadSize)
 {
     bool ret = true;
+    HTaskInfo hTaskInfo = nullptr;
+    bool masterTask = false;
     while (true) {
-        HTaskInfo hTaskInfo = AdminTask(OP_QUERY, hSession, channelId, nullptr);
-        if (!hTaskInfo) {
+        // Some basic commands do not have a local task constructor. example: Interactive shell, some uinty commands
+        if (NeedNewTaskInfo(command, masterTask)) {
             WRITE_LOG(LOG_DEBUG, "New HTaskInfo");
             hTaskInfo = new TaskInformation();
             hTaskInfo->channelId = channelId;
             hTaskInfo->sessionId = hSession->sessionId;
             hTaskInfo->runLoop = &hSession->childLoop;
             hTaskInfo->serverOrDaemon = serverOrDaemon;
+            hTaskInfo->masterSlave = masterTask;
+            AdminTask(OP_ADD, hSession, channelId, hTaskInfo);
+        } else {
+            hTaskInfo = AdminTask(OP_QUERY, hSession, channelId, nullptr);
         }
-        if (hTaskInfo->taskStop) {
-            WRITE_LOG(LOG_DEBUG, "RedirectToTask jump stopped task:%u", channelId);
-            break;
-        }
-        if (hTaskInfo->taskFree) {
-            WRITE_LOG(LOG_DEBUG, "Jump delete HTaskInfo");
+        if (!hTaskInfo || hTaskInfo->taskStop || hTaskInfo->taskFree) {
+            WRITE_LOG(LOG_ALL, "Dead HTaskInfo, ignore, channelId:%u command:%u", channelId, command);
             break;
         }
         ret = RedirectToTask(hTaskInfo, hSession, channelId, command, payload, payloadSize);
-        if (!hTaskInfo->hasInitial) {
-            AdminTask(OP_ADD, hSession, channelId, hTaskInfo);
-            hTaskInfo->hasInitial = true;
-        }
         break;
     }
     return ret;

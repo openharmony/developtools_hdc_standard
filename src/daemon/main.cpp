@@ -34,10 +34,9 @@ bool ForkChildCheck(int argc, const char *argv[])
     // hdcd        #service start forground
     // hdcd -b     #service start backgroundRun
     // hdcd -fork  #fork
-    char modeSet[BUF_SIZE_TINY] = "";
-    Base::GetHdcProperty("persist.hdc.mode", modeSet, BUF_SIZE_TINY);
     Base::PrintMessage("Background mode, persist.hdc.mode");
-    string workMode = modeSet;
+    string workMode;
+    SystemDepend::GetDevItem("persist.hdc.mode", workMode);
     workMode = Base::Trim(workMode);
     if (workMode == CMDSTR_TMODE_TCP) {
         WRITE_LOG(LOG_DEBUG, "Property enable TCP");
@@ -100,7 +99,7 @@ bool GetDaemonCommandlineOptions(int argc, const char *argv[])
 {
     int ch;
     // hdcd -l4 ...
-    WRITE_LOG(LOG_DEBUG, "Fgcli mode");
+    WRITE_LOG(LOG_DEBUG, "Forground cli-mode");
     // Both settings are running with parameters
     while ((ch = getopt(argc, (char *const *)argv, "utl:")) != -1) {
         switch (ch) {
@@ -134,10 +133,8 @@ bool GetDaemonCommandlineOptions(int argc, const char *argv[])
 
 void NeedDropPriv()
 {
-    char droprootSet[BUF_SIZE_TINY] = "";
-    Base::GetHdcProperty("persist.hdc.root", droprootSet, BUF_SIZE_TINY);
-    droprootSet[sizeof(droprootSet) - 1] = '\0';
-    string rootMode = droprootSet;
+    string rootMode;
+    SystemDepend::GetDevItem("persist.hdc.root", rootMode);
     if (Base::Trim(rootMode) == "1") {
         setuid(0);
         g_rootRun = true;
@@ -165,7 +162,6 @@ int main(int argc, const char *argv[])
     }
     if (argc == 1 || (argc == CMD_ARG1_COUNT && (!strcmp(argv[1], "-forkchild") || !strcmp(argv[1], "-b")))) {
         Hdc::Base::RemoveLogFile();
-        Base::SetLogLevel(LOG_LEVEL_FULL);
         ForkChildCheck(argc, argv);
     } else {
         GetDaemonCommandlineOptions(argc, argv);
@@ -181,6 +177,7 @@ int main(int argc, const char *argv[])
     umask(0);
     signal(SIGPIPE, SIG_IGN);
     signal(SIGCHLD, SIG_IGN);
+    signal(SIGALRM, SIG_IGN);
     WRITE_LOG(LOG_DEBUG, "HdcDaemon main run");
     HdcDaemon daemon(false);
     daemon.InitMod(g_enableTcp, g_enableUsb);
