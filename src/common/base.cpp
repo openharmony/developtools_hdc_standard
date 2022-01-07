@@ -877,14 +877,14 @@ namespace Base {
         }
     }
 
-    void BuildErrorString(const char *localPath, const char *op, errno_t err, string &str)
+    void BuildErrorString(const char *localPath, const char *op, const char *err, string &str)
     {
         // avoid to use stringstream
         str = op;
         str += " ";
         str += localPath;
         str += " failed, ";
-        str += strerror(err);
+        str += err;
     }
 
     // Both absolute and relative paths support
@@ -895,7 +895,7 @@ namespace Base {
             mode_t mode;
             int r = uv_fs_lstat(nullptr, &req, localPath, nullptr);
             if (r) {
-                BuildErrorString(localPath, "lstat", errno, errStr);
+                BuildErrorString(localPath, "lstat", uv_strerror(req.result), errStr);
             }
 
             mode = req.statbuf.st_mode;
@@ -905,7 +905,7 @@ namespace Base {
                 uv_fs_access(nullptr, &req, localPath, readWrite ? R_OK : W_OK, nullptr);
                 if (req.result) {
                     const char *op = readWrite ? "access R_OK" : "access W_OK";
-                    BuildErrorString(localPath, op, errno, errStr);
+                    BuildErrorString(localPath, op, uv_strerror(req.result), errStr);
                 }
                 uv_fs_req_cleanup(&req);
                 if (req.result == 0)
