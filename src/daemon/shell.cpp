@@ -128,7 +128,7 @@ int HdcShell::ChildForkDo(int pts, const char *cmd, const char *arg0, const char
         close(fd);
     }
     char *env = nullptr;
-    if ((env = getenv("HOME")) && chdir(env) < 0) {
+    if (((env = getenv("HOME")) && chdir(env) < 0) || chdir("/")) {
     }
     execl(cmd, cmd, arg0, arg1, nullptr);
     _Exit(1);
