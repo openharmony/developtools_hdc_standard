@@ -16,7 +16,6 @@
 #define DEFINE_PLUS_H
 
 namespace Hdc {
-constexpr uint8_t LOG_LEVEL_FULL = 5;
 // ############################# enum define ###################################
 enum LogLevel {
     LOG_OFF,
@@ -118,18 +117,22 @@ enum HdcCommand {
     CMD_KERNEL_ECHO,
     CMD_KERNEL_ECHO_RAW,
     CMD_KERNEL_ENABLE_KEEPALIVE,
+    CMD_KERNEL_WAKEUP_SLAVETASK,
     // One-pass simple commands
-    CMD_UNITY_EXECUTE = 1000,
+    CMD_UNITY_COMMAND_HEAD = 1000,  // not use
+    CMD_UNITY_EXECUTE,
     CMD_UNITY_REMOUNT,
     CMD_UNITY_REBOOT,
     CMD_UNITY_RUNMODE,
     CMD_UNITY_HILOG,
     CMD_UNITY_TERMINATE,
     CMD_UNITY_ROOTRUN,
+    CMD_JDWP_LIST,
+    CMD_JDWP_TRACK,
+    CMD_UNITY_COMMAND_TAIL,  // not use
+    // It will be separated from unity in the near future
     CMD_UNITY_BUGREPORT_INIT,
     CMD_UNITY_BUGREPORT_DATA,
-    CMD_UNITY_JPID,
-    CMD_TRACK_JPID,
     // Shell commands types
     CMD_SHELL_INIT = 2000,
     CMD_SHELL_DATA,
@@ -158,6 +161,9 @@ enum HdcCommand {
     CMD_APP_DATA,
     CMD_APP_FINISH,
     CMD_APP_UNINSTALL,
+
+    // deprecated, remove later
+    CMD_UNITY_JPID = CMD_JDWP_LIST,
 };
 
 enum UsbProtocolOption {
@@ -195,6 +201,7 @@ struct TaskInformation {
     bool taskStop;
     bool taskFree;
     bool serverOrDaemon;
+    bool masterSlave;
     uv_loop_t *runLoop;
     void *taskClass;
     void *ownerSessionClass;
@@ -203,38 +210,58 @@ using HTaskInfo = TaskInformation *;
 
 #pragma pack(pop)
 
+#ifdef HDC_HOST
+struct HostUSBEndpoint {
+    HostUSBEndpoint()
+    {
+        endpoint = 0;
+        sizeEpBuf = 16384;  // MAX_USBFFS_BULK
+        transfer = libusb_alloc_transfer(0);
+        isShutdown = true;
+        isComplete = true;
+    }
+    ~HostUSBEndpoint()
+    {
+        libusb_free_transfer(transfer);
+    }
+    uint8_t endpoint;
+    uint8_t buf[16384];  // MAX_USBFFS_BULK
+    bool isComplete;
+    bool isShutdown;
+    bool bulkInOut;  // true is bulkIn
+    uint16_t sizeEpBuf;
+    mutex mutexIo;
+    mutex mutexCb;
+    condition_variable cv;
+    libusb_transfer *transfer;
+};
+#endif
+
 struct HdcUSB {
 #ifdef HDC_HOST
     libusb_context *ctxUSB = nullptr;  // child-use, main null
     libusb_device *device;
     libusb_device_handle *devHandle;
-    uint8_t interfaceNumber;
     uint16_t retryCount;
-    // D2H device to host endpoint's address
-    uint8_t epDevice;
-    // H2D host to device endpoint's address
-    uint8_t epHost;
     uint8_t devId;
     uint8_t busId;
-    uint16_t sizeEpBuf;
+    uint8_t interfaceNumber;
     string serialNumber;
     string usbMountPoint;
-    uint8_t *bufDevice;
-    uint8_t *bufHost;
-    libusb_transfer *transferRecv;
-    bool recvIOComplete;
-    bool sendIOComplete;
-    uv_thread_t threadUsbChildWork;
+    HostUSBEndpoint hostBulkIn;
+    HostUSBEndpoint hostBulkOut;
+
 #else
     // usb accessory FunctionFS
     // USB main thread use, sub-thread disable, sub-thread uses the main thread USB handle
     int bulkOut;  // EP1 device recv
     int bulkIn;   // EP2 device send
 #endif
-    mutex lockDeviceHandle;
+    uint32_t payloadSize;
     uint16_t wMaxPacketSizeSend;
-    uint32_t bulkinDataSize;
     bool resetIO;  // if true, must break write and read,default false
+    mutex lockDeviceHandle;
+    mutex lockSendUsbBlock;
 };
 using HUSB = struct HdcUSB *;
 

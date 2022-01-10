@@ -155,7 +155,7 @@ namespace TranslateCommand {
             stringError = "Error tmode command";
             outCmd->bJumpDo = true;
         } else if (!strncmp(outCmd->parameters.c_str(), "port ", 5)) {
-            int port = atoi(input + 4);
+            int port = atoi(input + strlen("tmode port "));
             if (port > MAX_IP_PORT || port <= 0) {
                 stringError = "Incorrect port range";
                 outCmd->bJumpDo = true;
@@ -237,13 +237,13 @@ namespace TranslateCommand {
         } else if (!strcmp(input.c_str(), CMDSTR_TARGET_MOUNT.c_str())) {
             outCmd->cmdFlag = CMD_UNITY_REMOUNT;
         } else if (!strcmp(input.c_str(), CMDSTR_LIST_JDWP.c_str())) {
-            outCmd->cmdFlag = CMD_UNITY_JPID;
+            outCmd->cmdFlag = CMD_JDWP_LIST;
         } else if (!strcmp(input.c_str(), CMDSTR_TRACK_JDWP.c_str())) {
-            outCmd->cmdFlag = CMD_TRACK_JPID;
+            outCmd->cmdFlag = CMD_JDWP_TRACK;
         } else if (!strncmp(input.c_str(), CMDSTR_TARGET_REBOOT.c_str(), CMDSTR_TARGET_REBOOT.size())) {
-            TargetReboot(input.c_str(), outCmd);
+            stringError = TargetReboot(input.c_str(), outCmd);
         } else if (!strncmp(input.c_str(), CMDSTR_TARGET_MODE.c_str(), CMDSTR_TARGET_MODE.size())) {
-            RunMode(input.c_str(), outCmd);
+            stringError = RunMode(input.c_str(), outCmd);
         } else if (!strcmp(input.c_str(), CMDSTR_CONNECT_ANY.c_str())) {
             outCmd->cmdFlag = CMD_KERNEL_TARGET_ANY;
         } else if (!strncmp(input.c_str(), CMDSTR_HILOG.c_str(), CMDSTR_HILOG.size())) {

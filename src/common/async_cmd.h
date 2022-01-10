@@ -24,12 +24,12 @@ public:
     enum AsyncCmdOption {
         OPTION_COMMAND_ONETIME = 1,
         USB_OPTION_RESERVE2 = 2,
-        OPTION_READBACK_OUT = 4,  // PS: Not used, remove it later
+        OPTION_READBACK_OUT = 4,  // deprecated, remove it later
         USB_OPTION_RESERVE8 = 8,
     };
     // 1)is finish 2)exitStatus 3)resultString(maybe empty)
     using CmdResultCallback = std::function<bool(bool, int64_t, const string)>;
-    // PS: Not used, remove it later
+    // deprecated, remove it later
     static uint32_t GetDefaultOption()
     {
         return OPTION_COMMAND_ONETIME;

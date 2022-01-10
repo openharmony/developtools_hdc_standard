@@ -25,16 +25,23 @@ public:
     virtual ~HdcJdwp();
     int Initial();
     void Stop();
-    bool CreateJdwpTracker(HTaskInfo hTaskInfo) ;
+    bool CreateJdwpTracker(HTaskInfo taskInfo);
+    void RemoveJdwpTracker(HTaskInfo taskInfo);
     bool ReadyForRelease();
     string GetProcessList();
     bool SendJdwpNewFD(uint32_t targetPID, int fd);
     bool CheckPIDExist(uint32_t targetPID);
+
+private:
 #ifdef JS_JDWP_CONNECT
     static constexpr uint8_t JS_PKG_MIN_SIZE = 15; // JsMsgHeader + "pkgName:"uint8_t[7~127]
     static constexpr uint8_t JS_PKG_MX_SIZE = 135;
+    struct JsMsgHeader {
+        uint32_t msgLen;
+        uint32_t pid;
+    };
+    string GetProcessListExtendPkgName();
 #endif // JS_JDWP_CONNECT
-private:
     struct _PollFd {
         int fd;
         short events;
@@ -52,12 +59,6 @@ private:
             ppid = pid;
         }
     };
-#ifdef JS_JDWP_CONNECT
-    struct JsMsgHeader {
-        uint32_t msgLen;
-        uint32_t pid;
-    };
-#endif // JS_JDWP_CONNECT
     struct ContextJdwp {
         uint32_t pid;
         uv_pipe_t pipe;
@@ -79,18 +80,16 @@ private:
     static void ReadStream(uv_stream_t *pipe, ssize_t nread, const uv_buf_t *buf);
     static void SendCallbackJdwpNewFD(uv_write_t *req, int status);
     static void *FdEventPollThread(void *args);
+    void RemoveFdFromPollList(uint32_t pid);
     size_t JdwpProcessListMsg(char *buffer, size_t bufferlen);
-#ifdef JS_JDWP_CONNECT
-    string GetProcessListExtendPkgName();
-#endif // JS_JDWP_CONNECT
     void *MallocContext();
     void FreeContext(HCtxJdwp ctx);
     void *AdminContext(const uint8_t op, const uint32_t pid, HCtxJdwp ctxJdwp);
     int CreateFdEventPoll();
-    void ProcessListUpdated(void) ;
+    void ProcessListUpdated(HTaskInfo task = nullptr);
+    void SendProcessList(HTaskInfo t, string data);
     void DrainAwakenPollThread() const;
     void WakePollThread();
-
     uv_loop_t *loop;
     uv_pipe_t listenPipe;
     uint32_t refCount;
