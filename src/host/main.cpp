@@ -24,14 +24,14 @@ using namespace HdcTest;
 #include "server_for_client.h"
 using namespace Hdc;
 
-static bool g_isServerMode = false;
-static bool g_isPullServer = true;
-static bool g_isPcDebugRun = false;
-static bool g_isTCPorUSB = false;
-static auto g_logLevel = LOG_LEVEL_FULL;
-static int g_isTestMethod = 0;
-static string g_connectKey = "";
-static string g_serverListenString = DEFAULT_SERVER_ADDR;
+bool g_isServerMode = false;
+bool g_isPullServer = true;
+bool g_isPcDebugRun = false;
+bool g_isTCPorUSB = false;
+bool g_isCustomLoglevel = false;
+int g_isTestMethod = 0;
+string g_connectKey = "";
+string g_serverListenString = DEFAULT_SERVER_ADDR;
 
 namespace Hdc {
 // return value: 0 == not command, 1 == one command, 2 == double command
@@ -251,7 +251,7 @@ bool GetCommandlineOptions(int optArgc, const char *optArgv[])
                     needExit = true;
                     return needExit;
                 }
-                g_logLevel = logLevel;
+                g_isCustomLoglevel = true;
                 Base::SetLogLevel(logLevel);
                 break;
             }
@@ -323,11 +323,13 @@ int main(int argc, const char *argv[])
     if (g_isServerMode) {
         // -m server.Run alone in the background, no -s will be listen loopback address
         Hdc::Base::RemoveLogFile();
-        Base::SetLogLevel(g_logLevel);  // default level LOG_LEVEL_FULL
         Hdc::RunServerMode(g_serverListenString);
     } else if (g_isPcDebugRun) {
         Hdc::RunPcDebugMode(g_isPullServer, g_isTCPorUSB, g_isTestMethod);
     } else {
+        if (!g_isCustomLoglevel) {
+            Base::SetLogLevel(LOG_INFO);
+        }
         Hdc::RunClientMode(commands, g_serverListenString, g_connectKey, g_isPullServer);
     }
     WRITE_LOG(LOG_DEBUG, "!!!!!!!!!Main finish main");

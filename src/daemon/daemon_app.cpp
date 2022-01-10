@@ -36,6 +36,7 @@ bool HdcDaemonApp::ReadyForRelease()
     if (!asyncCommand.ReadyForRelease()) {
         return false;
     }
+    WRITE_LOG(LOG_DEBUG, "HdcDaemonApp ready for release");
     return true;
 }
 
@@ -142,14 +143,15 @@ void HdcDaemonApp::Sideload(const char *pathOTA)
 
 void HdcDaemonApp::WhenTransferFinish(CtxFile *context)
 {
+    if (context->lastErrno > 0) {
+        WRITE_LOG(LOG_DEBUG, "HdcDaemonApp WhenTransferFinish with errno:%d", context->lastErrno);
+        return;
+    }
     if (ctxNow.transferConfig.functionName == CMDSTR_APP_SIDELOAD) {
         Sideload(context->localPath.c_str());
     } else if (ctxNow.transferConfig.functionName == CMDSTR_APP_INSTALL) {
         PackageShell(true, context->transferConfig.options.c_str(), context->localPath.c_str());
     } else {
-        WRITE_LOG(LOG_WARN, "WhenTransferFinish error funcnm:[%s] lpath:[%s]",
-            ctxNow.transferConfig.functionName.c_str(), context->localPath.c_str());
-        PackageShell(true, context->transferConfig.options.c_str(), context->localPath.c_str());
     }
 };
 }

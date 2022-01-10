@@ -457,8 +457,8 @@ bool HdcServerForClient::DoCommandRemote(HChannel hChannel, void *formatCommandI
         case CMD_UNITY_RUNMODE:
         case CMD_UNITY_HILOG:
         case CMD_UNITY_ROOTRUN:
-        case CMD_TRACK_JPID:
-        case CMD_UNITY_JPID: {
+        case CMD_JDWP_TRACK:
+        case CMD_JDWP_LIST: {
             if (!SendToDaemon(hChannel, formatCommand->cmdFlag,
                               reinterpret_cast<uint8_t *>(const_cast<char *>(formatCommand->parameters.c_str())),
                               sizeSend)) {

@@ -45,15 +45,19 @@ public:
 
     HdcSessionBase(bool serverOrDaemonIn);
     virtual ~HdcSessionBase();
-    virtual void AttachChannel(HSession hSession, const uint32_t channelId) {};
-    virtual void DeatchChannel(HSession hSession, const uint32_t channelId) {};
+    virtual void AttachChannel(HSession hSession, const uint32_t channelId)
+    {
+    }
+    virtual void DeatchChannel(HSession hSession, const uint32_t channelId)
+    {
+    }
+    virtual void NotifyInstanceSessionFree(HSession hSession, bool freeOrClear)
+    {
+    }
     virtual bool RedirectToTask(HTaskInfo hTaskInfo, HSession hSession, const uint32_t channelId,
                                 const uint16_t command, uint8_t *payload, const int payloadSize)
     {
         return true;
-    }
-    virtual void NotifyInstanceSessionFree(HSession hSession, bool freeOrClear)
-    {
     }
     // Thread security interface for global stop programs
     void PostStopInstanceMessage(bool restart = false);
@@ -128,9 +132,10 @@ protected:
         bool ret = true;
         T *ptrTask = nullptr;
         if (!hTaskInfo->hasInitial) {
-            ptrTask = new T(hTaskInfo);
-            hTaskInfo->taskClass = ptrTask;
             hTaskInfo->taskType = taskType;
+            ptrTask = new T(hTaskInfo);
+            hTaskInfo->hasInitial = true;
+            hTaskInfo->taskClass = ptrTask;
         } else {
             ptrTask = (T *)hTaskInfo->taskClass;
         }
@@ -173,6 +178,7 @@ private:
     void FreeSessionByConnectType(HSession hSession);
     bool WorkThreadStartSession(HSession hSession);
     uint32_t GetSessionPseudoUid();
+    bool NeedNewTaskInfo(const uint16_t command, bool &masterTask);
 
     map<uint32_t, HSession> mapSession;
     uv_rwlock_t lockMapSession;

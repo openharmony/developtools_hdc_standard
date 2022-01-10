@@ -14,11 +14,6 @@
  */
 #include "daemon_unity.h"
 #include <sys/mount.h>
-#ifdef __MUSL__
-extern "C" {
-#include "init_reboot.h"
-}
-#endif
 
 namespace Hdc {
 HdcDaemonUnity::HdcDaemonUnity(HTaskInfo hTaskInfo)
@@ -34,8 +29,10 @@ HdcDaemonUnity::~HdcDaemonUnity()
 
 void HdcDaemonUnity::StopTask()
 {
+    // Remove jpid tracker when stopping task
+    RemoveJdwpTracker();
     asyncCommand.DoRelease();
-};
+}
 
 bool HdcDaemonUnity::ReadyForRelease()
 {
@@ -176,24 +173,7 @@ bool HdcDaemonUnity::RemountDevice()
 bool HdcDaemonUnity::RebootDevice(const string &cmd)
 {
     sync();
-#ifndef __MUSL__
-    string propertyVal;
-    if (!cmd.size()) {
-        propertyVal = "reboot";
-    } else {
-        propertyVal = Base::StringFormat("reboot,%s", cmd.c_str());
-    }
-    return Base::SetHdcProperty(rebootProperty.c_str(), propertyVal.c_str());
-#else
-    string reason;
-    if (cmd == "recovery") {
-        reason = "updater";
-    } else if (cmd == "bootloader") {
-        reason = "updater";
-    }
-    WRITE_LOG(LOG_DEBUG, "DoReboot with args:[%s] for cmd:[%s]", reason.c_str(), cmd.c_str());
-    return DoReboot(reason.c_str());
-#endif
+    return SystemDepend::RebootDevice(cmd);
 }
 
 bool HdcDaemonUnity::SetDeviceRunMode(void *daemonIn, const char *cmd)
@@ -201,12 +181,12 @@ bool HdcDaemonUnity::SetDeviceRunMode(void *daemonIn, const char *cmd)
     HdcDaemon *daemon = (HdcDaemon *)daemonIn;
     WRITE_LOG(LOG_DEBUG, "Set run mode:%s", cmd);
     if (!strcmp(CMDSTR_TMODE_USB.c_str(), cmd)) {
-        Base::SetHdcProperty("persist.hdc.mode", CMDSTR_TMODE_USB.c_str());
+        SystemDepend::SetDevItem("persist.hdc.mode", CMDSTR_TMODE_USB.c_str());
     } else if (!strncmp("port", cmd, strlen("port"))) {
-        Base::SetHdcProperty("persist.hdc.mode", CMDSTR_TMODE_TCP.c_str());
+        SystemDepend::SetDevItem("persist.hdc.mode", CMDSTR_TMODE_TCP.c_str());
         if (!strncmp("port ", cmd, strlen("port "))) {
             const char *port = cmd + 5;
-            Base::SetHdcProperty("persist.hdc.port", port);
+            SystemDepend::SetDevItem("persist.hdc.port", port);
         }
     } else {
         LogMsg(MSG_FAIL, "Unknow command");
@@ -243,13 +223,19 @@ inline bool HdcDaemonUnity::ListJdwpProcess(void *daemonIn)
 
 inline bool HdcDaemonUnity::TrackJdwpProcess(void *daemonIn)
 {
-    HdcDaemon *daemon = (HdcDaemon *)daemonIn;
-    if (!(((HdcJdwp *)daemon->clsJdwp)->CreateJdwpTracker(taskInfo))) {
+    HdcDaemon *daemon = static_cast<HdcDaemon *>(daemonIn);
+    if (!((static_cast<HdcJdwp *>(daemon->clsJdwp))->CreateJdwpTracker(taskInfo))) {
         string result = MESSAGE_FAIL;
         LogMsg(MSG_OK, result.c_str());
         return false;
     }
     return true;
+}
+
+inline void HdcDaemonUnity::RemoveJdwpTracker()
+{
+    HdcDaemon *daemon = static_cast<HdcDaemon *>(taskInfo->ownerSessionClass);
+    (static_cast<HdcJdwp *>(daemon->clsJdwp))->RemoveJdwpTracker(taskInfo);
 }
 
 bool HdcDaemonUnity::CommandDispatch(const uint16_t command, uint8_t *payload, const int payloadSize)
@@ -285,9 +271,9 @@ bool HdcDaemonUnity::CommandDispatch(const uint16_t command, uint8_t *payload, c
         case CMD_UNITY_ROOTRUN: {
             ret = false;
             if (payloadSize != 0 && !strcmp((char *)strPayload.c_str(), "r")) {
-                Base::SetHdcProperty("persist.hdc.root", "0");
+                SystemDepend::SetDevItem("persist.hdc.root", "0");
             } else {
-                Base::SetHdcProperty("persist.hdc.root", "1");
+                SystemDepend::SetDevItem("persist.hdc.root", "1");
             }
             daemon->PostStopInstanceMessage(true);
             break;
@@ -301,12 +287,12 @@ bool HdcDaemonUnity::CommandDispatch(const uint16_t command, uint8_t *payload, c
             ExecuteShell((char *)CMDSTR_BUGREPORT.c_str());
             break;
         }
-        case CMD_UNITY_JPID: {
+        case CMD_JDWP_LIST: {
             ret = false;
             ListJdwpProcess(daemon);
             break;
         }
-        case CMD_TRACK_JPID: {
+        case CMD_JDWP_TRACK: {
             if (!TrackJdwpProcess(daemon)) {
                 ret = false;
             }

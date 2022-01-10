@@ -26,6 +26,8 @@ HdcTaskBase::HdcTaskBase(HTaskInfo hTaskInfo)
     childReady = false;
     singalStop = false;
     refCount = 0;
+    if (taskInfo->masterSlave)
+        SendToAnother(CMD_KERNEL_WAKEUP_SLAVETASK, nullptr, 0);
 }
 
 HdcTaskBase::~HdcTaskBase()
