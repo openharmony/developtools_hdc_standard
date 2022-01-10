@@ -134,7 +134,9 @@ namespace Base {
     string GetFileNameAny(string &path);
     string GetCwd();
     string GetTmpDir();
+    void SetLogCache(bool enable);
     void RemoveLogFile();
+    void RemoveLogCache();
     uv_os_sock_t DuplicateUvSocket(uv_tcp_t *tcp);
     bool IsRoot();
     char GetPathSep();
