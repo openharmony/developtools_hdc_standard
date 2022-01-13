@@ -17,8 +17,6 @@
 This file is used to support compatibility between platforms, differences between old and new projects and
 compilation platforms
 
-defined __MUSL__ Has migrated to the latest version of harmony project
-
 defined HARMONY_PROJECT
 With openharmony toolchains suport. If not defined, it should be [device]buildroot or [PC]msys64(...)/ubuntu-apt(...)
 envirments
@@ -26,7 +24,7 @@ envirments
 */
 #include "system_depend.h"
 #include "../common/base.h"
-#if defined(__MUSL__) && defined(HARMONY_PROJECT)
+#if defined(HARMONY_PROJECT)
 extern "C" {
 #include "init_reboot.h"
 #include "parameter.h"
@@ -38,7 +36,6 @@ namespace SystemDepend {
     bool SetDevItem(const char *key, const char *value)
     {
         bool ret = true;
-#if defined __MUSL__
 #ifdef HARMONY_PROJECT
         ret = SetParameter(key, value) == 0;
 #else
@@ -46,15 +43,6 @@ namespace SystemDepend {
         string stringBuf = Base::StringFormat("param set %s %s", key, value);
         Base::RunPipeComand(stringBuf.c_str(), outBuf, sizeof(outBuf), true);
 #endif  // HARMONY_PROJECT
-#else   // not __MUSL__
-#ifdef HDC_PCDEBUG
-        WRITE_LOG(LOG_DEBUG, "SetDevItem, key:%s value:%s", key, value);
-#else
-        string keyValue = key;
-        string stringBuf = "setprop " + keyValue + " " + value;
-        system(stringBuf.c_str());
-#endif  // HDC_PCDEBUG
-#endif  // __MUSL__
         return ret;
     }
 
@@ -62,7 +50,6 @@ namespace SystemDepend {
     {
         bool ret = true;
         char tmpStringBuf[BUF_SIZE_MEDIUM] = "";
-#if defined __MUSL__
 #ifdef HARMONY_PROJECT
         const string strKey(key);
         if (GetParameter(key, preDefine.c_str(), tmpStringBuf, BUF_SIZE_MEDIUM) < 0) {
@@ -79,14 +66,6 @@ namespace SystemDepend {
             Base::ZeroStruct(tmpStringBuf);
         }
 #endif
-#else  // not __MUSL__
-#ifdef HDC_PCDEBUG
-        WRITE_LOG(LOG_DEBUG, "GetDevItem, key:%s", key);
-#else
-        string stringBuf = "getprop " + string(key);
-        Base::RunPipeComand(stringBuf.c_str(), tmpStringBuf, BUF_SIZE_MEDIUM - 1, true);
-#endif  // HDC_PCDEBUG
-#endif  //__MUSL__
         out = tmpStringBuf;
         return ret;
     }
@@ -103,7 +82,6 @@ namespace SystemDepend {
 
     bool RebootDevice(const string &cmd)
     {
-#if defined __MUSL__
         string reason;
         if (cmd == "recovery") {
             reason = "updater";
@@ -112,16 +90,6 @@ namespace SystemDepend {
         }
         WRITE_LOG(LOG_DEBUG, "DoReboot with args:[%s] for cmd:[%s]", reason.c_str(), cmd.c_str());
         return CallDoReboot(reason.c_str());
-#else
-        const string rebootProperty = "sys.powerctl";
-        string propertyVal;
-        if (!cmd.size()) {
-            propertyVal = "reboot";
-        } else {
-            propertyVal = Base::StringFormat("reboot,%s", cmd.c_str());
-        }
-        return SetDevItem(rebootProperty.c_str(), propertyVal.c_str());
-#endif
     }
 }
 }  // namespace Hdc
