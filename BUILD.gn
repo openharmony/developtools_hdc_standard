@@ -79,6 +79,10 @@ ohos_executable("hdcd") {
     "//third_party/openssl/include",
     "//third_party/libuv",
   ]
+  install_images = [
+    "system",
+    "updater",
+  ]
 
   install_enable = true
   subsystem_name = "developtools"
