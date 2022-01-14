@@ -81,7 +81,7 @@ ohos_executable("hdcd") {
   ]
   install_images = [
     "system",
-    "updater"
+    "updater",
   ]
 
   install_enable = true
