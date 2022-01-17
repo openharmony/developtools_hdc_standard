@@ -180,8 +180,6 @@ bool HdcFile::CommandDispatch(const uint16_t command, uint8_t *payload, const in
             if (*payload) {  // close-step3
                 --(*payload);
                 SendToAnother(CMD_FILE_FINISH, payload, 1);
-                ++refCount;
-                uv_fs_close(loopTask, &ctxNow.fsCloseReq, ctxNow.fsOpenReq.result, OnFileClose);
             } else {  // close-step3
                 TransferSummary(&ctxNow);
                 TaskFinish();
