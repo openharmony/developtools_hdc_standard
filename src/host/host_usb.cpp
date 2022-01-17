@@ -94,7 +94,7 @@ void HdcHostUSB::KickoutZombie(HSession hSession)
 {
     HdcServer *ptrConnect = (HdcServer *)hSession->classInstance;
     HUSB hUSB = hSession->hUSB;
-    if (!hUSB->devHandle || hSession->isDead) {
+    if (!hUSB->devHandle) {
         WRITE_LOG(LOG_WARN, "KickoutZombie devHandle:%p isDead:%d", hUSB->devHandle, hSession->isDead);
         return;
     }
@@ -203,7 +203,7 @@ int HdcHostUSB::CheckDescriptor(HUSB hUSB)
     } else {
         hUSB->serialNumber = serialNum;
     }
-    WRITE_LOG(LOG_DEBUG, "CheckDescriptor serialNum:%s", serialNum);
+    WRITE_LOG(LOG_DEBUG, "CheckDescriptor busId-devId:%d-%d serialNum:%s", curBus, curDev, serialNum);
     return 0;
 }
 
