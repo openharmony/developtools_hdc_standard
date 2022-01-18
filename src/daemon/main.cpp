@@ -149,6 +149,7 @@ void NeedDropPriv()
 // daemon running with default behavior. options also can be given to custom its behavior including b/t/u/l etc.
 int main(int argc, const char *argv[])
 {
+    Hdc::Base::SetLogCache(false);
     // check property
     if (argc == 2 && !strcmp(argv[1], "-h")) {
         string usage = DaemonUsage();

@@ -228,13 +228,14 @@ bool HdcDaemon::DaemonSessionHandshake(HSession hSession, const uint32_t channel
 }
 
 bool HdcDaemon::FetchCommand(HSession hSession, const uint32_t channelId, const uint16_t command, uint8_t *payload,
-                             int payloadSize)
+                             const int payloadSize)
 {
     bool ret = true;
     if (!hSession->handshakeOK && command != CMD_KERNEL_HANDSHAKE) {
         ret = false;
         return ret;
     }
+    WRITE_LOG(LOG_DEBUG, "FetchCommand channelId:%u command:%u", channelId, command);
     switch (command) {
         case CMD_KERNEL_HANDSHAKE: {
             // session handshake step2
@@ -294,7 +295,7 @@ void HdcDaemon::JdwpNewFileDescriptor(const uint8_t *buf, const int bytesIO)
     uint32_t pid = *(uint32_t *)(buf + 1);
     uint32_t fd = *(uint32_t *)(buf + 5);  // 5 : fd offset
     ((HdcJdwp *)clsJdwp)->SendJdwpNewFD(pid, fd);
-};
+}
 
 void HdcDaemon::NotifyInstanceSessionFree(HSession hSession, bool freeOrClear)
 {
