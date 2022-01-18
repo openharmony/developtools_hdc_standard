@@ -66,7 +66,7 @@ namespace Base {
     int CreateSocketPair(int *fds);
     void CloseSocketPair(const int *fds);
     int StringEndsWith(string s, string sub);
-    void BuildErrorString(const char *localPath, const char *op, errno_t err, string &str);
+    void BuildErrorString(const char *localPath, const char *op, const char *err, string &str);
     const char *GetFileType(mode_t mode);
     bool CheckDirectoryOrPath(const char *localPath, bool pathOrDir, bool readWrite, string &errStr);
     bool CheckDirectoryOrPath(const char *localPath, bool pathOrDir, bool readWrite);
@@ -134,7 +134,9 @@ namespace Base {
     string GetFileNameAny(string &path);
     string GetCwd();
     string GetTmpDir();
+    void SetLogCache(bool enable);
     void RemoveLogFile();
+    void RemoveLogCache();
     uv_os_sock_t DuplicateUvSocket(uv_tcp_t *tcp);
     bool IsRoot();
     char GetPathSep();

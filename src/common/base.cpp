@@ -27,6 +27,7 @@ using namespace std::chrono;
 
 namespace Hdc {
 namespace Base {
+    std::atomic<bool> g_logCache = true;
     uint8_t g_logLevel = LOG_DEBUG;  // tmp set,now debugmode.LOG_OFF when release;;
     void SetLogLevel(const uint8_t logLevel)
     {
@@ -113,6 +114,32 @@ namespace Base {
         }
     }
 
+    void LogToPath(const char *path, const char *str)
+    {
+        // logfile, not thread-safe
+        FILE *fp = fopen(path, "a");
+        if (fp == nullptr) {
+            return;
+        }
+        if (fprintf(fp, "%s", str) > 0 && fflush(fp)) {
+            // make ci happy
+        }
+        fclose(fp);
+
+    }
+
+    void LogToFile(const char *str)
+    {
+        string path = GetTmpDir() + LOG_FILE_NAME;
+        LogToPath(path.c_str(), str);
+    }
+
+    void LogToCache(const char *str)
+    {
+        string path = GetTmpDir() + LOG_CACHE_NAME;
+        LogToPath(path.c_str(), str);
+    }
+
     void PrintLogEx(const char *functionName, int line, uint8_t logLevel, const char *msg, ...)
     {
         if (logLevel > g_logLevel) {
@@ -140,16 +167,13 @@ namespace Base {
 
         printf("%s", logBuf.c_str());
         fflush(stdout);
-        // logfile, not thread-safe
-        string path = GetTmpDir() + LOG_FILE_NAME;
-        FILE *fp = fopen(path.c_str(), "a");
-        if (fp == nullptr) {
-            return;
+
+        if (!g_logCache) {
+            LogToFile(logBuf.c_str());
+        } else {
+            LogToCache(logBuf.c_str());
         }
-        if (fprintf(fp, "%s", logBuf.c_str()) > 0 && fflush(fp)) {
-            // make ci happy
-        }
-        fclose(fp);
+
         return;
     }
 #else   // else ENABLE_DEBUGLOG.If disabled, the entire output code will be optimized by the compiler
@@ -877,14 +901,14 @@ namespace Base {
         }
     }
 
-    void BuildErrorString(const char *localPath, const char *op, errno_t err, string &str)
+    void BuildErrorString(const char *localPath, const char *op, const char *err, string &str)
     {
         // avoid to use stringstream
         str = op;
         str += " ";
         str += localPath;
         str += " failed, ";
-        str += strerror(err);
+        str += err;
     }
 
     // Both absolute and relative paths support
@@ -895,7 +919,7 @@ namespace Base {
             mode_t mode;
             int r = uv_fs_lstat(nullptr, &req, localPath, nullptr);
             if (r) {
-                BuildErrorString(localPath, "lstat", errno, errStr);
+                BuildErrorString(localPath, "lstat", uv_strerror(req.result), errStr);
             }
 
             mode = req.statbuf.st_mode;
@@ -905,7 +929,7 @@ namespace Base {
                 uv_fs_access(nullptr, &req, localPath, readWrite ? R_OK : W_OK, nullptr);
                 if (req.result) {
                     const char *op = readWrite ? "access R_OK" : "access W_OK";
-                    BuildErrorString(localPath, op, errno, errStr);
+                    BuildErrorString(localPath, op, uv_strerror(req.result), errStr);
                 }
                 uv_fs_req_cleanup(&req);
                 if (req.result == 0)
@@ -1211,12 +1235,28 @@ namespace Base {
         return res;
     }
 
+    void SetLogCache(bool enable)
+    {
+        g_logCache = enable;
+    }
+
     void RemoveLogFile()
     {
-        string path = GetTmpDir() + LOG_FILE_NAME;
-        string newPath = GetTmpDir() + LOG_BAK_NAME;
-        unlink(newPath.c_str());
-        rename(path.c_str(), newPath.c_str());
+        if (g_logCache) {
+            string path = GetTmpDir() + LOG_FILE_NAME;
+            string bakPath = GetTmpDir() + LOG_BAK_NAME;
+            string cachePath = GetTmpDir() + LOG_CACHE_NAME;
+            unlink(bakPath.c_str());
+            rename(path.c_str(), bakPath.c_str());
+            rename(cachePath.c_str(), path.c_str());
+            g_logCache = false;
+        }
+    }
+
+    void RemoveLogCache()
+    {
+        string cachePath = GetTmpDir() + LOG_CACHE_NAME;
+        unlink(cachePath.c_str());
     }
 
     bool IsRoot()
