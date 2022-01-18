@@ -60,12 +60,10 @@ ohos_executable("hdcd") {
     "//third_party/openssl:libcrypto_static",
     "//utils/native/base:utils",
   ]
-  if (use_musl) {
-    deps += [
-      "//base/startup/init_lite/interfaces/innerkits/reboot:libreboot",
-      "//base/startup/syspara_lite/interfaces/innerkits/native/syspara:syspara",
-    ]
-  }
+  deps += [
+    "//base/startup/init_lite/interfaces/innerkits/reboot:libreboot",
+    "//base/startup/syspara_lite/interfaces/innerkits/native/syspara:syspara",
+  ]
   include_dirs = [
     "${HDC_PATH}/daemon",
     "//utils/native/base/include",
@@ -73,12 +71,10 @@ ohos_executable("hdcd") {
     "//third_party/openssl/include",
     "//third_party/libuv",
   ]
-  if (use_musl) {
-    include_dirs += [
-      "//base/startup/init_lite/interfaces/innerkits/include",
-      "//base/startup/syspara_lite/interfaces/innerkits/native/syspara/include",
-    ]
-  }
+  include_dirs += [
+    "//base/startup/init_lite/interfaces/innerkits/include",
+    "//base/startup/syspara_lite/interfaces/innerkits/native/syspara/include",
+  ]
   install_enable = true
   subsystem_name = "developtools"
   part_name = "hdc_standard"

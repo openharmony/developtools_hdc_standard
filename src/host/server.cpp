@@ -69,6 +69,7 @@ bool HdcServer::Initial(const char *listenString)
         WRITE_LOG(LOG_FATAL, "Other instance already running, program mutex failed");
         return false;
     }
+    Base::RemoveLogFile();
     clsServerForClient = new HdcServerForClient(true, listenString, this, &loopMain);
     clsTCPClt = new HdcHostTCP(true, this);
     clsUSBClt = new HdcHostUSB(true, this, ctxUSB);
