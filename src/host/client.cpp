@@ -259,12 +259,12 @@ void HdcClient::BindLocalStd(HChannel hChannel)
     if (command == CMDSTR_SHELL) {
         bShellInteractive = true;
     }
-    if (uv_guess_handle(STDIN_FILENO) != UV_TTY) {
-        WRITE_LOG(LOG_FATAL, "Not support std mode");
+    if (bShellInteractive && uv_guess_handle(STDIN_FILENO) != UV_TTY) {
+        WRITE_LOG(LOG_WARN, "Not support stdio TTY mode");
         return;
     }
 
-    WRITE_LOG(LOG_DEBUG, "Tty std mode");
+    WRITE_LOG(LOG_DEBUG, "setup stdio TTY mode");
     if (uv_tty_init(loopMain, &hChannel->stdoutTty, STDOUT_FILENO, 0)
         || uv_tty_init(loopMain, &hChannel->stdinTty, STDIN_FILENO, 1)) {
         WRITE_LOG(LOG_DEBUG, "uv_tty_init failed");
