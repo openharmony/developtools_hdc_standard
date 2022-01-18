@@ -127,7 +127,7 @@ bool HdcHostApp::CheckInstallContinue(AppModType mode, bool lastResult, const ch
             modeDesc = "Side load";
             break;
         default:
-            modeDesc = "Unknow";
+            modeDesc = "Unknown";
             break;
     }
     ctxNow.taskQueue.pop_back();
