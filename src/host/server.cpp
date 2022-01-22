@@ -101,11 +101,9 @@ bool HdcServer::PullupServerWin32(const char *path, const char *listenString)
         return retVal;
     }
     WRITE_LOG(LOG_DEBUG, "Run server in debug-forground, cmd:%s, args:%s", runPath.c_str(), buf);
-    STARTUPINFO si;
-    Base::ZeroStruct(si);
+    STARTUPINFO si = {};
     si.cb = sizeof(STARTUPINFO);
-    PROCESS_INFORMATION pi;
-    Base::ZeroStruct(pi);
+    PROCESS_INFORMATION pi = {};
 #ifndef HDC_DEBUG
     si.dwFlags = STARTF_USESHOWWINDOW;
     si.wShowWindow = SW_HIDE;
@@ -631,8 +629,7 @@ int HdcServer::CreateConnect(const string &connectKey)
     }
     AdminDaemonMap(OP_QUERY, connectKey, hdi);
     if (hdi == nullptr) {
-        HdcDaemonInformation di;
-        Base::ZeroStruct(di);
+        HdcDaemonInformation di = {};
         di.connectKey = connectKey;
         di.connType = connType;
         di.connStatus = STATUS_UNKNOW;

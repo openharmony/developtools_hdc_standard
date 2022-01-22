@@ -25,8 +25,6 @@ HdcDaemonTCP::HdcDaemonTCP(const bool serverOrDaemonIn, void *ptrMainBase)
     if (tcpListenPort <= 0) {
         tcpListenPort = 0;
     }
-    Base::ZeroStruct(servUDP);
-    Base::ZeroStruct(servTCP);
 #ifdef HDC_DEBUG
     const uint16_t DEBUG_TCP_PORT = 10178;
     tcpListenPort = DEBUG_TCP_PORT;
@@ -113,7 +111,7 @@ int HdcDaemonTCP::SetTCPListen()
     // tcp listen
     HdcSessionBase *ptrConnect = (HdcSessionBase *)clsMainBase;
     servTCP.data = this;
-    struct sockaddr_in addr;
+    struct sockaddr_in addr = {};
     int namelen;
     const int DEFAULT_BACKLOG = 128;
 

@@ -32,8 +32,8 @@ private:
     int SetTCPListen();
     void SetUDPListen();
 
-    uv_tcp_t servTCP;
-    uv_udp_t servUDP;
+    uv_tcp_t servTCP = {};
+    uv_udp_t servUDP = {};
 };
 }  // namespace Hdc
 

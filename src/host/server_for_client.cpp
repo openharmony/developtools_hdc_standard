@@ -64,8 +64,7 @@ void HdcServerForClient::AcceptClient(uv_stream_t *server, int status)
     // first packet static size, after this packet will be dup for normal recv
     uv_read_start((uv_stream_t *)&hChannel->hWorkTCP, funcChannelHeaderAlloc, ReadStream);
     // channel handshake step1
-    struct ChannelHandShake handShake;
-    Base::ZeroStruct(handShake);
+    struct ChannelHandShake handShake = {};
     if (EOK == strcpy_s(handShake.banner, sizeof(handShake.banner), HANDSHAKE_MESSAGE.c_str())) {
         handShake.channelId = htonl(hChannel->channelId);
         thisClass->Send(hChannel->channelId, (uint8_t *)&handShake, sizeof(struct ChannelHandShake));
@@ -160,7 +159,7 @@ void HdcServerForClient::OrderFindTargets(HChannel hChannel)
     // refresh main list
     HdcDaemonInformation di;
     while (!lst.empty()) {
-        Base::ZeroStruct(di);
+        di = {};
         ++count;
         di.connectKey = lst.front();
         di.connType = CONN_TCP;
