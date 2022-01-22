@@ -45,7 +45,7 @@ private:
     bool InitLocalLog(const char *path);
     bool AppendLocalLog(const char *bufLog, const int sizeLog);
 
-    ContextUnity opContext;
+    ContextUnity opContext = {};
 };
 }  // namespace Hdc
 #endif  // HDC_HOST_UNITY_H

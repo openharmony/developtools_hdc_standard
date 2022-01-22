@@ -128,8 +128,8 @@ void HdcFile::TransferSummary(CtxFile *context)
     if (context->indexIO >= context->fileSize) {
         LogMsg(MSG_OK, "FileTransfer finish, Size:%lld time:%lldms rate:%.2lfkB/s", context->indexIO, nMSec, fRate);
     } else {
-        LogMsg(MSG_FAIL, "Transfer Stop at:%lld/%lld(Bytes), Reason: %s",
-               context->indexIO, context->fileSize, uv_strerror((int)(-context->lastErrno)));
+        LogMsg(MSG_FAIL, "Transfer Stop at:%lld/%lld(Bytes), Reason: %s", context->indexIO, context->fileSize,
+               uv_strerror((int)(-context->lastErrno)));
     }
 }
 
@@ -149,8 +149,7 @@ bool HdcFile::SlaveCheck(uint8_t *payload, const int payloadSize)
     childRet = SmartSlavePath(stat.clientCwd, ctxNow.localPath, stat.optionalName.c_str());
     if (childRet && ctxNow.transferConfig.updateIfNew) {  // file exist and option need update
         // if is newer
-        uv_fs_t fs;
-        Base::ZeroStruct(fs.statbuf);
+        uv_fs_t fs = {};
         uv_fs_stat(nullptr, &fs, ctxNow.localPath.c_str(), nullptr);
         uv_fs_req_cleanup(&fs);
         if ((uint64_t)fs.statbuf.st_mtim.tv_sec >= ctxNow.transferConfig.mtime) {

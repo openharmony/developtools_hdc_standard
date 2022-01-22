@@ -13,13 +13,12 @@
  * limitations under the License.
  */
 #include "jdwp.h"
-#include <thread>
 #include <sys/eventfd.h>
+#include <thread>
 
 namespace Hdc {
 HdcJdwp::HdcJdwp(uv_loop_t *loopIn)
 {
-    Base::ZeroStruct(listenPipe);
     listenPipe.data = this;
     loop = loopIn;
     refCount = 0;
@@ -106,16 +105,16 @@ void HdcJdwp::RemoveFdFromPollList(uint32_t pid)
 void HdcJdwp::ReadStream(uv_stream_t *pipe, ssize_t nread, const uv_buf_t *buf)
 {
     bool ret = true;
-    if (nread == UV_ENOBUFS) { // It is definite enough, usually only 4 bytes
+    if (nread == UV_ENOBUFS) {  // It is definite enough, usually only 4 bytes
         ret = false;
         WRITE_LOG(LOG_DEBUG, "HdcJdwp::ReadStream IOBuf max");
     } else if (nread == 0) {
         return;
 #ifdef JS_JDWP_CONNECT
-    } else if (nread < JS_PKG_MIN_SIZE || nread > JS_PKG_MX_SIZE) { // valid Js package size
+    } else if (nread < JS_PKG_MIN_SIZE || nread > JS_PKG_MX_SIZE) {  // valid Js package size
 #else
-    } else if (nread < 0 || nread != 4) { // 4 : 4 bytes
-#endif // JS_JDWP_CONNECT
+    } else if (nread < 0 || nread != 4) {  // 4 : 4 bytes
+#endif  // JS_JDWP_CONNECT
         ret = false;
         WRITE_LOG(LOG_DEBUG, "HdcJdwp::ReadStream invalid package nread:%d.", nread);
     }
@@ -125,22 +124,20 @@ void HdcJdwp::ReadStream(uv_stream_t *pipe, ssize_t nread, const uv_buf_t *buf)
     if (ret) {
         uint32_t pid = 0;
         char *p = ctxJdwp->buf;
-        if (nread == sizeof(uint32_t)) { // Java: pid
+        if (nread == sizeof(uint32_t)) {  // Java: pid
             pid = atoi(p);
-        } else { // JS:pid PkgName
+        } else {  // JS:pid PkgName
 #ifdef JS_JDWP_CONNECT
             struct JsMsgHeader *jsMsg = reinterpret_cast<struct JsMsgHeader *>(p);
             if (jsMsg->msgLen == nread) {
                 pid = jsMsg->pid;
-                string pkgName =
-                    string((char *)p + sizeof(JsMsgHeader), jsMsg->msgLen - sizeof(JsMsgHeader));
+                string pkgName = string((char *)p + sizeof(JsMsgHeader), jsMsg->msgLen - sizeof(JsMsgHeader));
                 ctxJdwp->pkgName = pkgName;
             } else {
                 ret = false;
-                WRITE_LOG(LOG_DEBUG, "HdcJdwp::ReadStream invalid js package size %d:%d.",
-                          jsMsg->msgLen, nread);
+                WRITE_LOG(LOG_DEBUG, "HdcJdwp::ReadStream invalid js package size %d:%d.", jsMsg->msgLen, nread);
             }
-#endif // JS_JDWP_CONNECT
+#endif  // JS_JDWP_CONNECT
         }
         if (pid > 0) {
             ctxJdwp->pid = pid;
@@ -148,7 +145,7 @@ void HdcJdwp::ReadStream(uv_stream_t *pipe, ssize_t nread, const uv_buf_t *buf)
             WRITE_LOG(LOG_DEBUG, "JDWP accept pid:%d-pkg:%s", pid, ctxJdwp->pkgName.c_str());
 #else
             WRITE_LOG(LOG_DEBUG, "JDWP accept pid:%d", pid);
-#endif // JS_JDWP_CONNECT
+#endif  // JS_JDWP_CONNECT
             thisClass->AdminContext(OP_ADD, pid, ctxJdwp);
             ret = true;
             int fd = -1;
@@ -179,7 +176,7 @@ string HdcJdwp::GetProcessListExtendPkgName()
     uv_rwlock_rdunlock(&lockMapContext);
     return ret;
 }
-#endif // JS_JDWP_CONNECT
+#endif  // JS_JDWP_CONNECT
 
 void HdcJdwp::AcceptClient(uv_stream_t *server, int status)
 {
@@ -197,7 +194,7 @@ void HdcJdwp::AcceptClient(uv_stream_t *server, int status)
     }
     auto funAlloc = [](uv_handle_t *handle, size_t sizeSuggested, uv_buf_t *buf) -> void {
         HCtxJdwp ctxJdwp = (HCtxJdwp)handle->data;
-        buf->base = (char *)ctxJdwp->buf ;
+        buf->base = (char *)ctxJdwp->buf;
         buf->len = sizeof(ctxJdwp->buf);
     };
     uv_read_start((uv_stream_t *)&ctxJdwp->pipe, funAlloc, ReadStream);
@@ -356,7 +353,7 @@ size_t HdcJdwp::JdwpProcessListMsg(char *buffer, size_t bufferlen)
     string result = GetProcessListExtendPkgName();
 #else
     string result = GetProcessList();
-#endif // JS_JDWP_CONNECT
+#endif  // JS_JDWP_CONNECT
 
     size_t len = result.length();
     if (bufferlen < (len + headerLen)) {
@@ -399,7 +396,7 @@ void HdcJdwp::ProcessListUpdated(HTaskInfo task)
     static constexpr uint32_t jpidTrackListSize = 1024 * 4;
 #else
     static constexpr uint32_t jpidTrackListSize = 1024;
-#endif // JS_JDWP_CONNECT
+#endif  // JS_JDWP_CONNECT
     std::string data;
     data.resize(jpidTrackListSize);
     size_t len = JdwpProcessListMsg(&data[0], data.size());
@@ -414,10 +411,8 @@ void HdcJdwp::ProcessListUpdated(HTaskInfo task)
             if (t == nullptr) {
                 continue;
             }
-            if (t->taskStop || t->taskFree ||
-                !t->taskClass) { // The channel for the track-jpid has been stopped.
-                jdwpTrackers.erase(remove(jdwpTrackers.begin(), jdwpTrackers.end(), t),
-                                   jdwpTrackers.end());
+            if (t->taskStop || t->taskFree || !t->taskClass) {  // The channel for the track-jpid has been stopped.
+                jdwpTrackers.erase(remove(jdwpTrackers.begin(), jdwpTrackers.end(), t), jdwpTrackers.end());
                 if (jdwpTrackers.size() <= 0) {
                     return;
                 }
@@ -451,10 +446,8 @@ void HdcJdwp::RemoveJdwpTracker(HTaskInfo taskInfo)
     uv_rwlock_wrlock(&lockJdwpTrack);
     auto it = std::find(jdwpTrackers.begin(), jdwpTrackers.end(), taskInfo);
     if (it != jdwpTrackers.end()) {
-        WRITE_LOG(LOG_DEBUG, "RemoveJdwpTracker channelId:%d, taskType:%d.", taskInfo->channelId,
-                  taskInfo->taskType);
-        jdwpTrackers.erase(remove(jdwpTrackers.begin(), jdwpTrackers.end(), *it),
-                           jdwpTrackers.end());
+        WRITE_LOG(LOG_DEBUG, "RemoveJdwpTracker channelId:%d, taskType:%d.", taskInfo->channelId, taskInfo->taskType);
+        jdwpTrackers.erase(remove(jdwpTrackers.begin(), jdwpTrackers.end(), *it), jdwpTrackers.end());
     }
     uv_rwlock_wrunlock(&lockJdwpTrack);
 }
@@ -464,8 +457,7 @@ void HdcJdwp::DrainAwakenPollThread() const
     uint64_t value = 0;
     ssize_t retVal = read(awakenPollFd, &value, sizeof(value));
     if (retVal < 0) {
-        WRITE_LOG(LOG_FATAL, "DrainAwakenPollThread: Failed to read data from awaken pipe %d",
-                  retVal);
+        WRITE_LOG(LOG_FATAL, "DrainAwakenPollThread: Failed to read data from awaken pipe %d", retVal);
     }
 }
 
@@ -505,13 +497,11 @@ void *HdcJdwp::FdEventPollThread(void *args)
         }
         poll(&pollfds[0], size, -1);
         for (const auto &pollfdsing : pollfds) {
-            if (pollfdsing.revents &
-                (POLLNVAL | POLLRDHUP | POLLHUP | POLLERR)) { // POLLNVAL:fd not open
+            if (pollfdsing.revents & (POLLNVAL | POLLRDHUP | POLLHUP | POLLERR)) {  // POLLNVAL:fd not open
                 auto it = thisClass->pollNodeMap.find(pollfdsing.fd);
                 if (it != thisClass->pollNodeMap.end()) {
                     uint32_t targetPID = it->second.ppid;
-                    HCtxJdwp ctx =
-                        static_cast<HCtxJdwp>(thisClass->AdminContext(OP_QUERY, targetPID, nullptr));
+                    HCtxJdwp ctx = static_cast<HCtxJdwp>(thisClass->AdminContext(OP_QUERY, targetPID, nullptr));
                     if (ctx != nullptr) {
                         WRITE_LOG(LOG_INFO, "FreeContext for targetPID :%d", targetPID);
                         uv_read_stop((uv_stream_t *)&ctx->pipe);

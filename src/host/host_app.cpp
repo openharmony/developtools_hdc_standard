@@ -96,8 +96,7 @@ void HdcHostApp::RunQueue(CtxFile *context)
 
 void HdcHostApp::CheckMaster(CtxFile *context)
 {
-    uv_fs_t fs;
-    Base::ZeroStruct(fs.statbuf);
+    uv_fs_t fs = {};
     uv_fs_fstat(nullptr, &fs, context->fsOpenReq.result, nullptr);
     context->transferConfig.fileSize = fs.statbuf.st_size;
     uv_fs_req_cleanup(&fs);
@@ -130,7 +129,9 @@ bool HdcHostApp::CheckInstallContinue(AppModType mode, bool lastResult, const ch
             modeDesc = "Unknown";
             break;
     }
-    ctxNow.taskQueue.pop_back();
+    if (ctxNow.taskQueue.size() > 0) {
+        ctxNow.taskQueue.pop_back();
+    }
     LogMsg(MSG_INFO, "%s path:%s, queuesize:%d, msg:%s", modeDesc.c_str(), ctxNow.localPath.c_str(),
            ctxNow.taskQueue.size(), msg);
     if (singalStop || !ctxNow.taskQueue.size()) {
