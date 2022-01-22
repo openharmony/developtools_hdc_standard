@@ -18,7 +18,6 @@ namespace Hdc {
 HdcHostUnity::HdcHostUnity(HTaskInfo hTaskInfo)
     : HdcTaskBase(hTaskInfo)
 {
-    Base::ZeroStruct(opContext);
     opContext.thisClass = this;
 }
 

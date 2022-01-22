@@ -19,7 +19,6 @@ namespace Hdc {
 HdcDaemonUSB::HdcDaemonUSB(const bool serverOrDaemonIn, void *ptrMainBase)
     : HdcUSBBase(serverOrDaemonIn, ptrMainBase)
 {
-    Base::ZeroStruct(usbHandle);
 }
 
 HdcDaemonUSB::~HdcDaemonUSB()

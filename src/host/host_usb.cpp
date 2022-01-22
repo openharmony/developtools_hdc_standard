@@ -60,7 +60,6 @@ int HdcHostUSB::Initial()
 
 bool HdcHostUSB::DetectMyNeed(libusb_device *device, string &sn)
 {
-    bool ret = false;
     HUSB hUSB = new HdcUSB();
     hUSB->device = device;
     // just get usb SN, close handle immediately
@@ -239,9 +238,8 @@ bool HdcHostUSB::IsDebuggableDev(const struct libusb_interface_descriptor *ifDes
 
     if (ifDescriptor->bInterfaceClass != harmonyClass || ifDescriptor->bInterfaceSubClass != harmonySubClass
         || ifDescriptor->bInterfaceProtocol != harmonyProtocol) {
-        WRITE_LOG(LOG_DEBUG,
-            "IsDebuggableDev false bInterfaceClass:%d bInterfaceSubClass:%d bInterfaceProtocol:%d",
-            ifDescriptor->bInterfaceClass, ifDescriptor->bInterfaceSubClass, ifDescriptor->bInterfaceProtocol);
+        WRITE_LOG(LOG_DEBUG, "IsDebuggableDev false bInterfaceClass:%d bInterfaceSubClass:%d bInterfaceProtocol:%d",
+                  ifDescriptor->bInterfaceClass, ifDescriptor->bInterfaceSubClass, ifDescriptor->bInterfaceProtocol);
         return false;
     }
     if (ifDescriptor->bNumEndpoints != harmonyEpNum) {

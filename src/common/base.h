@@ -77,6 +77,7 @@ namespace Base {
     void ReverseBytes(void *start, int size);
     string CanonicalizeSpecPath(string &src);
     // Just zero a POD type, such as a structure or union
+    // If it contains c++ struct such as stl-string or others, please use 'T = {}' to initialize struct
     template<class T> int ZeroStruct(T &structBuf)
     {
         return memset_s(&structBuf, sizeof(T), 0, sizeof(T));
