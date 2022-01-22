@@ -637,8 +637,7 @@ int HdcSessionBase::Send(const uint32_t sessionId, const uint32_t channelId, con
     // reserve for encrypt here
     // xx-encrypt
 
-    PayloadHead payloadHead;  // need convert to big-endian
-    Base::ZeroStruct(payloadHead);
+    PayloadHead payloadHead = {};  // need convert to big-endian
     payloadHead.flag[0] = PACKET_FLAG.at(0);
     payloadHead.flag[1] = PACKET_FLAG.at(1);
     payloadHead.protocolVer = VER_PROTOCOL;
@@ -677,8 +676,7 @@ int HdcSessionBase::Send(const uint32_t sessionId, const uint32_t channelId, con
 
 int HdcSessionBase::DecryptPayload(HSession hSession, PayloadHead *payloadHeadBe, uint8_t *encBuf)
 {
-    PayloadProtect protectBuf;
-    Base::ZeroStruct(protectBuf);
+    PayloadProtect protectBuf = {};
     uint16_t headSize = ntohs(payloadHeadBe->headSize);
     int dataSize = ntohl(payloadHeadBe->dataSize);
     string encString(reinterpret_cast<char *>(encBuf), headSize);
@@ -851,8 +849,7 @@ bool HdcSessionBase::WorkThreadStartSession(HSession hSession)
     }
     if (regOK && hSession->serverOrDaemon) {
         // session handshake step1
-        SessionHandShake handshake;
-        Base::ZeroStruct(handshake);
+        SessionHandShake handshake = {};
         handshake.banner = HANDSHAKE_MESSAGE;
         handshake.sessionId = hSession->sessionId;
         handshake.connectKey = hSession->connectKey;
@@ -871,8 +868,7 @@ vector<uint8_t> HdcSessionBase::BuildCtrlString(InnerCtrlCommand command, uint32
         if (dataSize > BUF_SIZE_MICRO) {
             break;
         }
-        CtrlStruct ctrl;
-        Base::ZeroStruct(ctrl);
+        CtrlStruct ctrl = {};
         ctrl.command = command;
         ctrl.channelId = channelId;
         ctrl.dataSize = dataSize;

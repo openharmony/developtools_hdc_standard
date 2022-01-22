@@ -55,7 +55,7 @@ private:
     int UsbToHdcProtocol(uv_stream_t *stream, uint8_t *appendData, int dataSize);
     void FillUsbV2Head(struct usb_functionfs_desc_v2 &descUsbFfs);
 
-    HdcUSB usbHandle;
+    HdcUSB usbHandle = {};
     string basePath;                // usb device's base path
     uint32_t currentSessionId = 0;  // USB mode,limit only one session
     uv_timer_t checkEP;             // server-use

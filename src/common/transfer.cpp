@@ -252,8 +252,7 @@ void HdcTransferBase::OnFileOpen(uv_fs_t *req)
     thisClass->ResetCtx(context);
     if (context->master) {
         // init master
-        uv_fs_t fs;
-        Base::ZeroStruct(fs.statbuf);
+        uv_fs_t fs = {};
         uv_fs_fstat(nullptr, &fs, context->fsOpenReq.result, nullptr);
         TransferConfig &st = context->transferConfig;
         st.fileSize = fs.statbuf.st_size;
@@ -288,8 +287,7 @@ bool HdcTransferBase::MatchPackageExtendName(string fileName, string extName)
 int HdcTransferBase::GetSubFiles(const char *path, string filter, vector<string> *out)
 {
     int retNum = 0;
-    uv_fs_t req;
-    Base::ZeroStruct(req);
+    uv_fs_t req = {};
     uv_dirent_t dent;
     vector<string> filterStrings;
     if (!strlen(path)) {

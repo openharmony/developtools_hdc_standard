@@ -40,10 +40,7 @@ HdcChannelBase::~HdcChannelBase()
 vector<uint8_t> HdcChannelBase::GetChannelHandshake(string &connectKey) const
 {
     vector<uint8_t> ret;
-    // clang-format off
-    struct ChannelHandShake handshake = {{0}};
-    // clang-format on
-    Base::ZeroStruct(handshake);
+    struct ChannelHandShake handshake = {};
     if (strcpy_s(handshake.banner, sizeof(handshake.banner), HANDSHAKE_MESSAGE.c_str()) != EOK) {
         return ret;
     }

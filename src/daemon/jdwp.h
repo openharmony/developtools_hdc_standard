@@ -34,14 +34,14 @@ public:
 
 private:
 #ifdef JS_JDWP_CONNECT
-    static constexpr uint8_t JS_PKG_MIN_SIZE = 15; // JsMsgHeader + "pkgName:"uint8_t[7~127]
+    static constexpr uint8_t JS_PKG_MIN_SIZE = 15;  // JsMsgHeader + "pkgName:"uint8_t[7~127]
     static constexpr uint8_t JS_PKG_MX_SIZE = 135;
     struct JsMsgHeader {
         uint32_t msgLen;
         uint32_t pid;
     };
     string GetProcessListExtendPkgName();
-#endif // JS_JDWP_CONNECT
+#endif  // JS_JDWP_CONNECT
     struct _PollFd {
         int fd;
         short events;
@@ -69,7 +69,7 @@ private:
         string pkgName;
 #else
         char buf[sizeof(uint32_t)];
-#endif // JS_JDWP_CONNECT
+#endif  // JS_JDWP_CONNECT
         uint8_t dummy;
         uv_tcp_t jvmTCP;
     };
@@ -91,13 +91,13 @@ private:
     void DrainAwakenPollThread() const;
     void WakePollThread();
     uv_loop_t *loop;
-    uv_pipe_t listenPipe;
+    uv_pipe_t listenPipe = {};
     uint32_t refCount;
     int32_t awakenPollFd;
     map<uint32_t, HCtxJdwp> mapCtxJdwp;
     uv_rwlock_t lockMapContext;
     uv_rwlock_t lockJdwpTrack;
-    std::unordered_map<int, PollNode> pollNodeMap; // fd, PollNode
+    std::unordered_map<int, PollNode> pollNodeMap;  // fd, PollNode
     std::vector<HTaskInfo> jdwpTrackers;
     bool stop;
 };
