@@ -1,0 +1,36 @@
+{
+  "name": "@ohos/hdc_standard",
+  "description": "Device debug connector that provides the device connection capability and a command line tool",
+  "version": "3.1",
+  "license": "Apache License 2.0",
+  "publishAs": "code-segment",
+  "segment": {
+    "destPath": "developtools/hdc_standard"
+  },
+  "dirs": {},
+  "scripts": {},
+  "component": {
+    "name": "hdc_standard",
+    "subsystem": "developtools",
+    "adapted_system_type": [
+      "standard"
+    ],
+    "rom": "1725KB",
+    "ram": "1599KB",
+    "deps": {
+      "components": [
+        "base:utils"
+      ],
+      "third_party": [
+        "libuv:uv_static",
+        "lz4:liblz4_static",
+        "openssl:libcrypto_static"
+      ]
+    },
+    "build": {
+      "sub_component": [
+        "//developtools/hdc_standard:hdcd"
+      ]
+    }
+  }
+}
