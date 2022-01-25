@@ -21,7 +21,8 @@ HdcSessionBase::HdcSessionBase(bool serverOrDaemonIn)
     // print version pid
     WRITE_LOG(LOG_INFO, "Program running. %s Pid:%u", Base::GetVersion().c_str(), getpid());
     // server/daemon common initialization code
-    string threadNum = std::to_string(SIZE_THREAD_POOL);
+    threadPoolCount = SIZE_THREAD_POOL;
+    string threadNum = std::to_string(threadPoolCount);
     uv_os_setenv("UV_THREADPOOL_SIZE", threadNum.c_str());
     uv_loop_init(&loopMain);
     WRITE_LOG(LOG_DEBUG, "loopMain init");
@@ -568,7 +569,15 @@ HTaskInfo HdcSessionBase::AdminTask(const uint8_t op, HSession hSession, const u
     map<uint32_t, HTaskInfo> &mapTask = *hSession->mapTask;
     switch (op) {
         case OP_ADD:
+#ifndef HDC_HOST
+            // uv sub-thread confiured by threadPoolCount, reserve 2 for main & communicate
+            if (mapTask.size() >= (threadPoolCount - 2)) {
+                WRITE_LOG(LOG_WARN, "mapTask.size:%d, hdc is busy", mapTask.size());
+                break;
+            }
+#endif
             mapTask[channelId] = hInput;
+            hRet = hInput;
             break;
         case OP_REMOVE:
             mapTask.erase(channelId);
@@ -1077,7 +1086,25 @@ bool HdcSessionBase::DispatchTaskData(HSession hSession, const uint32_t channelI
             hTaskInfo->runLoop = &hSession->childLoop;
             hTaskInfo->serverOrDaemon = serverOrDaemon;
             hTaskInfo->masterSlave = masterTask;
-            AdminTask(OP_ADD, hSession, channelId, hTaskInfo);
+
+            int addTaskRetry = 3; // try 3 time
+            while (addTaskRetry > 0) {
+                if (AdminTask(OP_ADD, hSession, channelId, hTaskInfo)) {
+                    break;
+                }
+                sleep(1);
+                --addTaskRetry;
+            }
+
+            if (addTaskRetry == 0) {
+#ifndef HDC_HOST
+                LogMsg(hTaskInfo->sessionId, hTaskInfo->channelId, MSG_FAIL, "hdc thread pool busy, may cause reset later");
+#endif
+                delete hTaskInfo;
+                hTaskInfo = nullptr;
+                ret = false;
+                break;
+            }
         } else {
             hTaskInfo = AdminTask(OP_QUERY, hSession, channelId, nullptr);
         }
