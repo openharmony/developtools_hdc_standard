@@ -102,13 +102,14 @@ int AsyncCmd::Popen(string command, bool readWrite, int &pid)
     }
     if (childPid == 0) {
         if (readWrite) {
-            close(fd[PIPE_READ]);
             dup2(fd[PIPE_WRITE], STDOUT_FILENO);
             dup2(fd[PIPE_WRITE], STDERR_FILENO);
         } else {
-            close(fd[PIPE_WRITE]);
             dup2(fd[PIPE_READ], STDIN_FILENO);
         }
+        close(fd[PIPE_READ]);
+        close(fd[PIPE_WRITE]);
+
         setsid();
         setpgid(childPid, childPid);
         string shellPath = Base::GetShellPath();
@@ -117,8 +118,10 @@ int AsyncCmd::Popen(string command, bool readWrite, int &pid)
     } else {
         if (readWrite) {
             close(fd[PIPE_WRITE]);
+            fcntl(fd[PIPE_READ], F_SETFD, FD_CLOEXEC);
         } else {
             close(fd[PIPE_READ]);
+            fcntl(fd[PIPE_WRITE], F_SETFD, FD_CLOEXEC);
         }
     }
     pid = childPid;
