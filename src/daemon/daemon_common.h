@@ -31,6 +31,9 @@
 #include "daemon_tcp.h"
 #include "daemon_app.h"
 #include "daemon_usb.h"
+#ifdef HDC_SUPPORT_UART
+#include "daemon_uart.h"
+#endif
 #include "daemon_forward.h"
 #include "shell.h"
 #endif

@@ -73,6 +73,9 @@ using std::vector;
 
 #include "tcp.h"
 #include "usb.h"
+#ifdef HDC_SUPPORT_UART
+#include "uart.h"
+#endif
 #include "file_descriptor.h"
 
 // clang-format on

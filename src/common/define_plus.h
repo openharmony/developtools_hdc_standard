@@ -15,13 +15,16 @@
 #ifndef DEFINE_PLUS_H
 #define DEFINE_PLUS_H
 
+#include <sstream>
+#include <thread>
+
 namespace Hdc {
 // ############################# enum define ###################################
 enum LogLevel {
     LOG_OFF,
     LOG_FATAL,
-    LOG_INFO,  // default
     LOG_WARN,
+    LOG_INFO,  // default
     LOG_DEBUG,
     LOG_ALL,
     LOG_LAST = LOG_ALL,  // tail, not use
@@ -35,6 +38,31 @@ enum MessageLevel {
 };
 
 enum ConnType { CONN_USB = 0, CONN_TCP, CONN_SERIAL, CONN_BT };
+
+#ifdef HDC_SUPPORT_UART
+enum UartTimeConst {
+    UV_TIMEOUT = 10,
+    UV_REPEAT = 100,
+    TIMEOUTS_R_INTERALTIMEOUT = 1000,
+    TIMEOUTS_R_TOALTIMEOUTMULTIPLIER = 500,
+    TIMEOUTS_R_TIMEOUTCONSTANT = 5000
+};
+enum UartSetSerialNBits {
+    UART_BIT1 = 7,
+    UART_BIT2 = 8
+};
+enum UartSetSerialNSpeed {
+    UART_SPEED2400 = 2400,
+    UART_SPEED4800 = 4800,
+    UART_SPEED9600 = 9600,
+    UART_SPEED115200 = 115200,
+    UART_SPEED921600 = 921600
+};
+enum UartSetSerialNStop {
+    UART_STOP1 = 1,
+    UART_STOP2 = 2
+};
+#endif
 enum ConnStatus { STATUS_UNKNOW = 0, STATUS_READY, STATUS_CONNECTED, STATUS_OFFLINE };
 
 enum OperateID {
@@ -265,6 +293,34 @@ struct HdcUSB {
 };
 using HUSB = struct HdcUSB *;
 
+#ifdef HDC_SUPPORT_UART
+struct HdcUART {
+#ifdef HDC_HOST
+    string serialPort;
+    std::thread readThread;
+    uint16_t retryCount = 0;
+#endif // HDC_HOST
+
+#ifdef _WIN32
+    OVERLAPPED ovWrite;
+    OVERLAPPED ovRead;
+    HANDLE devUartHandle = INVALID_HANDLE_VALUE;
+#else
+    // we also make this for deamon side
+    int devUartHandle = -1;
+#endif
+    // if we want to cancel io (read thread exit)
+    bool ioCancel = false;
+    uint32_t dispatchedPackageIndex = 0;
+    bool resetIO = false; // if true, must break write and read,default false
+    uint64_t packageIndex = 0;
+    std::atomic_size_t streamSize = 0; // fro debug only
+    HdcUART();
+    ~HdcUART();
+};
+using HUART = struct HdcUART *;
+#endif
+
 struct HdcSession {
     bool serverOrDaemon;  // instance of daemon or server
     bool handshakeOK;     // Is an expected peer side
@@ -300,10 +356,25 @@ struct HdcSession {
     uv_os_sock_t fdChildWorkTCP;
     // usb handle
     HUSB hUSB;
+#ifdef HDC_SUPPORT_UART
+    HUART hUART = nullptr;
+#endif
     // tcp handle
     uv_tcp_t hWorkTCP;
     uv_thread_t hWorkThread;
     uv_thread_t hWorkChildThread;
+    std::string ToDebugString()
+    {
+        std::ostringstream oss;
+        oss << "HdcSession [";
+        oss << " serverOrDaemon:" << serverOrDaemon;
+        oss << " sessionId:" << sessionId;
+        oss << " handshakeOK:" << handshakeOK;
+        oss << " connectKey:" << connectKey;
+        oss << " connType:" << unsigned(connType);
+        oss << " ]";
+        return oss.str();
+    }
 };
 using HSession = struct HdcSession *;
 

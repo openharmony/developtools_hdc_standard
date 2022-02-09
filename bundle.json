@@ -29,7 +29,12 @@
     },
     "build": {
       "sub_component": [
-        "//developtools/hdc_standard:hdcd"
+        "//developtools/hdc_standard:hdcd",
+        "//developtools/hdc_standard:hdc_target_standard_all"
+      ],
+      "test": [
+        "//developtools/hdc_standard/test:hdc_jdwp_unittest",
+        "//developtools/hdc_standard/test:hdc_unittest"
       ]
     }
   }

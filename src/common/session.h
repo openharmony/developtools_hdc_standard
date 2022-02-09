@@ -14,6 +14,7 @@
  */
 #ifndef HDC_SESSION_H
 #define HDC_SESSION_H
+#include <sstream>
 #include "common.h"
 
 namespace Hdc {
@@ -23,12 +24,23 @@ class HdcSessionBase {
 public:
     enum AuthType { AUTH_NONE, AUTH_TOKEN, AUTH_SIGNATURE, AUTH_PUBLICKEY, AUTH_OK };
     struct SessionHandShake {
-        string banner;  // must first index
+        string banner; // must first index
         // auth none
         uint8_t authType;
         uint32_t sessionId;
         string connectKey;
         string buf;
+        std::string ToDebugString()
+        {
+            std::ostringstream oss;
+            oss << "SessionHandShake [";
+            oss << " banner:" << banner;
+            oss << " sessionId:" << sessionId;
+            oss << " authType:" << unsigned(authType);
+            oss << " connectKey:" << connectKey;
+            oss << "]";
+            return oss.str();
+        }
     };
     struct CtrlStruct {
         InnerCtrlCommand command;
@@ -71,20 +83,24 @@ public:
     static void ReadCtrlFromMain(uv_stream_t *uvpipe, ssize_t nread, const uv_buf_t *buf);
     static void ReadCtrlFromSession(uv_stream_t *uvpipe, ssize_t nread, const uv_buf_t *buf);
     HSession QueryUSBDeviceRegister(void *pDev, int busIDIn, int devIDIn);
-    HSession MallocSession(bool serverOrDaemon, const ConnType connType, void *classModule, uint32_t sessionId = 0);
-    void FreeSession(const uint32_t sessionId);
+    virtual HSession MallocSession(bool serverOrDaemon, const ConnType connType, void *classModule, uint32_t sessionId = 0);
+    virtual void FreeSession(const uint32_t sessionId);
     void WorkerPendding();
     int OnRead(HSession hSession, uint8_t *bufPtr, const int bufLen);
     int Send(const uint32_t sessionId, const uint32_t channelId, const uint16_t commandFlag, const uint8_t *data,
              const int dataSize);
     int SendByProtocol(HSession hSession, uint8_t *bufPtr, const int bufLen);
-    HSession AdminSession(const uint8_t op, const uint32_t sessionId, HSession hInput);
-    int FetchIOBuf(HSession hSession, uint8_t *ioBuf, int read);
-    void PushAsyncMessage(const uint32_t sessionId, const uint8_t method, const void *data, const int dataSize);
+    virtual HSession AdminSession(const uint8_t op, const uint32_t sessionId, HSession hInput);
+    virtual int FetchIOBuf(HSession hSession, uint8_t *ioBuf, int read);
+    virtual void PushAsyncMessage(const uint32_t sessionId, const uint8_t method, const void *data, const int dataSize);
     HTaskInfo AdminTask(const uint8_t op, HSession hSession, const uint32_t channelId, HTaskInfo hInput);
     bool DispatchTaskData(HSession hSession, const uint32_t channelId, const uint16_t command, uint8_t *payload,
                           int payloadSize);
     void EnumUSBDeviceRegister(void (*pCallBack)(HSession hSession));
+#ifdef HDC_SUPPORT_UART
+    using UartKickoutZombie = const std::function<void(HSession hSession)>;
+    virtual void EnumUARTDeviceRegister(UartKickoutZombie);
+#endif
     void ClearOwnTasks(HSession hSession, const uint32_t channelIDInput);
     virtual bool FetchCommand(HSession hSession, const uint32_t channelId, const uint16_t command, uint8_t *payload,
                               int payloadSize)

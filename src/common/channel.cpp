@@ -452,4 +452,38 @@ HChannel HdcChannelBase::AdminChannel(const uint8_t op, const uint32_t channelId
     }
     return hRet;
 }
+
+void HdcChannelBase::EchoToClient(HChannel hChannel, uint8_t *bufPtr, const int size)
+{
+    uv_stream_t *sendStream = nullptr;
+    int sizeNewBuf = size + DWORD_SERIALIZE_SIZE;
+    auto data = new uint8_t[sizeNewBuf]();
+    if (!data) {
+        return;
+    }
+    *(uint32_t *)data = htonl(size);
+    if (memcpy_s(data + DWORD_SERIALIZE_SIZE, sizeNewBuf - DWORD_SERIALIZE_SIZE, bufPtr, size)) {
+        delete[] data;
+        return;
+    }
+    sendStream = (uv_stream_t *)&hChannel->hChildWorkTCP;
+    if (!uv_is_closing((const uv_handle_t *)sendStream) && uv_is_writable(sendStream)) {
+        ++hChannel->ref;
+        Base::SendToStreamEx(sendStream, data, sizeNewBuf, nullptr, (void *)WriteCallback, data);
+    } else {
+        WRITE_LOG(LOG_WARN, "EchoToClient, channelId:%u is unwritable.", hChannel->channelId);
+        delete[] data;
+    }
+}
+
+void HdcChannelBase::EchoToAllChannelsViaSessionId(uint32_t targetSessionId, const string &echo)
+{
+    for (auto v : mapChannel) {
+        HChannel hChannel = (HChannel)v.second;
+        if (!hChannel->isDead && hChannel->targetSessionId == targetSessionId) {
+            WRITE_LOG(LOG_INFO, "%s:%u %s", __FUNCTION__, targetSessionId, echo.c_str());
+            EchoToClient(hChannel, (uint8_t *)echo.c_str(), echo.size());
+        }
+    }
+}
 }
