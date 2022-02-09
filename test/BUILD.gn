@@ -208,7 +208,6 @@ ohos_source_set("hdc_daemon_platform") {
     "startup_l2:syspara",
   ]
 
-
   include_dirs = [
     "${hdc_path}/daemon",
     "//utils/native/base/include",
