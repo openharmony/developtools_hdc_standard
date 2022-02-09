@@ -23,18 +23,24 @@ public:
     virtual ~HdcServer();
     bool FetchCommand(HSession hSession, const uint32_t channelId, const uint16_t command, uint8_t *payload,
                       const int payloadSize);
-    string AdminDaemonMap(uint8_t opType, const string &connectKey, HDaemonInfo &hDaemonInfoInOut);
+    virtual string AdminDaemonMap(uint8_t opType, const string &connectKey, HDaemonInfo &hDaemonInfoInOut);
     string AdminForwardMap(uint8_t opType, const string &taskString, HForwardInfo &hForwardInfoInOut);
     int CreateConnect(const string &connectKey);
     bool Initial(const char *listenString);
     void AttachChannel(HSession hSession, const uint32_t channelId);
     void DeatchChannel(HSession hSession, const uint32_t channelId);
+    virtual void EchoToClientsForSession(uint32_t targetSessionId, const string &echo);
     static bool PullupServer(const char *listenString);
     static void UsbPreConnect(uv_timer_t *handle);
     void NotifyInstanceSessionFree(HSession hSession, bool freeOrClear);
 
     HdcHostTCP *clsTCPClt;
     HdcHostUSB *clsUSBClt;
+#ifdef HDC_SUPPORT_UART
+    void CreatConnectUart(HSession hSession);
+    static void UartPreConnect(uv_timer_t *handle);
+    HdcHostUART *clsUARTClt = nullptr;
+#endif
     void *clsServerForClient;
 
 private:

@@ -111,7 +111,7 @@ void HdcJdwp::ReadStream(uv_stream_t *pipe, ssize_t nread, const uv_buf_t *buf)
     } else if (nread == 0) {
         return;
 #ifdef JS_JDWP_CONNECT
-    } else if (nread < JS_PKG_MIN_SIZE || nread > JS_PKG_MX_SIZE) {  // valid Js package size
+    } else if (nread < JS_PKG_MIN_SIZE || nread > JS_PKG_MX_SIZE) { // valid Js package size
 #else
     } else if (nread < 0 || nread != 4) {  // 4 : 4 bytes
 #endif  // JS_JDWP_CONNECT
@@ -347,13 +347,12 @@ size_t HdcJdwp::JdwpProcessListMsg(char *buffer, size_t bufferlen)
 {
     // Message is length-prefixed with 4 hex digits in ASCII.
     static constexpr size_t headerLen = 5;
-
     char head[headerLen + 2];
 #ifdef JS_JDWP_CONNECT
     string result = GetProcessListExtendPkgName();
 #else
     string result = GetProcessList();
-#endif  // JS_JDWP_CONNECT
+#endif // JS_JDWP_CONNECT
 
     size_t len = result.length();
     if (bufferlen < (len + headerLen)) {
@@ -396,7 +395,7 @@ void HdcJdwp::ProcessListUpdated(HTaskInfo task)
     static constexpr uint32_t jpidTrackListSize = 1024 * 4;
 #else
     static constexpr uint32_t jpidTrackListSize = 1024;
-#endif  // JS_JDWP_CONNECT
+#endif // JS_JDWP_CONNECT
     std::string data;
     data.resize(jpidTrackListSize);
     size_t len = JdwpProcessListMsg(&data[0], data.size());

@@ -13,9 +13,7 @@
 
 import("//build/ohos.gni")
 HDC_PATH = "//developtools/hdc_standard"
-declare_args() {
-  js_jdwp_connect = true
-}
+import("//developtools/hdc_standard/hdc.gni")
 
 hdc_common_sources = [
   "${HDC_PATH}/src/common/async_cmd.cpp",
@@ -32,13 +30,20 @@ hdc_common_sources = [
   "${HDC_PATH}/src/common/transfer.cpp",
   "${HDC_PATH}/src/common/usb.cpp",
 ]
-
+if (hdc_support_uart) {
+  hdc_common_sources += [ "${HDC_PATH}/src/common/uart.cpp" ]
+}
 config("hdc_config") {
   include_dirs = [ "${HDC_PATH}/src/common" ]
   cflags_cc = [ "-std=c++17" ]
+  if (is_mingw) {
+    cflags_cc += [ "-Wno-inconsistent-dllimport" ]  # in mingw some sec api will
+                                                    # overwrite by utilsecurec
+  }
 }
 
 ohos_executable("hdcd") {
+  use_exceptions = true
   sources = [
     "src/daemon/daemon.cpp",
     "src/daemon/daemon_app.cpp",
@@ -55,6 +60,13 @@ ohos_executable("hdcd") {
 
   defines = [ "HARMONY_PROJECT" ]
 
+  if (hdc_debug) {
+    defines += [ "HDC_DEBUG" ]
+  }
+  if (hdc_support_uart) {
+    defines += [ "HDC_SUPPORT_UART" ]
+    sources += [ "src/daemon/daemon_uart.cpp" ]
+  }
   if (js_jdwp_connect) {
     defines += [ "JS_JDWP_CONNECT" ]
   }
@@ -66,6 +78,11 @@ ohos_executable("hdcd") {
     "//third_party/openssl:libcrypto_static",
     "//utils/native/base:utils",
   ]
+
+  if (hdc_jdwp_test) {
+    defines += [ "SIMULATE_JDWP" ]
+    deps += [ "${HDC_PATH}/src/test/jdwp:jdwp_test" ]
+  }
 
   external_deps = [
     "init:libbegetutil",
@@ -90,6 +107,9 @@ ohos_executable("hdcd") {
 }
 
 ohos_executable("hdc_std") {
+  use_exceptions = true
+  ldflags = []
+  libs = []
   configs = [ ":hdc_config" ]
   defines = [
     "HDC_HOST",
@@ -97,6 +117,9 @@ ohos_executable("hdc_std") {
   ]
   if (is_mac) {
     defines += [ "HOST_MAC" ]
+  }
+  if (hdc_debug) {
+    defines += [ "HDC_DEBUG" ]
   }
   cflags_cc = [
     "-Wno-error",
@@ -116,6 +139,10 @@ ohos_executable("hdc_std") {
     "src/host/translate.cpp",
   ]
   sources += hdc_common_sources
+  if (hdc_support_uart) {
+    defines += [ "HDC_SUPPORT_UART" ]
+    sources += [ "src/host/host_uart.cpp" ]
+  }
 
   deps = [
     "//third_party/libusb:libusb",
@@ -132,6 +159,35 @@ ohos_executable("hdc_std") {
     "//third_party/openssl/include",
     "//third_party/libuv",
   ]
+
+  if (is_mingw) {
+    static_link = true
+
+    # we should use something we define , not just _WIN32 (this will defined in some windows header)
+    defines += [ "HOST_MINGW" ]  # we define this for mingw
+    defines += [ "WIN32_LEAN_AND_MEAN" ]
+    libs += [ "setupapi" ]
+    ldflags += [
+      "-Wl,--whole-archive",
+      "-lpthread",
+      "-Wl,--no-whole-archive",
+    ]
+  }
+
+  if (is_linux) {
+    static_link = true
+    defines += [ "HOST_LINUX" ]
+    ldflags += [
+      "-Wl,--whole-archive",
+      "-lpthread",
+      "-latomic",
+      "-ldl",
+      "-lrt",
+      "-Wl,--no-whole-archive",
+    ]
+    cflags_cc += [ "-g" ]
+  }
+
   subsystem_name = "developtools"
   part_name = "hdc_standard"
 }
@@ -140,5 +196,37 @@ group("hdc_target_standard") {
   deps = [
     ":hdc_std",
     ":hdcd",
+  ]
+}
+
+group("hdc_target_standard_linux") {
+  deps = [ ":hdc_std(//build/toolchain/linux:clang_x64)" ]
+}
+
+group("hdc_target_standard_mingw") {
+  deps = [ ":hdc_std(//build/toolchain/mingw:mingw_x86_64)" ]
+}
+
+group("hdc_target_standard_all") {
+  deps = [
+    ":hdc_target_standard",
+    ":hdc_target_standard_linux",
+    ":hdc_target_standard_mingw",
+  ]
+}
+
+group("hdc_target_standard_windows") {
+  deps = [
+    ":hdc_target_standard",
+    ":hdc_target_standard_mingw",
+  ]
+}
+
+group("hdc_all") {
+  testonly = true
+  deps = [
+    ":hdc_target_standard_all",
+    "test:HdcJdwpTest",
+    "test:hdc_unittest",
   ]
 }

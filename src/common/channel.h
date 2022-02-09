@@ -27,6 +27,7 @@ public:
     void PushAsyncMessage(const uint32_t channelId, const uint8_t method, const void *data, const int dataSize);
     void WorkerPendding();
     void FreeChannel(const uint32_t channelId);
+    void EchoToAllChannelsViaSessionId(uint32_t targetSessionId, const string &echo);
     vector<uint8_t> GetChannelHandshake(string &connectKey) const;
 
 protected:
@@ -45,6 +46,7 @@ protected:
     virtual void NotifyInstanceChannelFree(HChannel hChannel) {};
     void Send(const uint32_t channelId, uint8_t *bufPtr, const int size);
     void SendChannel(HChannel hChannel, uint8_t *bufPtr, const int size);
+    void EchoToClient(HChannel hChannel, uint8_t *bufPtr, const int size);
     virtual bool ChannelSendSessionCtrlMsg(vector<uint8_t> &ctrlMsg, uint32_t sessionId)
     {
         return true;  // just server use

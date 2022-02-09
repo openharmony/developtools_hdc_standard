@@ -221,6 +221,9 @@ void HdcServerForClient::OrderConnecTargetResult(uv_timer_t *req)
 
 bool HdcServerForClient::NewConnectTry(void *ptrServer, HChannel hChannel, const string &connectKey)
 {
+#ifdef HDC_DEBUG
+    WRITE_LOG(LOG_ALL, "%s %s", __FUNCTION__, connectKey.c_str());
+#endif
     int childRet = ((HdcServer *)ptrServer)->CreateConnect(connectKey);
     bool ret = false;
     if (-1 == childRet) {
@@ -354,10 +357,16 @@ bool HdcServerForClient::DoCommandLocal(HChannel hChannel, void *formatCommandIn
             break;
         }
         case CMD_KERNEL_TARGET_ANY: {
+#ifdef HDC_DEBUG
+            WRITE_LOG(LOG_DEBUG, "%s CMD_KERNEL_TARGET_ANY %s", __FUNCTION__, parameterString);
+#endif
             ret = GetAnyTarget(hChannel);
             break;
         }
         case CMD_KERNEL_TARGET_CONNECT: {
+#ifdef HDC_DEBUG
+            WRITE_LOG(LOG_DEBUG, "%s CMD_KERNEL_TARGET_CONNECT %s", __FUNCTION__, parameterString);
+#endif
             ret = NewConnectTry(ptrServer, hChannel, parameterString);
             break;
         }

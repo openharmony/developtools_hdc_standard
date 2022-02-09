@@ -18,6 +18,7 @@
 
 namespace Hdc {
 namespace Base {
+    uint8_t GetLogLevel();
     extern uint8_t g_logLevel;
     void SetLogLevel(const uint8_t logLevel);
     void PrintLogEx(const char *functionName, int line, uint8_t logLevel, const char *msg, ...);

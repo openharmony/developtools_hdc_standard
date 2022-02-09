@@ -20,6 +20,9 @@ HdcServer::HdcServer(bool serverOrDaemonIn)
 {
     clsTCPClt = nullptr;
     clsUSBClt = nullptr;
+#ifdef HDC_SUPPORT_UART
+    clsUARTClt = nullptr;
+#endif
     clsServerForClient = nullptr;
     uv_rwlock_init(&daemonAdmin);
     uv_rwlock_init(&forwardAdmin);
@@ -42,6 +45,11 @@ void HdcServer::ClearInstanceResource()
     if (clsUSBClt) {
         delete clsUSBClt;
     }
+#ifdef HDC_SUPPORT_UART
+    if (clsUARTClt) {
+        delete clsUARTClt;
+    }
+#endif
     if (clsServerForClient) {
         delete (static_cast<HdcServerForClient *>(clsServerForClient));
     }
@@ -56,6 +64,11 @@ void HdcServer::TryStopInstance()
     if (clsUSBClt) {
         clsUSBClt->Stop();
     }
+#ifdef HDC_SUPPORT_UART
+    if (clsUARTClt) {
+        clsUARTClt->Stop();
+    }
+#endif
     if (clsServerForClient) {
         ((HdcServerForClient *)clsServerForClient)->Stop();
     }
@@ -79,6 +92,18 @@ bool HdcServer::Initial(const char *listenString)
     }
     (static_cast<HdcServerForClient *>(clsServerForClient))->Initial();
     clsUSBClt->Initial();
+
+#ifdef HDC_SUPPORT_UART
+    clsUARTClt = new HdcHostUART(*this);
+    if (!clsUARTClt) {
+        WRITE_LOG(LOG_FATAL, "Class init failed");
+        return false;
+    }
+    if (clsUARTClt->Initial() != RET_SUCCESS) {
+        WRITE_LOG(LOG_FATAL, "clsUARTClt Class init failed.");
+        return false;
+    }
+#endif
     return true;
 }
 
@@ -97,7 +122,9 @@ bool HdcServer::PullupServerWin32(const char *path, const char *listenString)
         runPath = uvPath.substr(uvPath.find_last_of("/\\") + 1);
     }
     WRITE_LOG(LOG_DEBUG, "server shortpath:[%s] runPath:[%s]", shortPath, runPath.c_str());
-    if (sprintf_s(buf, sizeof(buf), "-l0 -s %s -m", listenString) < 0) {
+    // here we give a dummy option first, because getopt will assume the first option is command. it
+    // begin from 2nd args.
+    if (sprintf_s(buf, sizeof(buf), "dummy -l %d -s %s -m", Base::GetLogLevel(), listenString) < 0) {
         return retVal;
     }
     WRITE_LOG(LOG_DEBUG, "Run server in debug-forground, cmd:%s, args:%s", runPath.c_str(), buf);
@@ -186,7 +213,11 @@ void HdcServer::BuildDaemonVisableLine(HDaemonInfo hdi, bool fullDisplay, string
             case CONN_USB:
                 sConn = "USB";
                 break;
-
+#ifdef HDC_SUPPORT_UART
+            case CONN_SERIAL:
+                sConn = "UART";
+                break;
+#endif
             case CONN_BT:
                 sConn = "BT";
                 break;
@@ -411,6 +442,9 @@ bool HdcServer::ServerSessionHandshake(HSession hSession, uint8_t *payload, int 
     string s = string((char *)payload, payloadSize);
     Hdc::HdcSessionBase::SessionHandShake handshake;
     SerialStruct::ParseFromString(handshake, s);
+#ifdef HDC_DEBUG
+    WRITE_LOG(LOG_DEBUG, "handshake.banner:%s, payload:%s(%d)", handshake.banner.c_str(), s.c_str(), payloadSize);
+#endif
     if (handshake.banner != HANDSHAKE_MESSAGE.c_str()) {
         WRITE_LOG(LOG_DEBUG, "Hello failed");
         return false;
@@ -450,7 +484,8 @@ bool HdcServer::FetchCommand(HSession hSession, const uint32_t channelId, const 
     HdcServerForClient *sfc = static_cast<HdcServerForClient *>(clsServerForClient);
     if (CMD_KERNEL_HANDSHAKE == command) {
         ret = ServerSessionHandshake(hSession, payload, payloadSize);
-        WRITE_LOG(LOG_DEBUG, "Session handshake %s", ret ? "successful" : "failed");
+        WRITE_LOG(LOG_DEBUG, "Session handshake %s connType:%d", ret ? "successful" : "failed",
+                  hSession->connType);
         return ret;
     }
     // When you first initialize, ChannelID may be 0
@@ -459,8 +494,10 @@ bool HdcServer::FetchCommand(HSession hSession, const uint32_t channelId, const 
         if (command == CMD_KERNEL_CHANNEL_CLOSE) {
             // Daemon close channel and want to notify server close channel also, but it may has been
             // closed by herself
+            WRITE_LOG(LOG_DEBUG, "Die channelId :%lu recv CMD_KERNEL_CHANNEL_CLOSE", channelId);
         } else {
             // Client may be ctrl+c and Server remove channel. notify server async
+            WRITE_LOG(LOG_DEBUG, "channelId :%lu die", channelId);
         }
         uint8_t flag = 0;
         Send(hSession->sessionId, channelId, CMD_KERNEL_CHANNEL_CLOSE, &flag, 1);
@@ -613,14 +650,64 @@ void HdcServer::UsbPreConnect(uv_timer_t *handle)
         uv_close((uv_handle_t *)handle, Base::CloseTimerCallback);
     }
 }
+#ifdef HDC_SUPPORT_UART
+void HdcServer::UartPreConnect(uv_timer_t *handle)
+{
+    WRITE_LOG(LOG_DEBUG, "%s", __FUNCTION__);
+    HSession hSession = (HSession)handle->data;
+    bool stopLoop = false;
+    HdcServer *hdcServer = (HdcServer *)hSession->classInstance;
+    const int uartConnectRetryMax = 100; // max 6s
+    while (true) {
+        if (hSession->hUART->retryCount > uartConnectRetryMax) {
+            WRITE_LOG(LOG_DEBUG, "%s failed because max retry limit %d", __FUNCTION__,
+                      hSession->hUART->retryCount);
+            hdcServer->FreeSession(hSession->sessionId);
+            stopLoop = true;
+            break;
+        }
+        hSession->hUART->retryCount++;
+        HDaemonInfo pDi = nullptr;
 
+        WRITE_LOG(LOG_DEBUG, "%s query %s", __FUNCTION__, hSession->ToDebugString().c_str());
+        hdcServer->AdminDaemonMap(OP_QUERY, hSession->connectKey, pDi);
+        if (!pDi) {
+            WRITE_LOG(LOG_DEBUG, "%s not found", __FUNCTION__);
+            break;
+        }
+        HdcHostUART *hdcHostUART = (HdcHostUART *)hSession->classModule;
+        hdcHostUART->ConnectDaemonByUart(hSession, pDi);
+        WRITE_LOG(LOG_DEBUG, "%s ConnectDaemonByUart done", __FUNCTION__);
+
+        stopLoop = true;
+        break;
+    }
+    if (stopLoop) {
+        uv_close((uv_handle_t *)handle, Base::CloseTimerCallback);
+    }
+}
+
+void HdcServer::CreatConnectUart(HSession hSession)
+{
+    uv_timer_t *waitTimeDoCmd = new uv_timer_t;
+    uv_timer_init(&loopMain, waitTimeDoCmd);
+    waitTimeDoCmd->data = hSession;
+    uv_timer_start(waitTimeDoCmd, UartPreConnect, UV_TIMEOUT, UV_REPEAT);
+}
+#endif
 // -1,has old,-2 error
 int HdcServer::CreateConnect(const string &connectKey)
 {
     uint8_t connType = 0;
-    if (connectKey.find(":") != std::string::npos) {  // TCP
+    if (connectKey.find(":") != std::string::npos) { // TCP
         connType = CONN_TCP;
-    } else {  // USB
+    }
+#ifdef HDC_SUPPORT_UART
+    else if (connectKey.find("COM") == 0 || connectKey.find("/dev/ttyUSB") == 0) { // UART
+        connType = CONN_SERIAL;
+    }
+#endif
+    else { // USB
         connType = CONN_USB;
     }
     HDaemonInfo hdi = nullptr;
@@ -643,6 +730,10 @@ int HdcServer::CreateConnect(const string &connectKey)
     HSession hSession = nullptr;
     if (CONN_TCP == connType) {
         hSession = clsTCPClt->ConnectDaemon(connectKey);
+    } else if (CONN_SERIAL == connType) {
+#ifdef HDC_SUPPORT_UART
+        hSession = clsUARTClt->ConnectDaemon(connectKey);
+#endif
     } else {
         hSession = MallocSession(true, CONN_USB, clsUSBClt);
         hSession->connectKey = connectKey;
@@ -797,5 +888,12 @@ bool HdcServer::RemoveInstanceTask(const uint8_t op, HTaskInfo hTask)
             break;
     }
     return ret;
+}
+
+void HdcServer::EchoToClientsForSession(uint32_t targetSessionId, const string &echo)
+{
+    HdcServerForClient *hSfc = static_cast<HdcServerForClient *>(clsServerForClient);
+    WRITE_LOG(LOG_INFO, "%s:%u %s", __FUNCTION__, targetSessionId, echo.c_str());
+    hSfc->EchoToAllChannelsViaSessionId(targetSessionId, echo);
 }
 }  // namespace Hdc

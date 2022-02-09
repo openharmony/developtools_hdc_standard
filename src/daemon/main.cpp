@@ -16,6 +16,9 @@
 using namespace Hdc;
 
 static bool g_enableUsb = false;
+#ifdef HDC_SUPPORT_UART
+static bool g_enableUart = false;
+#endif
 static bool g_enableTcp = false;
 static bool g_rootRun = false;
 static bool g_backgroundRun = false;
@@ -44,13 +47,27 @@ bool ForkChildCheck(int argc, const char *argv[])
     } else if (workMode == CMDSTR_TMODE_USB) {
         WRITE_LOG(LOG_DEBUG, "Property enable USB");
         g_enableUsb = true;
+#ifdef HDC_SUPPORT_UART
+    } else if (workMode == CMDSTR_TMODE_UART) {
+        WRITE_LOG(LOG_DEBUG, "Property enable UART");
+        g_enableUart = true;
     } else if (workMode == "all") {
+#else
+    } else if (workMode == "all") {
+#endif
         WRITE_LOG(LOG_DEBUG, "Property enable USB and TCP");
         g_enableUsb = true;
         g_enableTcp = true;
+#ifdef HDC_SUPPORT_UART
+        g_enableUart = true;
+#endif
     } else {
         WRITE_LOG(LOG_DEBUG, "Default USB mode");
         g_enableUsb = true;
+#ifdef HDC_SUPPORT_UART
+        WRITE_LOG(LOG_DEBUG, "Default UART mode");
+        g_enableUart = true;
+#endif
     }
     if (argc == CMD_ARG1_COUNT) {
         if (!strcmp(argv[1], "-forkchild")) {
@@ -90,6 +107,9 @@ string DaemonUsage()
           "\n"
           "daemon mode options:\n"
           " -b                            - Daemon run in background/fork mode\n"
+#ifdef HDC_SUPPORT_UART
+          " -i                            - Enable UART mode\n"
+#endif
           " -u                            - Enable USB mode\n"
           " -t                            - Enable TCP mode\n";
     return ret;
@@ -122,6 +142,13 @@ bool GetDaemonCommandlineOptions(int argc, const char *argv[])
                 g_enableTcp = true;
                 break;
             }
+#ifdef HDC_SUPPORT_UART
+            case 'i': { // enable uart
+                Base::PrintMessage("Parament Enable UART");
+                g_enableUart = true;
+                break;
+            }
+#endif
             default:
                 Base::PrintMessage("Option:%c non-supported!", ch);
                 exit(0);
@@ -168,8 +195,15 @@ int main(int argc, const char *argv[])
         GetDaemonCommandlineOptions(argc, argv);
     }
     if (!g_enableTcp && !g_enableUsb) {
+#ifdef HDC_SUPPORT_UART
+        if (!g_enableUart) {
+            Base::PrintMessage("TCP, USB and Uart are disable, cannot run continue\n");
+            return -1;
+        }
+#else
         Base::PrintMessage("Both TCP and USB are disable, cannot run continue\n");
         return -1;
+#endif
     }
     if (g_backgroundRun) {
         return BackgroundRun();
@@ -181,16 +215,27 @@ int main(int argc, const char *argv[])
     signal(SIGALRM, SIG_IGN);
     WRITE_LOG(LOG_DEBUG, "HdcDaemon main run");
     HdcDaemon daemon(false);
+#ifdef HDC_SUPPORT_UART
+    daemon.InitMod(g_enableTcp, g_enableUsb, g_enableUart);
+#else
     daemon.InitMod(g_enableTcp, g_enableUsb);
+#endif
     daemon.WorkerPendding();
     bool wantRestart = daemon.WantRestart();
-    WRITE_LOG(LOG_DEBUG, "Daemon finish");
+    WRITE_LOG(LOG_DEBUG, "Daemon finish g_rootRun %d wantRestart %d", g_rootRun, wantRestart);
     // There is no daemon, we can only restart myself.
     if (g_rootRun && wantRestart) {
         // just root can self restart, low privilege will be exit and start by service(root)
         WRITE_LOG(LOG_INFO, "Daemon restart");
         RestartDaemon(false);
     }
+#ifdef HDC_SUPPORT_UART
+    // when no usb insert , device will hung here , we don't konw why.
+    // Test the command "smode -r" in uart mode, then execute shell
+    // hdcd will not really exit until usb plug in
+    // so we use abort here
+    abort();
+#endif
     return 0;
 }
 #endif
