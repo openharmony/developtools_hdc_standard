@@ -16,7 +16,6 @@
 #define DEFINE_PLUS_H
 
 #include <sstream>
-#include <thread>
 
 namespace Hdc {
 // ############################# enum define ###################################

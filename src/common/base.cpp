@@ -129,7 +129,7 @@ namespace Base {
         std::call_once(firstLog, [&]() { printf("log at %s\n", path); });
 #endif
 #ifdef HDC_DEBUG_UART
-        //better than open log file every time.
+        // better than open log file every time.
         static std::unique_ptr<FILE, decltype(&fclose)> file(fopen(path, "w"), &fclose);
         FILE *fp = file.get();
 #else
