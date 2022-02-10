@@ -145,6 +145,9 @@ bool HdcFile::SlaveCheck(uint8_t *payload, const int payloadSize)
     ctxNow.localPath = stat.path;
     ctxNow.master = false;
     ctxNow.fsOpenReq.data = &ctxNow;
+#ifdef HDC_DEBUG
+    WRITE_LOG(LOG_DEBUG, "HdcFile fileSize got %" PRIu64 "", ctxNow.fileSize);
+#endif
     // check path
     childRet = SmartSlavePath(stat.clientCwd, ctxNow.localPath, stat.optionalName.c_str());
     if (childRet && ctxNow.transferConfig.updateIfNew) {  // file exist and option need update

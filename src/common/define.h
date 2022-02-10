@@ -86,6 +86,14 @@ const string CMDSTR_TARGET_MODE = "tmode";
 const string CMDSTR_BUGREPORT = "bugreport";
 const string CMDSTR_HILOG = "hilog";
 const string CMDSTR_TMODE_USB = "usb";
+#ifdef HDC_SUPPORT_UART
+const string CMDSTR_TMODE_UART = "uart";
+const string UART_HDC_NODE = "/dev/ttyAMA0";
+const string CONSOLE_ACTIVE_NODE = "/sys/class/tty/console/active";
+constexpr int uartIOWaitTime100 = 100;
+constexpr int uartIOWaitTime = 1000;
+constexpr uint16_t MAX_UART_SIZE_IOBUF = 4096; // MAX_SIZE_IOBUF;
+#endif
 const string CMDSTR_TMODE_TCP = "tcp";
 const string CMDSTR_FILE_SEND = "file send";
 const string CMDSTR_FILE_RECV = "file recv";

@@ -22,6 +22,9 @@ HdcDaemon::HdcDaemon(bool serverOrDaemonIn)
 {
     clsTCPServ = nullptr;
     clsUSBServ = nullptr;
+#ifdef HDC_SUPPORT_UART
+    clsUARTServ = nullptr;
+#endif
     clsJdwp = nullptr;
     enableSecure = false;
 }
@@ -43,6 +46,12 @@ void HdcDaemon::ClearInstanceResource()
         delete (HdcDaemonUSB *)clsUSBServ;
         clsUSBServ = nullptr;
     }
+#ifdef HDC_SUPPORT_UART
+    if (clsUARTServ) {
+        delete (HdcDaemonUART *)clsUARTServ;
+    }
+    clsUARTServ = nullptr;
+#endif
     if (clsJdwp) {
         delete (HdcJdwp *)clsJdwp;
         clsJdwp = nullptr;
@@ -61,15 +70,28 @@ void HdcDaemon::TryStopInstance()
         WRITE_LOG(LOG_DEBUG, "Stop USB");
         ((HdcDaemonUSB *)clsUSBServ)->Stop();
     }
+#ifdef HDC_SUPPORT_UART
+    if (clsUARTServ) {
+        WRITE_LOG(LOG_DEBUG, "Stop UART");
+        ((HdcDaemonUART *)clsUARTServ)->Stop();
+    }
+#endif
     ((HdcJdwp *)clsJdwp)->Stop();
     // workaround temply remove MainLoop instance clear
     ReMainLoopForInstanceClear();
     WRITE_LOG(LOG_DEBUG, "Stop loopmain");
 }
 
+#ifdef HDC_SUPPORT_UART
+void HdcDaemon::InitMod(bool bEnableTCP, bool bEnableUSB, [[maybe_unused]] bool bEnableUART)
+#else
 void HdcDaemon::InitMod(bool bEnableTCP, bool bEnableUSB)
+#endif
 {
     WRITE_LOG(LOG_DEBUG, "HdcDaemon InitMod");
+#ifdef HDC_SUPPORT_UART
+    WRITE_LOG(LOG_DEBUG, "bEnableTCP:%d,bEnableUSB:%d", bEnableTCP, bEnableUSB);
+#endif
     if (bEnableTCP) {
         // tcp
         clsTCPServ = new HdcDaemonTCP(false, this);
@@ -80,6 +102,14 @@ void HdcDaemon::InitMod(bool bEnableTCP, bool bEnableUSB)
         clsUSBServ = new HdcDaemonUSB(false, this);
         ((HdcDaemonUSB *)clsUSBServ)->Initial();
     }
+#ifdef HDC_SUPPORT_UART
+    WRITE_LOG(LOG_DEBUG, "bEnableUART:%d", bEnableUART);
+    if (bEnableUART) {
+        // UART
+        clsUARTServ = new HdcDaemonUART(*this);
+        ((HdcDaemonUART *)clsUARTServ)->Initial();
+    }
+#endif
     clsJdwp = new HdcJdwp(&loopMain);
     ((HdcJdwp *)clsJdwp)->Initial();
     // enable security
@@ -193,6 +223,9 @@ bool HdcDaemon::DaemonSessionHandshake(HSession hSession, const uint32_t channel
     SessionHandShake handshake;
     string err;
     SerialStruct::ParseFromString(handshake, s);
+#ifdef HDC_DEBUG
+    WRITE_LOG(LOG_DEBUG, "session %s try to handshake", hSession->ToDebugString().c_str());
+#endif
     // banner to check is parse ok...
     if (handshake.banner != HANDSHAKE_MESSAGE) {
         hSession->availTailIndex = 0;
@@ -205,6 +238,15 @@ bool HdcDaemon::DaemonSessionHandshake(HSession hSession, const uint32_t channel
         hSession->sessionId = handshake.sessionId;
         hSession->connectKey = handshake.connectKey;
         AdminSession(OP_UPDATE, unOld, hSession);
+#ifdef HDC_SUPPORT_UART
+        if (hSession->connType == CONN_SERIAL and clsUARTServ!= nullptr) {
+            WRITE_LOG(LOG_DEBUG, " HdcDaemon::DaemonSessionHandshake %s",
+                      handshake.ToDebugString().c_str());
+            if (clsUARTServ != nullptr) {
+                (static_cast<HdcDaemonUART *>(clsUARTServ))->OnNewHandshakeOK(hSession->sessionId);
+            }
+        } else
+#endif // HDC_SUPPORT_UART
         if (clsUSBServ != nullptr) {
             (reinterpret_cast<HdcDaemonUSB *>(clsUSBServ))->OnNewHandshakeOK(hSession->sessionId);
         }
@@ -216,6 +258,9 @@ bool HdcDaemon::DaemonSessionHandshake(HSession hSession, const uint32_t channel
         return false;
     }
     // handshake auth OK.Can append the sending device information to HOST
+#ifdef HDC_DEBUG
+    WRITE_LOG(LOG_INFO, "session %u handshakeOK send back CMD_KERNEL_HANDSHAKE", hSession->sessionId);
+#endif
     char hostName[BUF_SIZE_MEDIUM] = "";
     size_t len = sizeof(hostName);
     uv_os_gethostname(hostName, &len);
@@ -231,7 +276,9 @@ bool HdcDaemon::FetchCommand(HSession hSession, const uint32_t channelId, const 
                              const int payloadSize)
 {
     bool ret = true;
-    if (!hSession->handshakeOK && command != CMD_KERNEL_HANDSHAKE) {
+    if (!hSession->handshakeOK and command != CMD_KERNEL_HANDSHAKE) {
+        WRITE_LOG(LOG_WARN, "session %u wait CMD_KERNEL_HANDSHAKE , but got command %u",
+                  hSession->sessionId, command);
         ret = false;
         return ret;
     }

@@ -15,7 +15,6 @@
 #include "host_usb.h"
 #include "server.h"
 #include <thread>
-
 namespace Hdc {
 HdcHostUSB::HdcHostUSB(const bool serverOrDaemonIn, void *ptrMainBase, void *ctxUSBin)
     : HdcUSBBase(serverOrDaemonIn, ptrMainBase)
@@ -322,7 +321,7 @@ void HdcHostUSB::CancelUsbIo(HSession hSession)
 int HdcHostUSB::UsbToHdcProtocol(uv_stream_t *stream, uint8_t *appendData, int dataSize)
 {
     HSession hSession = (HSession)stream->data;
-    int fd = hSession->dataFd[STREAM_MAIN];
+    unsigned int fd = hSession->dataFd[STREAM_MAIN];
     fd_set fdSet;
     struct timeval timeout = { 3, 0 };
     FD_ZERO(&fdSet);

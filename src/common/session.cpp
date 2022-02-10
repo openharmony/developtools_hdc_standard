@@ -36,7 +36,9 @@ HdcSessionBase::HdcSessionBase(bool serverOrDaemonIn)
 
 #ifdef HDC_HOST
     if (serverOrDaemon) {
-        libusb_init((libusb_context **)&ctxUSB);
+        if (libusb_init((libusb_context **)&ctxUSB) != 0) {
+            ctxUSB = nullptr;
+        }
     }
 #endif
 }
@@ -49,7 +51,7 @@ HdcSessionBase::~HdcSessionBase()
     uv_rwlock_destroy(&mainAsync);
     uv_rwlock_destroy(&lockMapSession);
 #ifdef HDC_HOST
-    if (serverOrDaemon) {
+    if (serverOrDaemon and ctxUSB != nullptr) {
         libusb_exit((libusb_context *)ctxUSB);
     }
 #endif
@@ -158,6 +160,23 @@ void HdcSessionBase::ReMainLoopForInstanceClear()
     Base::IdleUvTask(&loopMain, this, clearSessionsForFinish);
     uv_run(&loopMain, UV_RUN_DEFAULT);
 };
+
+#ifdef HDC_SUPPORT_UART
+void HdcSessionBase::EnumUARTDeviceRegister(UartKickoutZombie kickOut)
+{
+    uv_rwlock_rdlock(&lockMapSession);
+    map<uint32_t, HSession>::iterator i;
+    for (i = mapSession.begin(); i != mapSession.end(); ++i) {
+        HSession hs = i->second;
+        if ((hs->connType != CONN_SERIAL) or (hs->hUART == nullptr)) {
+            continue;
+        }
+        kickOut(hs);
+        break;
+    }
+    uv_rwlock_rdunlock(&lockMapSession);
+}
+#endif
 
 void HdcSessionBase::EnumUSBDeviceRegister(void (*pCallBack)(HSession hSession))
 {
@@ -319,6 +338,17 @@ int HdcSessionBase::MallocSessionByConnectType(HSession hSession)
             hSession->hUSB->wMaxPacketSizeSend = MAX_PACKET_SIZE_HISPEED;
             break;
         }
+#ifdef HDC_SUPPORT_UART
+        case CONN_SERIAL: {
+            HUART hUART = new HdcUART();
+            if (!hUART) {
+                ret = -1;
+                break;
+            }
+            hSession->hUART = hUART;
+            break;
+        }
+#endif // HDC_SUPPORT_UART
         default:
             ret = -1;
             break;
@@ -359,8 +389,8 @@ HSession HdcSessionBase::MallocSession(bool serverOrDaemon, const ConnType connT
     hSession->listKey = new list<void *>;
     hSession->uvHandleRef = 0;
     // pullup child
-    WRITE_LOG(LOG_DEBUG, "HdcSessionBase NewSession, sessionId:%u", hSession->sessionId);
-
+    WRITE_LOG(LOG_DEBUG, "HdcSessionBase NewSession, sessionId:%u, connType:%d.",
+              hSession->sessionId, hSession->connType);
     uv_tcp_init(&loopMain, &hSession->ctrlPipe[STREAM_MAIN]);
     ++hSession->uvHandleRef;
     Base::CreateSocketPair(hSession->ctrlFd);
@@ -388,6 +418,8 @@ HSession HdcSessionBase::MallocSession(bool serverOrDaemon, const ConnType connT
 
 void HdcSessionBase::FreeSessionByConnectType(HSession hSession)
 {
+    WRITE_LOG(LOG_DEBUG, "FreeSessionByConnectType %s", hSession->ToDebugString().c_str());
+
     if (CONN_USB == hSession->connType) {
         // ibusb All context is applied for sub-threaded, so it needs to be destroyed in the subline
         if (!hSession->hUSB) {
@@ -416,6 +448,35 @@ void HdcSessionBase::FreeSessionByConnectType(HSession hSession)
         delete hSession->hUSB;
         hSession->hUSB = nullptr;
     }
+#ifdef HDC_SUPPORT_UART
+    if (CONN_SERIAL == hSession->connType) {
+        if (!hSession->hUART) {
+            return;
+        }
+        HUART hUART = hSession->hUART;
+        if (!hUART) {
+            return;
+        }
+        HdcUARTBase *uartBase = (HdcUARTBase *)hSession->classModule;
+        // tell uart session will be free
+        uartBase->StopSession(hSession);
+#ifdef HDC_HOST
+#ifdef HOST_MINGW
+        if (hUART->devUartHandle != INVALID_HANDLE_VALUE) {
+            CloseHandle(hUART->devUartHandle);
+            hUART->devUartHandle = INVALID_HANDLE_VALUE;
+        }
+#elif defined(HOST_LINUX)
+        if (hUART->devUartHandle >= 0) {
+            close(hUART->devUartHandle);
+            hUART->devUartHandle = -1;
+        }
+#endif // _WIN32
+#endif
+        delete hSession->hUART;
+        hSession->hUART = nullptr;
+    }
+#endif
 }
 
 // work when libuv-handle at struct of HdcSession has all callback finished
@@ -623,6 +684,14 @@ int HdcSessionBase::SendByProtocol(HSession hSession, uint8_t *bufPtr, const int
             delete[] bufPtr;
             break;
         }
+#ifdef HDC_SUPPORT_UART
+        case CONN_SERIAL: {
+            HdcUARTBase *pUART = ((HdcUARTBase *)hSession->classModule);
+            ret = pUART->SendUARTData(hSession, bufPtr, bufLen);
+            delete[] bufPtr;
+            break;
+        }
+#endif
         default:
             break;
     }
@@ -695,12 +764,13 @@ int HdcSessionBase::DecryptPayload(HSession hSession, PayloadHead *payloadHeadBe
         return ERR_BUF_CHECK;
     }
     uint8_t *data = encBuf + headSize;
-    if (protectBuf.checkSum != 0 && (protectBuf.checkSum != Base::CalcCheckSum(data, dataSize))) {
+    if (ENABLE_IO_CHECKSUM && protectBuf.checkSum != 0 && (protectBuf.checkSum != Base::CalcCheckSum(data, dataSize))) {
         WRITE_LOG(LOG_FATAL, "Session recv CalcCheckSum failed");
         return ERR_BUF_CHECK;
     }
     if (!FetchCommand(hSession, protectBuf.channelId, protectBuf.commandFlag, data, dataSize)) {
-        WRITE_LOG(LOG_WARN, "FetchCommand failed");
+        WRITE_LOG(LOG_WARN, "FetchCommand failed: channelId %x commandFlag %x",
+                  protectBuf.channelId, protectBuf.commandFlag);
         return ERR_GENERIC;
     }
     return RET_SUCCESS;
@@ -710,7 +780,7 @@ int HdcSessionBase::OnRead(HSession hSession, uint8_t *bufPtr, const int bufLen)
 {
     int ret = ERR_GENERIC;
     if (memcmp(bufPtr, PACKET_FLAG.c_str(), PACKET_FLAG.size())) {
-        WRITE_LOG(LOG_FATAL, "PACKET_FLAG incorrect");
+        WRITE_LOG(LOG_FATAL, "PACKET_FLAG incorrect %x %x", bufPtr[0], bufPtr[1]);
         return ERR_BUF_CHECK;
     }
     struct PayloadHead *payloadHead = (struct PayloadHead *)bufPtr;
@@ -851,11 +921,18 @@ bool HdcSessionBase::WorkThreadStartSession(HSession hSession)
         Base::SetTcpOptions((uv_tcp_t *)&hSession->hChildWorkTCP);
         uv_read_start((uv_stream_t *)&hSession->hChildWorkTCP, AllocCallback, pTCPBase->ReadStream);
         regOK = true;
+#ifdef HDC_SUPPORT_UART
+    } else if (hSession->connType == CONN_SERIAL) { // UART
+        HdcUARTBase *pUARTBase = (HdcUARTBase *)hSession->classModule;
+        WRITE_LOG(LOG_DEBUG, "UART ReadyForWorkThread");
+        regOK = pUARTBase->ReadyForWorkThread(hSession);
+#endif
     } else {  // USB
         HdcUSBBase *pUSBBase = (HdcUSBBase *)hSession->classModule;
         WRITE_LOG(LOG_DEBUG, "USB ReadyForWorkThread");
         regOK = pUSBBase->ReadyForWorkThread(hSession);
     }
+
     if (regOK && hSession->serverOrDaemon) {
         // session handshake step1
         SessionHandShake handshake = {};
@@ -864,6 +941,10 @@ bool HdcSessionBase::WorkThreadStartSession(HSession hSession)
         handshake.connectKey = hSession->connectKey;
         handshake.authType = AUTH_NONE;
         string hs = SerialStruct::SerializeToString(handshake);
+#ifdef HDC_SUPPORT_UART
+        WRITE_LOG(LOG_DEBUG, "WorkThreadStartSession session %u auth %u send handshake hs:",
+                  hSession->sessionId, handshake.authType, hs.c_str());
+#endif
         Send(hSession->sessionId, 0, CMD_KERNEL_HANDSHAKE, (uint8_t *)hs.c_str(), hs.size());
     }
     return regOK;
@@ -1121,7 +1202,7 @@ bool HdcSessionBase::DispatchTaskData(HSession hSession, const uint32_t channelI
 void HdcSessionBase::PostStopInstanceMessage(bool restart)
 {
     PushAsyncMessage(0, ASYNC_STOP_MAINLOOP, nullptr, 0);
-    WRITE_LOG(LOG_DEBUG, "StopDaemon has sended");
+    WRITE_LOG(LOG_DEBUG, "StopDaemon has sended restart %d", restart);
     wantRestart = restart;
 }
 }  // namespace Hdc

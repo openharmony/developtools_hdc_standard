@@ -1,0 +1,320 @@
+# Copyright (C) 2021 Huawei Device Co., Ltd.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+import("//build/test.gni")
+import("//developtools/hdc_standard/hdc.gni")
+hdc_path = "//developtools/hdc_standard/"
+module_output_path = "developtools/hdc_standard/"
+declare_args() {
+  hdc_unit_test = true
+}
+
+hdc_common_sources = [
+  "${hdc_path}/src/common/async_cmd.cpp",
+  "${hdc_path}/src/common/auth.cpp",
+  "${hdc_path}/src/common/base.cpp",
+  "${hdc_path}/src/common/channel.cpp",
+  "${hdc_path}/src/common/debug.cpp",
+  "${hdc_path}/src/common/file.cpp",
+  "${hdc_path}/src/common/file_descriptor.cpp",
+  "${hdc_path}/src/common/forward.cpp",
+  "${hdc_path}/src/common/session.cpp",
+  "${hdc_path}/src/common/task.cpp",
+  "${hdc_path}/src/common/tcp.cpp",
+  "${hdc_path}/src/common/transfer.cpp",
+  "${hdc_path}/src/common/usb.cpp",
+]
+
+hdc_daemon_sources = [
+  "${hdc_path}/src/daemon/daemon.cpp",
+  "${hdc_path}/src/daemon/daemon_app.cpp",
+  "${hdc_path}/src/daemon/daemon_forward.cpp",
+  "${hdc_path}/src/daemon/daemon_tcp.cpp",
+  "${hdc_path}/src/daemon/daemon_unity.cpp",
+  "${hdc_path}/src/daemon/daemon_usb.cpp",
+  "${hdc_path}/src/daemon/jdwp.cpp",
+  "${hdc_path}/src/daemon/shell.cpp",
+  "${hdc_path}/src/daemon/system_depend.cpp",
+]
+
+hdc_host_sources = [
+  "${hdc_path}/src/host/client.cpp",
+  "${hdc_path}/src/host/host_app.cpp",
+  "${hdc_path}/src/host/host_forward.cpp",
+  "${hdc_path}/src/host/host_tcp.cpp",
+  "${hdc_path}/src/host/host_unity.cpp",
+  "${hdc_path}/src/host/host_usb.cpp",
+  "${hdc_path}/src/host/server.cpp",
+  "${hdc_path}/src/host/server_for_client.cpp",
+  "${hdc_path}/src/host/translate.cpp",
+]
+
+common_deps = [
+  "//third_party/libusb:libusb",
+  "//third_party/libuv:uv_static",
+  "//third_party/lz4:liblz4_static",
+  "//third_party/openssl:libcrypto_static",
+  "//utils/native/base:utilsecurec",
+]
+
+config("hdc_code_flag") {
+  cflags = [
+    "-Wno-error",
+    "-Wno-error=unused-variable",
+    "-Wno-unused-variable",
+    "-Wno-missing-field-initializers",
+  ]
+}
+
+config("hdc_ut_code_flag") {
+  cflags = code_check_flag
+}
+
+config("hdc_ut_config") {
+  defines = []
+  include_dirs = [ "${hdc_path}/src/common" ]
+
+  cflags = [
+    "-std=c++17",
+    "-fno-access-control",
+    "-g",
+  ]
+  ldflags = []
+
+  if (hdc_test_coverage && is_ohos) {
+    cflags += [
+      "-fprofile-arcs",
+      "-ftest-coverage",
+    ]
+    ldflags += [ "--coverage" ]
+  }
+}
+
+config("hdc_common_config") {
+  defines = []
+  include_dirs = [
+    "${hdc_path}/src/common",
+    "${hdc_path}/src/daemon",
+    "${hdc_path}/src/host",
+    "${hdc_path}/test/unittest/common/include",
+    "//third_party/libuv",  # used in common.h
+    "//third_party/lz4/lib",  # used in transfer.cpp
+    "//base/startup/syspara_lite/interfaces/innerkits/native/syspara/include",
+    "//base/startup/init_lite/interfaces/innerkits/include",  #daemon_unity.cpp
+  ]
+
+  if (hdc_support_uart) {
+    defines += [ "HDC_SUPPORT_UART" ]
+  }
+
+  defines += [ "HDC_UT" ]
+}
+
+config("hdc_host_common_config") {
+  defines = [ "HDC_HOST" ]
+
+  # both linux and ohos is same linux syscall
+  defines += [ "HOST_LINUX" ]
+  defines += [ "HARMONY_PROJECT" ]
+}
+
+ohos_source_set("hdc_common") {
+  use_exceptions = true
+  sources = hdc_common_sources
+  if (hdc_support_uart) {
+    sources += [ "${hdc_path}/src/common/uart.cpp" ]
+  }
+  public_deps = common_deps
+  public_configs = [
+    ":hdc_common_config",
+    ":hdc_ut_config",
+  ]
+  configs = [ ":hdc_code_flag" ]
+}
+
+ohos_source_set("hdc_daemon") {
+  use_exceptions = true
+  sources = hdc_common_sources
+  sources += hdc_daemon_sources
+  if (hdc_support_uart) {
+    sources += [ "${hdc_path}/src/common/uart.cpp" ]
+    sources += [ "${hdc_path}/src/daemon/daemon_uart.cpp" ]
+  }
+  public_deps = common_deps
+  public_configs = [
+    ":hdc_common_config",
+    ":hdc_ut_config",
+  ]
+  configs = [ ":hdc_code_flag" ]
+}
+
+ohos_source_set("hdc_host") {
+  use_exceptions = true
+  sources = hdc_common_sources
+  sources += hdc_host_sources
+  if (hdc_support_uart) {
+    sources += [ "${hdc_path}/src/common/uart.cpp" ]
+    sources += [ "${hdc_path}/src/host/host_uart.cpp" ]
+  }
+  public_deps = common_deps
+  public_configs = [
+    ":hdc_common_config",
+    ":hdc_host_common_config",
+    ":hdc_ut_config",
+  ]
+  configs = [ ":hdc_code_flag" ]
+}
+
+ohos_source_set("hdc_daemon_platform") {
+  configs = [ ":hdc_code_flag" ]
+  public_configs = [ ":hdc_ut_config" ]
+  public_configs += [ "//third_party/googletest:gtest_config" ]
+
+  #defines = [ "HARMONY_PROJECT" ]
+  defines = []
+  if (hdc_test_coverage && is_ohos) {
+    defines += [ "TEST_COVERAGE" ]
+  }
+
+  if (hdc_unit_test) {
+    defines += [ "HDC_UNIT_TEST" ]
+  }
+  if (js_jdwp_connect) {
+    defines += [ "JS_JDWP_CONNECT" ]
+  }
+
+  sources = [
+    "${hdc_path}/src/daemon/daemon_unity.cpp",
+    "${hdc_path}/src/daemon/jdwp.cpp",
+  ]
+
+  public_deps = [
+    "//third_party/libuv:uv_static",
+    "//third_party/openssl:libcrypto_static",
+    "//utils/native/base:utilsecurec",
+  ]
+
+  external_deps = [
+    "init:libbegetutil",
+    "startup_l2:syspara",
+  ]
+
+  include_dirs = [
+    "${hdc_path}/daemon",
+    "//utils/native/base/include",
+    "//third_party/openssl/include",
+    "//third_party/libuv",
+  ]
+
+  if (use_musl) {
+    include_dirs += [
+      "//base/startup/init_lite/interfaces/innerkits/include",
+      "//base/startup/syspara_lite/interfaces/innerkits/native/syspara/include",
+    ]
+  }
+}
+
+ohos_unittest("hdc_jdwp_unittest") {
+  module_out_path = module_output_path
+  configs = [ ":hdc_code_flag" ]
+  public_configs = [ ":hdc_ut_config" ]
+  defines = [ "HARMONY_PROJECT" ]
+  if (hdc_test_coverage && is_ohos) {
+    defines += [ "TEST_COVERAGE" ]
+  }
+  if (hdc_unit_test) {
+    defines += [ "HDC_UNIT_TEST" ]
+  }
+  if (js_jdwp_connect) {
+    defines += [ "JS_JDWP_CONNECT" ]
+  }
+  public_deps = [ ":hdc_daemon_platform" ]
+
+  deps = [
+    "//third_party/googletest:gmock_main",
+    "//third_party/googletest:gtest_main",
+  ]
+
+  sources = [ "unittest/common/HdcJdwpTest.cpp" ]
+  deps += [ ":hdc_common" ]
+
+  include_dirs = [
+    "${hdc_path}/test/unittest/common/include",
+    "${hdc_path}/src/daemon",
+    "${hdc_path}/src/common",
+    "//third_party/libuv",
+    "//utils/native/base/include",
+  ]
+
+  if (is_linux) {
+    static_link = false
+  }
+  subsystem_name = "developtools"
+}
+
+ohos_unittest("hdc_uart_unittest") {
+  use_exceptions = true
+  module_out_path = module_output_path
+  resource_config_file = "unittest/resource/ohos_test.xml"
+  sources = [
+    "unittest/common/daemon_uart_test.cpp",
+    "unittest/common/uart_test.cpp",
+  ]
+
+  configs = [ ":hdc_common_config" ]
+  configs += [ ":hdc_ut_code_flag" ]
+  deps = [ ":hdc_daemon" ]
+
+  deps += [
+    "//third_party/googletest:gmock_main",
+    "//third_party/googletest:gtest_main",
+  ]
+}
+
+ohos_unittest("hdc_host_uart_unittest") {
+  use_exceptions = true
+  module_out_path = module_output_path
+  resource_config_file = "unittest/resource/ohos_test.xml"
+  sources = [
+    "unittest/common/host_uart_test.cpp",
+    "unittest/common/uart_test.cpp",
+  ]
+
+  configs = [
+    ":hdc_common_config",
+    ":hdc_host_common_config",
+    ":hdc_ut_code_flag",
+  ]
+
+  deps = [ ":hdc_host" ]
+
+  deps += [
+    "//third_party/googletest:gmock_main",
+    "//third_party/googletest:gtest_main",
+  ]
+}
+
+group("HdcJdwpTest") {
+  testonly = true
+  deps = [ ":hdc_jdwp_unittest" ]
+}
+
+group("hdc_unittest") {
+  testonly = true
+  deps = [
+    ":hdc_host_uart_unittest",
+    ":hdc_host_uart_unittest(${host_toolchain})",
+    ":hdc_jdwp_unittest",
+    ":hdc_uart_unittest",
+    ":hdc_uart_unittest(${host_toolchain})",
+  ]
+}

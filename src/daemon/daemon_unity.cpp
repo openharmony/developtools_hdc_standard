@@ -244,6 +244,9 @@ bool HdcDaemonUnity::CommandDispatch(const uint16_t command, uint8_t *payload, c
     HdcDaemon *daemon = (HdcDaemon *)taskInfo->ownerSessionClass;
     // Both are not executed, do not need to be detected 'childReady'
     string strPayload = string((char *)payload, payloadSize);
+#ifdef HDC_DEBUG
+    WRITE_LOG(LOG_DEBUG, "CommandDispatch command:%d", command);
+#endif // HDC_LOCAL_DEBUG
     switch (command) {
         case CMD_UNITY_EXECUTE: {
             ExecuteShell((char *)strPayload.c_str());
@@ -301,6 +304,9 @@ bool HdcDaemonUnity::CommandDispatch(const uint16_t command, uint8_t *payload, c
         default:
             break;
     }
+#ifdef HDC_DEBUG
+    WRITE_LOG(LOG_DEBUG, "CommandDispatch command:%d finish.", command);
+#endif // HDC_LOCAL_DEBUG
     return ret;
 };
 }  // namespace Hdc

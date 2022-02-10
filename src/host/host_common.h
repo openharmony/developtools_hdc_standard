@@ -25,6 +25,9 @@
 
 #include "host_tcp.h"
 #include "host_usb.h"
+#ifdef HDC_SUPPORT_UART
+#include "host_uart.h"
+#endif
 #include "translate.h"
 #include "server_for_client.h"
 #include "client.h"

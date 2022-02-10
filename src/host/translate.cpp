@@ -34,6 +34,15 @@ namespace TranslateCommand {
               " tconn key                             - Connect device via key, TCP use ip:port\n"
               "                                         example:192.168.0.100:10178/192.168.0.100\n"
               "                                         USB connect automatic, TCP need to connect manually\n"
+#ifdef HDC_SUPPORT_UART
+              "\n"
+              "                                         UART connect need connect manually.\n"
+              "                                         Baud Rate can be specified with commas.\n"
+              "                                         key format: <Port Name>[,Baud Rate]\n"
+              "                                         example: tconn COM5,921600\n"
+              "                                         Default Baud Rate is 921600.\n"
+              "\n"
+#endif
               " start [-r]                            - Start server. If with '-r', will be restart server\n"
               " kill [-r]                             - Kill server. If with '-r', will be restart server\n"
               " -s [ip:]port                          - Set hdc server listen config\n"
@@ -125,7 +134,7 @@ namespace TranslateCommand {
         const char *pExtra = input + 6;  // CMDSTR_FORWARD_FPORT CMDSTR_FORWARD_RPORT + " " size
         if (!strcmp(pExtra, "ls")) {
             outCmd->cmdFlag = CMD_FORWARD_LIST;
-        } else if (!strncmp(pExtra, "rm", 2)) {
+        } else if (!strncmp(pExtra, "rm", 2)) { // 2: "rm" size
             outCmd->cmdFlag = CMD_FORWARD_REMOVE;
             if (strcmp(pExtra, "rm")) {
                 outCmd->parameters = input + 9;
@@ -277,6 +286,9 @@ namespace TranslateCommand {
             stringError = "Unknown command...";
             outCmd->bJumpDo = true;
         }
+#ifdef HDC_DEBUG
+        WRITE_LOG(LOG_DEBUG, "String2FormatCommand cmdFlag:%d", outCmd->cmdFlag);
+#endif
         // nl
         if (stringError.size()) {
             stringError += "\n";

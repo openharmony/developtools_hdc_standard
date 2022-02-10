@@ -27,6 +27,10 @@ using namespace std::chrono;
 
 namespace Hdc {
 namespace Base {
+    uint8_t GetLogLevel()
+    {
+        return g_logLevel;
+    }
     std::atomic<bool> g_logCache = true;
     uint8_t g_logLevel = LOG_DEBUG;  // tmp set,now debugmode.LOG_OFF when release;;
     void SetLogLevel(const uint8_t logLevel)
@@ -119,15 +123,27 @@ namespace Base {
     void LogToPath(const char *path, const char *str)
     {
         // logfile, not thread-safe
+#ifdef HDC_DEBUG_UART
+        // make a log path print.
+        static std::once_flag firstLog;
+        std::call_once(firstLog, [&]() { printf("log at %s\n", path); });
+#endif
+#ifdef HDC_DEBUG_UART
+        // better than open log file every time.
+        static std::unique_ptr<FILE, decltype(&fclose)> file(fopen(path, "w"), &fclose);
+        FILE *fp = file.get();
+#else
         FILE *fp = fopen(path, "a");
+#endif
         if (fp == nullptr) {
             return;
         }
         if (fprintf(fp, "%s", str) > 0 && fflush(fp)) {
             // make ci happy
         }
+#ifndef HDC_DEBUG_UART
         fclose(fp);
-
+#endif
     }
 
     void LogToFile(const char *str)
@@ -250,7 +266,7 @@ namespace Base {
     void SendCallback(uv_write_t *req, int status)
     {
         if (status < 0) {
-            WRITE_LOG(LOG_WARN, "SendCallback failed,status:%d", status);
+            WRITE_LOG(LOG_WARN, "SendCallback failed,status:%d %s", status, uv_strerror(status));
         }
         delete[]((uint8_t *)req->data);
         delete req;
@@ -357,6 +373,10 @@ namespace Base {
                 delete reqWrite;
                 break;
             }
+#ifdef HDC_DEBUG
+            WRITE_LOG(LOG_ALL, "SendToStreamEx %p, uv_write %p:%p, size:%lu", handleStream,
+                      reqWrite, reqWrite->data, bfr.len);
+#endif
             // handleSend must be a TCP socket or pipe, which is a server or a connection (listening or
             // connected state). Bound sockets or pipes will be assumed to be servers.
             if (handleSend) {
