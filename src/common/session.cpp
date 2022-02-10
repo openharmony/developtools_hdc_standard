@@ -22,8 +22,15 @@ HdcSessionBase::HdcSessionBase(bool serverOrDaemonIn)
     WRITE_LOG(LOG_INFO, "Program running. %s Pid:%u", Base::GetVersion().c_str(), getpid());
     // server/daemon common initialization code
     threadPoolCount = SIZE_THREAD_POOL;
-    string threadNum = std::to_string(threadPoolCount);
-    uv_os_setenv("UV_THREADPOOL_SIZE", threadNum.c_str());
+    string uvThreadEnv("UV_THREADPOOL_SIZE");
+    string uvThreadVal = std::to_string(threadPoolCount);
+#ifdef _WIN32
+    uvThreadEnv += "=";
+    uvThreadEnv += uvThreadVal;
+    _putenv(uvThreadEnv.c_str());
+#else
+    setenv(uvThreadEnv.c_str(), uvThreadVal.c_str(), 1);
+#endif
     uv_loop_init(&loopMain);
     WRITE_LOG(LOG_DEBUG, "loopMain init");
     uv_rwlock_init(&mainAsync);
