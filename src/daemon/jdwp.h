@@ -17,7 +17,6 @@
 #include "daemon_common.h"
 #include <poll.h>
 #include <unordered_map>
-
 namespace Hdc {
 class HdcJdwp {
 public:
@@ -41,7 +40,7 @@ private:
         uint32_t pid;
     };
     string GetProcessListExtendPkgName();
-#endif  // JS_JDWP_CONNECT
+#endif // JS_JDWP_CONNECT
     struct _PollFd {
         int fd;
         short events;
@@ -101,5 +100,5 @@ private:
     std::vector<HTaskInfo> jdwpTrackers;
     bool stop;
 };
-}  // namespace Hdc
+} // namespace Hdc
 #endif

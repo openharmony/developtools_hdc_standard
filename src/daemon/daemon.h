@@ -21,13 +21,20 @@ class HdcDaemon : public HdcSessionBase {
 public:
     HdcDaemon(bool serverOrDaemonIn);
     virtual ~HdcDaemon();
+#ifdef HDC_SUPPORT_UART
+    void InitMod(bool bEnableTCP, bool bEnableUSB, bool bEnableUART);
+#else
     void InitMod(bool bEnableTCP, bool bEnableUSB);
+#endif
     bool FetchCommand(HSession hSession, const uint32_t channelId, const uint16_t command, uint8_t *payload,
                       const int payloadSize);
     bool ServerCommand(const uint32_t sessionId, const uint32_t channelId, const uint16_t command, uint8_t *bufPtr,
                        const int size);
     void *clsTCPServ;
     void *clsUSBServ;
+#ifdef HDC_SUPPORT_UART
+    void *clsUARTServ;
+#endif
     void *clsJdwp;
 
 private:

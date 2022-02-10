@@ -200,6 +200,10 @@ void HdcTransferBase::OnFileIO(uv_fs_t *req)
         }
         context->indexIO += req->result;
         if (req->fs_type == UV_FS_READ) {
+#ifdef HDC_DEBUG
+            WRITE_LOG(LOG_DEBUG, "read file data %" PRIu64 "/%" PRIu64 "", context->indexIO,
+                      context->fileSize);
+#endif // HDC_DEBUG
             if (!thisClass->SendIOPayload(context, context->indexIO - req->result, bufIO, req->result)) {
                 context->ioFinish = true;
                 break;
@@ -211,6 +215,10 @@ void HdcTransferBase::OnFileIO(uv_fs_t *req)
                 context->ioFinish = true;
             }
         } else if (req->fs_type == UV_FS_WRITE) {  // write
+#ifdef HDC_DEBUG
+            WRITE_LOG(LOG_DEBUG, "write file data %" PRIu64 "/%" PRIu64 "", context->indexIO,
+                      context->fileSize);
+#endif // HDC_DEBUG
             if (context->indexIO >= context->fileSize) {
                 // The active end must first read it first, but you can't make Finish first, because Slave may not
                 // end.Only slave receives complete talents Finish
