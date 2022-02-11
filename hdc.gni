@@ -13,7 +13,7 @@
 
 declare_args() {
   # build with --gn-args "hdc_debug=true, which is used to debug"
-  hdc_debug = true
+  hdc_debug = false
   hdc_host_hide_debug_win = true
   hdc_support_uart = true
   hdc_test_coverage = false
