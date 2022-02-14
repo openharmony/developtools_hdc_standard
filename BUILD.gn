@@ -161,7 +161,7 @@ ohos_executable("hdc_std") {
   ]
 
   if (is_mingw) {
-    static_link = true
+    static_link = false
 
     # we should use something we define , not just _WIN32 (this will defined in some windows header)
     defines += [ "HOST_MINGW" ]  # we define this for mingw
@@ -175,7 +175,7 @@ ohos_executable("hdc_std") {
   }
 
   if (is_linux) {
-    static_link = true
+    static_link = false
     defines += [ "HOST_LINUX" ]
     ldflags += [
       "-Wl,--whole-archive",
