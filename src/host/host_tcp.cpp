@@ -43,7 +43,7 @@ void HdcHostTCP::RecvUDPEntry(const sockaddr *addrSrc, uv_udp_t *handle, const u
     if (!port) {
         return;
     }
-    uv_ip4_name((sockaddr_in *)addrSrc, bufString, sizeof(bufString));
+    uv_ip6_name((sockaddr_in6 *)addrSrc, bufString, sizeof(bufString));
     string addrPort = string(bufString);
     addrPort += string(":") + std::to_string(port);
     lstDaemonResult.push_back(addrPort);
@@ -65,21 +65,21 @@ void HdcHostTCP::BroadcatFindDaemon(const char *broadcastLanIP)
 
     uv_loop_t loopBroadcast;
     uv_loop_init(&loopBroadcast);
-    struct sockaddr_in addr;
+    struct sockaddr_in6 addr;
     uv_udp_send_t req;
     uv_udp_t client;
     // send
-    uv_ip4_addr(broadcastLanIP, 0, &addr);
+    uv_ip6_addr(broadcastLanIP, 0, &addr);
     uv_udp_init(&loopBroadcast, &client);
     uv_udp_bind(&client, (const struct sockaddr *)&addr, 0);
     uv_udp_set_broadcast(&client, 1);
-    uv_ip4_addr("255.255.255.255", DEFAULT_PORT, &addr);
+    uv_ip6_addr("FFFF:FFFF:FFFF", DEFAULT_PORT, &addr);
     uv_buf_t buf = uv_buf_init((char *)HANDSHAKE_MESSAGE.c_str(), HANDSHAKE_MESSAGE.size());
     uv_udp_send(&req, &client, &buf, 1, (const struct sockaddr *)&addr, nullptr);
     // recv
     uv_udp_t server;
     server.data = this;
-    uv_ip4_addr(broadcastLanIP, DEFAULT_PORT, &addr);
+    uv_ip6_addr(broadcastLanIP, DEFAULT_PORT, &addr);
     uv_udp_init(&loopBroadcast, &server);
     uv_udp_bind(&server, (const struct sockaddr *)&addr, UV_UDP_REUSEADDR);
     uv_udp_recv_start(&server, AllocStreamUDP, RecvUDP);
@@ -134,8 +134,8 @@ HSession HdcHostTCP::ConnectDaemon(const string &connectKey)
         return nullptr;
     }
     hSession->connectKey = connectKey;
-    struct sockaddr_in dest;
-    uv_ip4_addr(ip, port, &dest);
+    struct sockaddr_in6 dest;
+    uv_ip6_addr(ip, port, &dest);
     uv_connect_t *conn = new uv_connect_t();
     conn->data = hSession;
     uv_tcp_connect(conn, (uv_tcp_t *)&hSession->hWorkTCP, (const struct sockaddr *)&dest, Connect);
@@ -155,10 +155,10 @@ void HdcHostTCP::FindLanDaemon()
     i = count;
     while (--i) {
         uv_interface_address_t interface = info[i];
-        if (interface.address.address4.sin_family == AF_INET6) {
+        if (interface.address.address6.sin6_family == AF_INET6) {
             continue;
         }
-        uv_ip4_name(&interface.address.address4, ipAddr, sizeof(ipAddr));
+        uv_ip6_name(&interface.address.address6, ipAddr, sizeof(ipAddr));
         BroadcatFindDaemon(ipAddr);
     }
     uv_free_interface_addresses(info, count);
