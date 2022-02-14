@@ -74,9 +74,9 @@ void HdcServerForClient::AcceptClient(uv_stream_t *server, int status)
 void HdcServerForClient::SetTCPListen()
 {
     tcpListen.data = this;
-    struct sockaddr_in addr;
+    struct sockaddr_in6 addr;
     uv_tcp_init(loopMain, &tcpListen);
-    uv_ip4_addr(channelHost.c_str(), channelPort, &addr);
+    uv_ip6_addr(channelHost.c_str(), channelPort, &addr);
     uv_tcp_bind(&tcpListen, (const struct sockaddr *)&addr, 0);
     uv_listen((uv_stream_t *)&tcpListen, 128, (uv_connection_cb)AcceptClient);
 }
