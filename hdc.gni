@@ -16,6 +16,9 @@ declare_args() {
   hdc_debug = false
   hdc_host_hide_debug_win = true
   hdc_support_uart = true
+  if (is_mac) {
+    hdc_support_uart = false
+  }
   hdc_test_coverage = false
   hdc_jdwp_test = false
   js_jdwp_connect = true

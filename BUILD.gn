@@ -56,9 +56,6 @@ ohos_executable("hdcd") {
     "src/daemon/shell.cpp",
     "src/daemon/system_depend.cpp",
   ]
-  if (is_mac) {
-    hdc_support_uart = false
-  }
 
   sources += hdc_common_sources
 
@@ -121,7 +118,6 @@ ohos_executable("hdc_std") {
   ]
   if (is_mac) {
     defines += [ "HOST_MAC" ]
-    hdc_support_uart = false
   }
   if (hdc_debug) {
     defines += [ "HDC_DEBUG" ]
