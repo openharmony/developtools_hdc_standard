@@ -56,7 +56,6 @@ ohos_executable("hdcd") {
     "src/daemon/shell.cpp",
     "src/daemon/system_depend.cpp",
   ]
-
   sources += hdc_common_sources
 
   defines = [ "HARMONY_PROJECT" ]
