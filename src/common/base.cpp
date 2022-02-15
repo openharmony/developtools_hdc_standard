@@ -149,6 +149,7 @@ namespace Base {
     void LogToFile(const char *str)
     {
         string path = GetTmpDir() + LOG_FILE_NAME;
+        RollLogFile(path.c_str());
         LogToPath(path.c_str(), str);
     }
 
@@ -156,6 +157,30 @@ namespace Base {
     {
         string path = GetTmpDir() + LOG_CACHE_NAME;
         LogToPath(path.c_str(), str);
+    }
+
+    void RollLogFile(const char *path)
+    {
+        int value = -1;
+        uv_fs_t fs;
+        value = uv_fs_stat(nullptr, &fs, path, nullptr);
+        if (value != 0) {
+            PrintMessage("RollLogFile error log file %s not exist %s", path, uv_strerror(value));
+            return;
+        }
+        uint64_t size = fs.statbuf.st_size;
+        if (size < LOG_FILE_MAX_SIZE) {
+            return;
+        }
+        string last = StringFormat("%s.%d", path, 0);
+        value = uv_fs_unlink(nullptr, &fs, last.c_str(), nullptr);
+        if (value != 0) {
+            PrintMessage("RollLogFile error unlink last:%s %s", last.c_str(), uv_strerror(value));
+        }
+        value = uv_fs_rename(nullptr, &fs, path, last.c_str(), nullptr);
+        if (value != 0) {
+            PrintMessage("RollLogFile error rename %s to %s %s", path, last.c_str(), uv_strerror(value));
+        }
     }
 
     void PrintLogEx(const char *functionName, int line, uint8_t logLevel, const char *msg, ...)
