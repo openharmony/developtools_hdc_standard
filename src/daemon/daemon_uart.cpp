@@ -46,7 +46,7 @@ int HdcDaemonUART::Initial(const std::string &devPathIn)
         consoleActive = OHOS::TrimStr(consoleActive,'\n');
         WRITE_LOG(LOG_DEBUG, "consoleActive (%d):%s", consoleActive.length(),
                   consoleActive.c_str());
-        if (consoleActive == devPathIn) {
+        if (devPathIn.find(consoleActive.c_str()) != std::string::npos) {
             WRITE_LOG(LOG_FATAL,
                       "kernel use this dev(%s) as console , we can't open it as hdc uart dev",
                       devPathIn.c_str());
@@ -242,13 +242,17 @@ void HdcDaemonUART::DeamonReadThread()
     // use < not <= because if it full , should not read again
     while (isAlive && dataReadBuf.size() < MAX_READ_BUFFER) {
         ssize_t bytesRead = ReadUartDev(dataReadBuf, expectedSize, deamonUart);
-        if (bytesRead <= 0) {
+        if (bytesRead == 0) {
             WRITE_LOG(LOG_DEBUG, "%s read %zd, clean the data try read again.", __FUNCTION__,
                       bytesRead);
             // drop current cache
             expectedSize = 0;
             dataReadBuf.clear();
             continue;
+        } else if (bytesRead < 0) {
+            WRITE_LOG(LOG_DEBUG, "%s read abnormal, stop uart module.", __FUNCTION__);
+            Stop();
+            break;
         }
         WRITE_LOG(LOG_DEBUG, "DeamonReadThread bytesRead:%d, totalReadBytes.size():%d.", bytesRead,
                   dataReadBuf.size());
@@ -329,7 +333,7 @@ HdcDaemonUART::~HdcDaemonUART()
 
 void HdcDaemonUART::Stop()
 {
-    WRITE_LOG(LOG_DEBUG, "%s Stop!", __FUNCTION__);
+    WRITE_LOG(LOG_DEBUG, "%s run!", __FUNCTION__);
     if (!stopped) {
         stopped = true;
         std::lock_guard<std::mutex> lock(workThreadProcessingData);
@@ -339,13 +343,13 @@ void HdcDaemonUART::Stop()
         ResponseUartTrans(currentSessionId, 0, PKG_OPTION_FREE);
         EnsureAllPkgsSent();
         isAlive = false;
-        WRITE_LOG(LOG_DEBUG, "%s Stop free main session", __FUNCTION__);
+        WRITE_LOG(LOG_DEBUG, "%s free main session", __FUNCTION__);
         if (checkSerialPort.data != nullptr) {
             externInterface.TryCloseHandle((uv_handle_t *)&checkSerialPort);
             checkSerialPort.data = nullptr;
         }
         CloseUartDevice();
-        WRITE_LOG(LOG_DEBUG, "%s Stop free main session finish", __FUNCTION__);
+        WRITE_LOG(LOG_DEBUG, "%s free main session finish", __FUNCTION__);
     }
 }
 } // namespace Hdc
