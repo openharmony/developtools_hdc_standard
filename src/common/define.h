@@ -58,6 +58,7 @@ const string UT_TMP_PATH = "/tmp/hdc-ut";
 const string LOG_FILE_NAME = "hdc.log";
 const string LOG_BAK_NAME = "hdclast.log";
 const string LOG_CACHE_NAME = ".hdc.cache.log";
+constexpr uint64_t LOG_FILE_MAX_SIZE = 104857600;
 const string SERVER_NAME = "HDCServer";
 const string STRING_EMPTY = "";
 const string HANDSHAKE_MESSAGE = "OHOS HDC";  // sep not char '-', not more than 11 bytes
