@@ -361,8 +361,11 @@ int HdcHostUART::OpenSerialPort(const std::string &connectKey)
 #if defined HOST_LINUX
         uart.devUartHandle = open(portName.c_str(), O_RDWR | O_NOCTTY | O_NONBLOCK);
         if (uart.devUartHandle < 0) {
+            constexpr int bufSize = 1024;
+            char buf[bufSize] = { 0 };
+            strerror_r(errno, buf, bufSize);
             WRITE_LOG(LOG_WARN, "Linux open serial port faild,serialPort:%s, Message : %s",
-                      uart.serialPort.c_str(), strerror(errno));
+                      uart.serialPort.c_str(), buf);
             ret = ERR_GENERIC;
             break;
         }

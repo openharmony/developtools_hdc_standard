@@ -218,7 +218,10 @@ bool HdcJdwp::JdwpListen()
         uv_pipe_init(loop, &listenPipe, 0);
         listenPipe.data = this;
         if ((uv_pipe_bind(&listenPipe, jdwpCtrlName))) {
-            WRITE_LOG(LOG_WARN, "Bind error : %d: %s", errno, strerror(errno));
+            constexpr int bufSize = 1024;
+            char buf[bufSize] = { 0 };
+            strerror_r(errno, buf, bufSize);
+            WRITE_LOG(LOG_WARN, "Bind error : %d: %s", errno, buf);
             return 1;
         }
         if (uv_listen((uv_stream_t *)&listenPipe, DEFAULT_BACKLOG, AcceptClient)) {
