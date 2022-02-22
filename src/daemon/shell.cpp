@@ -140,7 +140,10 @@ int HdcShell::ShellFork(const char *cmd, const char *arg0, const char *arg1)
     pid_t pid;
     pid = fork();
     if (pid < 0) {
-        WRITE_LOG(LOG_DEBUG, "Fork shell failed:%s", strerror(errno));
+        constexpr int bufSize = 1024;
+        char buf[bufSize] = { 0 };
+        strerror_r(errno, buf, bufSize);
+        WRITE_LOG(LOG_DEBUG, "Fork shell failed:%s", buf);
         return ERR_GENERIC;
     }
     if (pid == 0) {
@@ -163,16 +166,25 @@ int HdcShell::CreateSubProcessPTY(const char *cmd, const char *arg0, const char 
 {
     ptm = open(devPTMX.c_str(), O_RDWR | O_CLOEXEC);
     if (ptm < 0) {
-        WRITE_LOG(LOG_DEBUG, "Cannot open ptmx, error:%s", strerror(errno));
+        constexpr int bufSize = 1024;
+        char buf[bufSize] = { 0 };
+        strerror_r(errno, buf, bufSize);
+        WRITE_LOG(LOG_DEBUG, "Cannot open ptmx, error:%s", buf);
         return ERR_FILE_OPEN;
     }
     if (grantpt(ptm) || unlockpt(ptm)) {
-        WRITE_LOG(LOG_DEBUG, "Cannot open2 ptmx, error:%s", strerror(errno));
+        constexpr int bufSize = 1024;
+        char buf[bufSize] = { 0 };
+        strerror_r(errno, buf, bufSize);
+        WRITE_LOG(LOG_DEBUG, "Cannot open2 ptmx, error:%s", buf);
         close(ptm);
         return ERR_API_FAIL;
     }
     if (ptsname_r(ptm, devname, sizeof(devname)) != 0) {
-        WRITE_LOG(LOG_DEBUG, "Trouble with  ptmx, error:%s", strerror(errno));
+        constexpr int bufSize = 1024;
+        char buf[bufSize] = { 0 };
+        strerror_r(errno, buf, bufSize);
+        WRITE_LOG(LOG_DEBUG, "Trouble with  ptmx, error:%s", buf);
         close(ptm);
         return ERR_API_FAIL;
     }

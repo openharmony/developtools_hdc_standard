@@ -446,7 +446,10 @@ void HdcDaemonUSB::OnUSBRead(uv_fs_t *req)
             // interrupts will increase the correctness of USB data reading. Setting GDB to asynchronous mode or using
             // log debugging can avoid this problem
             if (bytesIOBytes != -EINTR) {  // Epoll will be broken when gdb attach
-                WRITE_LOG(LOG_WARN, "USBIO ret:%d failed:%s", bytesIOBytes, uv_strerror(bytesIOBytes));
+                constexpr int bufSize = 1024;
+                char buf[bufSize] = { 0 };
+                uv_strerror_r(bytesIOBytes, buf, bufSize);
+                WRITE_LOG(LOG_WARN, "USBIO ret:%d failed:%s", bytesIOBytes, buf);
                 ret = false;
                 break;
             } else {

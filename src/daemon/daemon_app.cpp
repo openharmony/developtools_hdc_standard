@@ -144,9 +144,12 @@ void HdcDaemonApp::Sideload(const char *pathOTA)
 void HdcDaemonApp::WhenTransferFinish(CtxFile *context)
 {
     if (context->lastErrno > 0) {
+        constexpr int bufSize = 1024;
+        char buf[bufSize] = { 0 };
+        uv_strerror_r((int)(-context->lastErrno), buf, bufSize);
         WRITE_LOG(LOG_DEBUG, "HdcDaemonApp WhenTransferFinish with errno:%d", context->lastErrno);
         LogMsg(MSG_FAIL, "Transfer App at:%lld/%lld(Bytes), Reason: %s",
-               context->indexIO, context->fileSize, uv_strerror((int)(-context->lastErrno)));
+               context->indexIO, context->fileSize, buf);
         return;
     }
     if (ctxNow.transferConfig.functionName == CMDSTR_APP_SIDELOAD) {

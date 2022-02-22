@@ -119,8 +119,10 @@ int HdcDaemonUART::CloseUartDevice()
 {
     int ret = close(uartHandle);
     if (ret < 0) {
-        WRITE_LOG(LOG_FATAL, "DaemonUART stop for CloseBulkSpErrno: %d:%s\n", errno,
-                  strerror(errno));
+        constexpr int bufSize = 1024;
+        char buf[bufSize] = { 0 };
+        strerror_r(errno, buf, bufSize);
+        WRITE_LOG(LOG_FATAL, "DaemonUART stop for CloseBulkSpErrno: %d:%s\n", errno, buf);
     } else {
         uartHandle = -1;
     }

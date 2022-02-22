@@ -331,12 +331,26 @@ int HdcHostUSB::UsbToHdcProtocol(uv_stream_t *stream, uint8_t *appendData, int d
 
     while (index < dataSize) {
         if ((childRet = select(fd + 1, NULL, &fdSet, NULL, &timeout)) <= 0) {
-            WRITE_LOG(LOG_FATAL, "select error:%d [%s][%d]", errno, strerror(errno), childRet);
+            constexpr int bufSize = 1024;
+            char buf[bufSize] = { 0 };
+#ifdef _WIN32
+            strerror_s(buf, bufSize, errno);
+#else
+            strerror_r(errno, buf, bufSize);
+#endif
+            WRITE_LOG(LOG_FATAL, "select error:%d [%s][%d]", errno, buf, childRet);
             break;
         }
         childRet = send(fd, (const char *)appendData + index, dataSize - index, 0);
         if (childRet < 0) {
-            WRITE_LOG(LOG_FATAL, "UsbToHdcProtocol senddata err:%d [%s]", errno, strerror(errno));
+            constexpr int bufSize = 1024;
+            char buf[bufSize] = { 0 };
+#ifdef _WIN32
+            strerror_s(buf, bufSize, errno);
+#else
+            strerror_r(errno, buf, bufSize);
+#endif
+            WRITE_LOG(LOG_FATAL, "UsbToHdcProtocol senddata err:%d [%s]", errno, buf);
             break;
         }
         index += childRet;
