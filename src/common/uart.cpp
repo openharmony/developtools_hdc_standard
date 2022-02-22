@@ -119,7 +119,10 @@ int HdcUARTBase::SetSerial(int fd, int nSpeed, int nBits, char nEvent, int nStop
 {
     struct termios newttys1, oldttys1;
     if (tcgetattr(fd, &oldttys1) != 0) {
-        WRITE_LOG(LOG_DEBUG, "tcgetattr failed with %s\n", strerror(errno));
+        constexpr int bufSize = 1024;
+        char buf[bufSize] = { 0 };
+        strerror_r(errno, buf, bufSize);
+        WRITE_LOG(LOG_DEBUG, "tcgetattr failed with %s\n", buf);
         return ERR_GENERIC;
     }
     bzero(&newttys1, sizeof(newttys1));
@@ -307,7 +310,10 @@ ssize_t HdcUARTBase::WriteUartDev(uint8_t *data, const size_t length, HdcUART &u
             } else {
                 // we don't know how to recory in this function
                 // need reopen device ?
-                WRITE_LOG(LOG_FATAL, "write fatal errno %d:%s", errno, strerror(errno));
+                constexpr int bufSize = 1024;
+                char buf[bufSize] = { 0 };
+                strerror_r(errno, buf, bufSize);
+                WRITE_LOG(LOG_FATAL, "write fatal errno %d:%s", errno, buf);
                 return -1;
             }
         } else {
@@ -335,13 +341,27 @@ int HdcUARTBase::UartToHdcProtocol(uv_stream_t *stream, uint8_t *data, int dataS
     while (index < dataSize) {
         childRet = select(fd + 1, NULL, &fdSet, NULL, &timeout);
         if (childRet <= 0) {
+            constexpr int bufSize = 1024;
+            char buf[bufSize] = { 0 };
+#ifdef _WIN32
+            strerror_s(buf, bufSize, errno);
+#else
+            strerror_r(errno, buf, bufSize);
+#endif
             WRITE_LOG(LOG_FATAL, "%s select error:%d [%s][%d]", __FUNCTION__, errno,
-                      strerror(errno), childRet);
+                      buf, childRet);
             break;
         }
         childRet = send(fd, (const char *)data + index, dataSize - index, 0);
         if (childRet < 0) {
-            WRITE_LOG(LOG_FATAL, "%s senddata err:%d [%s]", __FUNCTION__, errno, strerror(errno));
+            constexpr int bufSize = 1024;
+            char buf[bufSize] = { 0 };
+#ifdef _WIN32
+            strerror_s(buf, bufSize, errno);
+#else
+            strerror_r(errno, buf, bufSize);
+#endif
+            WRITE_LOG(LOG_FATAL, "%s senddata err:%d [%s]", __FUNCTION__, errno, buf);
             break;
         }
         index += childRet;

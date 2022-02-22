@@ -80,7 +80,10 @@ void HdcTCPBase::ReadStream(uv_stream_t *tcp, ssize_t nread, const uv_buf_t *buf
         } else if (nread < 0) {
             // I originally in the IO main thread, no need to send asynchronous messages, close the socket as soon as
             // possible
-            WRITE_LOG(LOG_DEBUG, "HdcTCPBase::ReadStream < 0 %s", uv_strerror(nread));
+            constexpr int bufSize = 1024;
+            char buffer[bufSize] = { 0 };
+            uv_strerror_r((int)nread, buffer, bufSize);
+            WRITE_LOG(LOG_DEBUG, "HdcTCPBase::ReadStream < 0 %s", buffer);
             break;
         }
         if (hSessionBase->FetchIOBuf(hSession, hSession->ioBuf, nread) < 0) {

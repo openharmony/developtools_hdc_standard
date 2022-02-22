@@ -815,7 +815,10 @@ int HdcSessionBase::FetchIOBuf(HSession hSession, uint8_t *ioBuf, int read)
     int indexBuf = 0;
     int childRet = 0;
     if (read < 0) {
-        WRITE_LOG(LOG_FATAL, "HdcSessionBase read io failed,%s", uv_strerror(read));
+        constexpr int bufSize = 1024;
+        char buf[bufSize] = { 0 };
+        uv_strerror_r(read, buf, bufSize);
+        WRITE_LOG(LOG_FATAL, "HdcSessionBase read io failed,%s", buf);
         return ERR_IO_FAIL;
     }
     hSession->availTailIndex += read;
@@ -894,7 +897,10 @@ void HdcSessionBase::ReadCtrlFromSession(uv_stream_t *uvpipe, ssize_t nread, con
     HdcSessionBase *hSessionBase = (HdcSessionBase *)hSession->classInstance;
     while (true) {
         if (nread < 0) {
-            WRITE_LOG(LOG_DEBUG, "SessionCtrl failed,%s", uv_strerror(nread));
+            constexpr int bufSize = 1024;
+            char buffer[bufSize] = { 0 };
+            uv_strerror_r((int)nread, buffer, bufSize);
+            WRITE_LOG(LOG_DEBUG, "SessionCtrl failed,%s", buf);
             uv_read_stop(uvpipe);
             break;
         }
@@ -922,7 +928,10 @@ bool HdcSessionBase::WorkThreadStartSession(HSession hSession)
             return false;
         }
         if ((childRet = uv_tcp_open(&hSession->hChildWorkTCP, hSession->fdChildWorkTCP)) < 0) {
-            WRITE_LOG(LOG_DEBUG, "SessionCtrl failed 2,fd:%d,str:%s", hSession->fdChildWorkTCP, uv_strerror(childRet));
+            constexpr int bufSize = 1024;
+            char buf[bufSize] = { 0 };
+            uv_strerror_r(childRet, buf, bufSize);
+            WRITE_LOG(LOG_DEBUG, "SessionCtrl failed 2,fd:%d,str:%s", hSession->fdChildWorkTCP, buf);
             return false;
         }
         Base::SetTcpOptions((uv_tcp_t *)&hSession->hChildWorkTCP);
@@ -1042,7 +1051,10 @@ void HdcSessionBase::ReadCtrlFromMain(uv_stream_t *uvpipe, ssize_t nread, const 
     bool ret = true;
     while (true) {
         if (nread < 0) {
-            WRITE_LOG(LOG_DEBUG, "SessionCtrl failed,%s", uv_strerror(nread));
+            constexpr int bufSize = 1024;
+            char buffer[bufSize] = { 0 };
+            uv_strerror_r((int)nread, buffer, bufSize);
+            WRITE_LOG(LOG_DEBUG, "SessionCtrl failed,%s", buffer);
             ret = false;
             break;
         }
@@ -1093,10 +1105,16 @@ void HdcSessionBase::SessionWorkThread(uv_work_t *arg)
     uv_loop_init(&hSession->childLoop);
     hSession->hWorkChildThread = uv_thread_self();
     if ((childRet = uv_tcp_init(&hSession->childLoop, &hSession->ctrlPipe[STREAM_WORK])) < 0) {
-        WRITE_LOG(LOG_DEBUG, "SessionCtrl err1, %s", uv_strerror(childRet));
+        constexpr int bufSize = 1024;
+        char buf[bufSize] = { 0 };
+        uv_strerror_r(childRet, buf, bufSize);
+        WRITE_LOG(LOG_DEBUG, "SessionCtrl err1, %s", buf);
     }
     if ((childRet = uv_tcp_open(&hSession->ctrlPipe[STREAM_WORK], hSession->ctrlFd[STREAM_WORK])) < 0) {
-        WRITE_LOG(LOG_DEBUG, "SessionCtrl err2, %s fd:%d", uv_strerror(childRet), hSession->ctrlFd[STREAM_WORK]);
+        constexpr int bufSize = 1024;
+        char buf[bufSize] = { 0 };
+        uv_strerror_r(childRet, buf, bufSize);
+        WRITE_LOG(LOG_DEBUG, "SessionCtrl err2, %s fd:%d", buf, hSession->ctrlFd[STREAM_WORK]);
     }
     uv_read_start((uv_stream_t *)&hSession->ctrlPipe[STREAM_WORK], Base::AllocBufferCallback, ReadCtrlFromMain);
     WRITE_LOG(LOG_DEBUG, "!!!Workthread run begin, sessionId:%u instance:%s", hSession->sessionId,

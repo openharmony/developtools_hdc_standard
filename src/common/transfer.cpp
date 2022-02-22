@@ -192,7 +192,10 @@ void HdcTransferBase::OnFileIO(uv_fs_t *req)
             break;
         }
         if (req->result < 0) {
-            WRITE_LOG(LOG_DEBUG, "OnFileIO error: %s", uv_strerror((int)req->result));
+            constexpr int bufSize = 1024;
+            char buf[bufSize] = { 0 };
+            uv_strerror_r((int)req->result, buf, bufSize);
+            WRITE_LOG(LOG_DEBUG, "OnFileIO error: %s", buf);
             context->closeNotify = true;
             context->lastErrno = abs(req->result);
             context->ioFinish = true;
@@ -252,7 +255,10 @@ void HdcTransferBase::OnFileOpen(uv_fs_t *req)
     WRITE_LOG(LOG_DEBUG, "Filemod openfile:%s", context->localPath.c_str());
     --thisClass->refCount;
     if (req->result < 0) {
-        thisClass->LogMsg(MSG_FAIL, "Error opening file: %s, path:%s", uv_strerror((int)req->result),
+        constexpr int bufSize = 1024;
+        char buf[bufSize] = { 0 };
+        uv_strerror_r((int)req->result, buf, bufSize);
+        thisClass->LogMsg(MSG_FAIL, "Error opening file: %s, path:%s", buf,
                           context->localPath.c_str());
         thisClass->TaskFinish();
         return;

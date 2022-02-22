@@ -128,8 +128,11 @@ void HdcFile::TransferSummary(CtxFile *context)
     if (context->indexIO >= context->fileSize) {
         LogMsg(MSG_OK, "FileTransfer finish, Size:%lld time:%lldms rate:%.2lfkB/s", context->indexIO, nMSec, fRate);
     } else {
+        constexpr int bufSize = 1024;
+        char buf[bufSize] = { 0 };
+        uv_strerror_r((int)(-context->lastErrno), buf, bufSize);
         LogMsg(MSG_FAIL, "Transfer Stop at:%lld/%lld(Bytes), Reason: %s", context->indexIO, context->fileSize,
-               uv_strerror((int)(-context->lastErrno)));
+               buf);
     }
 }
 
