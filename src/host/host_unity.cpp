@@ -83,7 +83,10 @@ void HdcHostUnity::OnFileIO(uv_fs_t *req)
     while (true) {
         if (req->result <= 0) {
             if (req->result < 0) {
-                WRITE_LOG(LOG_DEBUG, "Error OnFileIO: %s", uv_strerror((int)req->result));
+                constexpr int bufSize = 1024;
+                char buf[bufSize] = { 0 };
+                uv_strerror_r((int)req->result, buf, bufSize);
+                WRITE_LOG(LOG_DEBUG, "Error OnFileIO: %s", buf);
             }
             break;
         }

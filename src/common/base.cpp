@@ -165,7 +165,10 @@ namespace Base {
         uv_fs_t fs;
         value = uv_fs_stat(nullptr, &fs, path, nullptr);
         if (value != 0) {
-            PrintMessage("RollLogFile error log file %s not exist %s", path, uv_strerror(value));
+            constexpr int bufSize = 1024;
+            char buf[bufSize] = { 0 };
+            uv_strerror_r(value, buf, bufSize);
+            PrintMessage("RollLogFile error log file %s not exist %s", path, buf);
             return;
         }
         uint64_t size = fs.statbuf.st_size;
@@ -175,11 +178,17 @@ namespace Base {
         string last = StringFormat("%s.%d", path, 0);
         value = uv_fs_unlink(nullptr, &fs, last.c_str(), nullptr);
         if (value != 0) {
-            PrintMessage("RollLogFile error unlink last:%s %s", last.c_str(), uv_strerror(value));
+            constexpr int bufSize = 1024;
+            char buf[bufSize] = { 0 };
+            uv_strerror_r(value, buf, bufSize);
+            PrintMessage("RollLogFile error unlink last:%s %s", last.c_str(), buf);
         }
         value = uv_fs_rename(nullptr, &fs, path, last.c_str(), nullptr);
         if (value != 0) {
-            PrintMessage("RollLogFile error rename %s to %s %s", path, last.c_str(), uv_strerror(value));
+            constexpr int bufSize = 1024;
+            char buf[bufSize] = { 0 };
+            uv_strerror_r(value, buf, bufSize);
+            PrintMessage("RollLogFile error rename %s to %s %s", path, last.c_str(), buf);
         }
     }
 
@@ -291,7 +300,10 @@ namespace Base {
     void SendCallback(uv_write_t *req, int status)
     {
         if (status < 0) {
-            WRITE_LOG(LOG_WARN, "SendCallback failed,status:%d %s", status, uv_strerror(status));
+            constexpr int bufSize = 1024;
+            char buf[bufSize] = { 0 };
+            uv_strerror_r(status, buf, bufSize);
+            WRITE_LOG(LOG_WARN, "SendCallback failed,status:%d %s", status, buf);
         }
         delete[]((uint8_t *)req->data);
         delete req;
@@ -848,7 +860,10 @@ namespace Base {
                 if (fcntl(fds[i], F_SETFD, FD_CLOEXEC) == -1) {
                     close(fds[0]);
                     close(fds[1]);
-                    WRITE_LOG(LOG_WARN, "fcntl failed to set FD_CLOEXEC: %s", strerror(errno));
+                    constexpr int bufSize = 1024;
+                    char buf[bufSize] = { 0 };
+                    strerror_r(errno, buf, bufSize);
+                    WRITE_LOG(LOG_WARN, "fcntl failed to set FD_CLOEXEC: %s", buf);
                     return -1;
                 }
             }
@@ -966,7 +981,10 @@ namespace Base {
             mode_t mode;
             int r = uv_fs_lstat(nullptr, &req, localPath, nullptr);
             if (r) {
-                BuildErrorString(localPath, "lstat", uv_strerror(req.result), errStr);
+                constexpr int bufSize = 1024;
+                char buf[bufSize] = { 0 };
+                uv_strerror_r((int)req.result, buf, bufSize);
+                BuildErrorString(localPath, "lstat", buf, errStr);
             }
 
             mode = req.statbuf.st_mode;
@@ -976,7 +994,10 @@ namespace Base {
                 uv_fs_access(nullptr, &req, localPath, readWrite ? R_OK : W_OK, nullptr);
                 if (req.result) {
                     const char *op = readWrite ? "access R_OK" : "access W_OK";
-                    BuildErrorString(localPath, op, uv_strerror(req.result), errStr);
+                    constexpr int bufSize = 1024;
+                    char buf[bufSize] = { 0 };
+                    uv_strerror_r((int)req.result, buf, bufSize);
+                    BuildErrorString(localPath, op, buf, errStr);
                 }
                 uv_fs_req_cleanup(&req);
                 if (req.result == 0)
