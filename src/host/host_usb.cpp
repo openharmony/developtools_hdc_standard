@@ -20,9 +20,6 @@ HdcHostUSB::HdcHostUSB(const bool serverOrDaemonIn, void *ptrMainBase, void *ctx
     : HdcUSBBase(serverOrDaemonIn, ptrMainBase)
 {
     modRunning = false;
-    if (!ctxUSBin) {
-        return;
-    }
     HdcServer *pServer = (HdcServer *)ptrMainBase;
     ctxUSB = (libusb_context *)ctxUSBin;
     uv_timer_init(&pServer->loopMain, &devListWatcher);
@@ -59,7 +56,11 @@ int HdcHostUSB::Initial()
 
 bool HdcHostUSB::DetectMyNeed(libusb_device *device, string &sn)
 {
-    HUSB hUSB = new HdcUSB();
+    HUSB hUSB = new(std::nothrow) HdcUSB();
+    if (hUSB == nullptr) {
+        WRITE_LOG(LOG_FATAL, "DetectMyNeed new hUSB failed");
+        return false;
+    }
     hUSB->device = device;
     // just get usb SN, close handle immediately
     int childRet = OpenDeviceMyNeed(hUSB);
@@ -79,7 +80,12 @@ bool HdcHostUSB::DetectMyNeed(libusb_device *device, string &sn)
     HdcServer *hdcServer = (HdcServer *)clsMainBase;
     HSession hSession = hdcServer->MallocSession(true, CONN_USB, this);
     hSession->connectKey = hUSB->serialNumber;
-    uv_timer_t *waitTimeDoCmd = new uv_timer_t;
+    uv_timer_t *waitTimeDoCmd = new(std::nothrow) uv_timer_t;
+    if (waitTimeDoCmd == nullptr) {
+        WRITE_LOG(LOG_FATAL, "DetectMyNeed new waitTimeDoCmd failed");
+        delete hUSB;
+        return false;
+    }
     uv_timer_init(&hdcServer->loopMain, waitTimeDoCmd);
     waitTimeDoCmd->data = hSession;
     uv_timer_start(waitTimeDoCmd, hdcServer->UsbPreConnect, 0, DEVICE_CHECK_INTERVAL);
@@ -183,8 +189,8 @@ int HdcHostUSB::CheckDescriptor(HUSB hUSB)
     char serialNum[BUF_SIZE_MEDIUM] = "";
     int childRet = 0;
     struct libusb_device_descriptor desc;
-    int curBus = libusb_get_bus_number(hUSB->device);
-    int curDev = libusb_get_device_address(hUSB->device);
+    uint8_t curBus = libusb_get_bus_number(hUSB->device);
+    uint8_t curDev = libusb_get_device_address(hUSB->device);
     hUSB->busId = curBus;
     hUSB->devId = curDev;
     if (libusb_get_device_descriptor(hUSB->device, &desc)) {

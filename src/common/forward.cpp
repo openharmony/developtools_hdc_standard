@@ -245,7 +245,10 @@ void HdcForwardBase::ConnectTarget(uv_connect_t *connection, int status)
     HdcForwardBase *thisClass = ctx->thisClass;
     delete connection;
     if (status < 0) {
-        WRITE_LOG(LOG_WARN, "Forward connect result:%d error:%s", status, uv_err_name(status));
+        constexpr int bufSize = 1024;
+        char buf[bufSize] = { 0 };
+        uv_err_name_r(status, buf, bufSize);
+        WRITE_LOG(LOG_WARN, "Forward connect result:%d error:%s", status, buf);
     }
     thisClass->SetupPointContinue(ctx, status);
 }
@@ -343,7 +346,11 @@ bool HdcForwardBase::SetupTCPPoint(HCtxForward ctxPoint)
         }
     } else {
         uv_ip4_addr("127.0.0.1", port, &addr);  // loop interface
-        uv_connect_t *conn = new uv_connect_t();
+        uv_connect_t *conn = new(std::nothrow) uv_connect_t();
+        if (conn == nullptr) {
+            WRITE_LOG(LOG_FATAL, "SetupTCPPoint new conn failed");
+            return false;
+        }
         conn->data = ctxPoint;
         uv_tcp_connect(conn, (uv_tcp_t *)&ctxPoint->tcp, (const struct sockaddr *)&addr, ConnectTarget);
     }
@@ -369,7 +376,11 @@ bool HdcForwardBase::SetupDevicePoint(HCtxForward ctxPoint)
         FreeContext(ctx, 0, true);
         return false;
     };
-    ctxPoint->fdClass = new HdcFileDescriptor(loopTask, ctxPoint->fd, ctxPoint, funcRead, funcFinish);
+    ctxPoint->fdClass = new(std::nothrow) HdcFileDescriptor(loopTask, ctxPoint->fd, ctxPoint, funcRead, funcFinish);
+    if (ctxPoint->fdClass == nullptr) {
+        WRITE_LOG(LOG_FATAL, "SetupDevicePoint new ctxPoint->fdClass failed");
+        return false;
+    }
     SetupPointContinue(ctxPoint, flag);
     return true;
 }
@@ -435,7 +446,11 @@ bool HdcForwardBase::SetupFilePoint(HCtxForward ctxPoint)
                 return false;
             }
         } else {
-            uv_connect_t *connect = new uv_connect_t();
+            uv_connect_t *connect = new(std::nothrow) uv_connect_t();
+            if (connect == nullptr) {
+                WRITE_LOG(LOG_FATAL, "SetupFilePoint new connect failed");
+                return false;
+            }
             connect->data = ctxPoint;
             uv_pipe_connect(connect, &ctxPoint->pipe, sNodeCfg.c_str(), ConnectTarget);
         }
@@ -502,6 +517,10 @@ bool HdcForwardBase::BeginForward(const string &command, string &sError)
         return false;
     }
     char **argv = Base::SplitCommandToArgs(command.c_str(), &argc);
+    if (argv == nullptr) {
+        WRITE_LOG(LOG_FATAL, "SplitCommandToArgs failed");
+        return false;
+    }
     while (true) {
         if (argc < CMD_ARG1_COUNT) {
             break;
@@ -533,9 +552,7 @@ bool HdcForwardBase::BeginForward(const string &command, string &sError)
             taskCommand = command;
         }
     }
-    if (argv) {
-        delete[]((char *)argv);
-    }
+    delete[]((char *)argv);
     return ret;
 }
 

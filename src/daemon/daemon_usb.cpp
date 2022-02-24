@@ -262,7 +262,11 @@ int HdcDaemonUSB::CloseBulkEp(bool bulkInOut, int bulkFd, uv_loop_t *loop)
         HdcDaemonUSB *thisClass;
         bool bulkInOut;
     };
-    CtxCloseBulkEp *ctx = new CtxCloseBulkEp();
+    CtxCloseBulkEp *ctx = new(std::nothrow) CtxCloseBulkEp();
+    if (ctx == nullptr) {
+        WRITE_LOG(LOG_FATAL, "CloseBulkEp new ctx failed");
+        return -1;
+    }
     uv_fs_t *req = &ctx->req;
     req->data = ctx;
     ctx->bulkInOut = bulkInOut;
