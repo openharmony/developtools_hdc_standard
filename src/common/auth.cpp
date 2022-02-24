@@ -60,7 +60,7 @@ struct RSAPublicKey {
     uint32_t rsaN0inv;              // -1 / n[0] mod 2^32
     uint32_t modulus[RSANUMWORDS];  // modulus as little endian array
     uint32_t rr[RSANUMWORDS];       // R^2 as little endian array
-    int exponent;                   // 3 or 65537
+    BN_ULONG exponent;                   // 3 or 65537
 };
 
 #ifdef HDC_HOST
@@ -251,7 +251,8 @@ int GetUserKeyPath(string &path)
     // $home
     if (uv_os_homedir(buf, &len) < 0)
         return false;
-    path = string(buf) + Base::GetPathSep() + string(harmoneyPath) + Base::GetPathSep();
+    string dir = string(buf) + Base::GetPathSep() + string(harmoneyPath) + Base::GetPathSep();
+    path = Base::CanonicalizeSpecPath(dir);
     if (stat(path.c_str(), &status)) {
         uv_fs_t req;
         uv_fs_mkdir(nullptr, &req, path.c_str(), 0750, nullptr);  // 0750:permission

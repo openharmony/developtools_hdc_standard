@@ -54,15 +54,19 @@ int HdcDaemonUART::Initial(const std::string &devPathIn)
         }
     }
 #endif
+    constexpr int bufSize = 1024;
+    char buf[bufSize] = { 0 };
     const uint16_t uartScanInterval = 1500;
     ret = uv_timer_init(&daemon.loopMain, &checkSerialPort);
     if (ret != 0) {
-        WRITE_LOG(LOG_FATAL, "uv_timer_init failed %s", uv_err_name(ret));
+        uv_err_name_r(ret, buf, bufSize);
+        WRITE_LOG(LOG_FATAL, "uv_timer_init failed %s", buf);
     } else {
         checkSerialPort.data = this;
         ret = uv_timer_start(&checkSerialPort, UvWatchTimer, 0, uartScanInterval);
         if (ret != 0) {
-            WRITE_LOG(LOG_FATAL, "uv_timer_start failed %s", uv_err_name(ret));
+            uv_err_name_r(ret, buf, bufSize);
+            WRITE_LOG(LOG_FATAL, "uv_timer_start failed %s", buf);
         } else {
             return 0;
         }

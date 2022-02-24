@@ -247,6 +247,7 @@ struct HostUSBEndpoint {
         transfer = libusb_alloc_transfer(0);
         isShutdown = true;
         isComplete = true;
+        (void)memset_s(buf, sizeEpBuf, 0, sizeEpBuf);
     }
     ~HostUSBEndpoint()
     {
@@ -374,6 +375,18 @@ struct HdcSession {
         oss << " connType:" << unsigned(connType);
         oss << " ]";
         return oss.str();
+    }
+
+    ~HdcSession()
+    {
+        if (mapTask) {
+            delete mapTask;
+            mapTask = nullptr;
+        }
+        if (listKey) {
+            delete listKey;
+            listKey = nullptr;
+        }
     }
 };
 using HSession = struct HdcSession *;

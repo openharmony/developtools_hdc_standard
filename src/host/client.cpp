@@ -21,6 +21,9 @@ HdcClient::HdcClient(const bool serverOrClient, const string &addrString, uv_loo
 {
     MallocChannel(&channel);  // free by logic
     debugRetryCount = 0;
+#ifndef _WIN32
+    Base::ZeroStruct(terminalState);
+#endif
 }
 
 HdcClient::~HdcClient()
@@ -183,7 +186,11 @@ int HdcClient::ConnectServerForClient(const char *ip, uint16_t port)
     WRITE_LOG(LOG_DEBUG, "Try to connect %s:%d", ip, port);
     struct sockaddr_in dest;
     uv_ip4_addr(ip, port, &dest);
-    uv_connect_t *conn = new uv_connect_t();
+    uv_connect_t *conn = new(std::nothrow) uv_connect_t();
+    if (conn == nullptr) {
+        WRITE_LOG(LOG_FATAL, "ConnectServerForClient new conn failed");
+        return ERR_GENERIC;
+    }
     conn->data = this;
     uv_tcp_connect(conn, (uv_tcp_t *)&channel->hWorkTCP, (const struct sockaddr *)&dest, Connect);
     return 0;

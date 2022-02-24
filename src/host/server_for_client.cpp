@@ -634,6 +634,7 @@ int HdcServerForClient::ReadChannel(HChannel hChannel, uint8_t *bufPtr, const in
                 EchoClient(hChannel, MSG_FAIL, retEcho.c_str());
             }
         }
+        WRITE_LOG(LOG_DEBUG, "ReadChannel command: %s", bufPtr);
         if (formatCommand.bJumpDo) {
             ret = -10;
             return ret;

@@ -94,23 +94,39 @@ void HdcDaemon::InitMod(bool bEnableTCP, bool bEnableUSB)
 #endif
     if (bEnableTCP) {
         // tcp
-        clsTCPServ = new HdcDaemonTCP(false, this);
+        clsTCPServ = new(std::nothrow) HdcDaemonTCP(false, this);
+        if (clsTCPServ == nullptr) {
+            WRITE_LOG(LOG_FATAL, "InitMod new clsTCPServ failed");
+            return;
+        }
         ((HdcDaemonTCP *)clsTCPServ)->Initial();
     }
     if (bEnableUSB) {
         // usb
-        clsUSBServ = new HdcDaemonUSB(false, this);
+        clsUSBServ = new(std::nothrow) HdcDaemonUSB(false, this);
+        if (clsUSBServ == nullptr) {
+            WRITE_LOG(LOG_FATAL, "InitMod new clsUSBServ failed");
+            return;
+        }
         ((HdcDaemonUSB *)clsUSBServ)->Initial();
     }
 #ifdef HDC_SUPPORT_UART
     WRITE_LOG(LOG_DEBUG, "bEnableUART:%d", bEnableUART);
     if (bEnableUART) {
         // UART
-        clsUARTServ = new HdcDaemonUART(*this);
+        clsUARTServ = new(std::nothrow) HdcDaemonUART(*this);
+        if (clsUARTServ == nullptr) {
+            WRITE_LOG(LOG_FATAL, "InitMod new clsUARTServ failed");
+            return;
+        }
         ((HdcDaemonUART *)clsUARTServ)->Initial();
     }
 #endif
-    clsJdwp = new HdcJdwp(&loopMain);
+    clsJdwp = new(std::nothrow) HdcJdwp(&loopMain);
+    if (clsJdwp == nullptr) {
+        WRITE_LOG(LOG_FATAL, "InitMod new clsJdwp failed");
+        return;
+    }
     ((HdcJdwp *)clsJdwp)->Initial();
     // enable security
     string secure;

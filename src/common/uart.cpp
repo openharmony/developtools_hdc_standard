@@ -72,6 +72,7 @@ bool ExternInterface::DelayDo(uv_loop_t *loop, const int delayMs, const uint8_t 
 HdcUARTBase::HdcUARTBase(HdcSessionBase &sessionBaseIn, ExternInterface &interfaceIn)
     : externInterface(interfaceIn), sessionBase(sessionBaseIn)
 {
+    uartOpened = false;
 }
 
 HdcUARTBase::~HdcUARTBase(void) {}
@@ -467,7 +468,7 @@ bool HdcUARTBase::SendUARTRaw(HSession hSession, uint8_t *data, const size_t len
     if (uartHeader->IsResponsePackage()) {
         // for the response package and in daemon side,
         // we dont need seesion info
-        size_t sendBytes = WriteUartDev(data, length, deamonUart);
+        ssize_t sendBytes = WriteUartDev(data, length, deamonUart);
         return sendBytes > 0;
     }
 #endif
@@ -484,9 +485,9 @@ bool HdcUARTBase::SendUARTRaw(HSession hSession, uint8_t *data, const size_t len
     hSession->ref++;
     WRITE_LOG(LOG_DEBUG, "%s length:%d", __FUNCTION__, length);
 #ifdef HDC_HOST
-    size_t sendBytes = WriteUartDev(data, length, *hSession->hUART);
+    ssize_t sendBytes = WriteUartDev(data, length, *hSession->hUART);
 #else
-    size_t sendBytes = WriteUartDev(data, length, deamonUart);
+    ssize_t sendBytes = WriteUartDev(data, length, deamonUart);
 #endif
     WRITE_LOG(LOG_DEBUG, "%s sendBytes %zu", __FUNCTION__, sendBytes);
     if (sendBytes < 0) {
@@ -862,7 +863,7 @@ int HdcUARTBase::SendUARTData(HSession hSession, uint8_t *data, const size_t len
         uint8_t *payload = sendDataBuf + sizeof(UartHead);
         if (EOK !=
             memcpy_s(payload, packageDataMaxSize, (uint8_t *)data + offset, head->dataSize)) {
-            WRITE_LOG(LOG_FATAL, "memcpy_s failed %p max %zu , need %zu", payload,
+            WRITE_LOG(LOG_FATAL, "memcpy_s failed max %zu , need %zu",
                       packageDataMaxSize, head->dataSize);
             return ERR_BUF_COPY;
         }
@@ -881,8 +882,13 @@ void HdcUARTBase::ReadDataFromUARTStream(uv_stream_t *stream, ssize_t nread, con
     HdcUARTBase *hUARTBase = (HdcUARTBase *)hSession->classModule;
     std::lock_guard<std::mutex> lock(hUARTBase->workThreadProcessingData);
 
+    constexpr int bufSize = 1024;
+    char buffer[bufSize] = { 0 };
+    if (nread < 0) {
+        uv_err_name_r(nread, buffer, bufSize);
+    }
     WRITE_LOG(LOG_DEBUG, "%s sessionId:%u, nread:%zd %s streamSize %zu", __FUNCTION__,
-              hSession->sessionId, nread, (nread < 0 ? uv_err_name(nread) : ""),
+              hSession->sessionId, nread, buffer,
               hSession->hUART->streamSize.load());
     HdcSessionBase *hSessionBase = (HdcSessionBase *)hSession->classInstance;
     if (nread <= 0 or nread > signed(hSession->hUART->streamSize)) {

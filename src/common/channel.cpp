@@ -113,7 +113,10 @@ void HdcChannelBase::ReadStream(uv_stream_t *tcp, ssize_t nread, const uv_buf_t 
         return;
     } else if (nread < 0) {
         Base::TryCloseHandle((uv_handle_t *)tcp);
-        WRITE_LOG(LOG_DEBUG, "HdcChannelBase::ReadStream failed2:%s", uv_err_name(nread));
+        constexpr int bufSize = 1024;
+        char buffer[bufSize] = { 0 };
+        uv_err_name_r(nread, buffer, bufSize);
+        WRITE_LOG(LOG_DEBUG, "HdcChannelBase::ReadStream failed2:%s", buffer);
         needExit = true;
         goto Finish;
     } else {

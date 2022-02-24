@@ -34,7 +34,7 @@ void HdcHostTCP::Stop()
 void HdcHostTCP::RecvUDPEntry(const sockaddr *addrSrc, uv_udp_t *handle, const uv_buf_t *rcvbuf)
 {
     char bufString[BUF_SIZE_TINY];
-    uint16_t port = 0;
+    int port = 0;
     char *p = strstr(rcvbuf->base, "-");
     if (!p) {
         return;
@@ -136,7 +136,13 @@ HSession HdcHostTCP::ConnectDaemon(const string &connectKey)
     hSession->connectKey = connectKey;
     struct sockaddr_in6 dest;
     uv_ip6_addr(ip, port, &dest);
-    uv_connect_t *conn = new uv_connect_t();
+    uv_connect_t *conn = new(std::nothrow) uv_connect_t();
+    if (conn == nullptr) {
+        WRITE_LOG(LOG_FATAL, "ConnectDaemon new conn failed");
+        delete hSession;
+        hSession = nullptr;
+        return nullptr;
+    }
     conn->data = hSession;
     uv_tcp_connect(conn, (uv_tcp_t *)&hSession->hWorkTCP, (const struct sockaddr *)&dest, Connect);
     return hSession;
