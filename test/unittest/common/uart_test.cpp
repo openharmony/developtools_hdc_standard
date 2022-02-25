@@ -418,6 +418,7 @@ HWTEST_F(HdcUARTBaseTest, ReadyForWorkThread, TestSize.Level1)
     session.classInstance = &sessionBase;
     auto loop = &session.childLoop;
     auto tcp = &session.dataPipe[STREAM_WORK];
+    session.dataFd[STREAM_WORK] = rnd();
     auto socket = session.dataFd[STREAM_WORK];
     auto alloc = sessionBase.AllocCallback;
     auto cb = HdcUARTBase::ReadDataFromUARTStream;
