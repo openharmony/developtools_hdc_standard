@@ -634,6 +634,7 @@ int HdcServerForClient::ReadChannel(HChannel hChannel, uint8_t *bufPtr, const in
                 EchoClient(hChannel, MSG_FAIL, retEcho.c_str());
             }
         }
+        WRITE_LOG(LOG_DEBUG, "ReadChannel command: %s", bufPtr);
         if (formatCommand.bJumpDo) {
             ret = -10;
             return ret;
@@ -642,6 +643,7 @@ int HdcServerForClient::ReadChannel(HChannel hChannel, uint8_t *bufPtr, const in
         formatCommand.parameters = string(reinterpret_cast<char *>(bufPtr), bytesIO);
         formatCommand.cmdFlag = CMD_SHELL_DATA;
     }
+
     if (!DoCommand(hChannel, &formatCommand)) {
         return -3;  // -3: error or want close
     }

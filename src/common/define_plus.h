@@ -76,7 +76,8 @@ enum OperateID {
     OP_UPDATE,
     OP_CLEAR,
     OP_INIT,
-    OP_GET_ONLY
+    OP_GET_ONLY,
+    OP_VOTE_RESET
 };
 
 enum RetErrCode {
@@ -233,6 +234,7 @@ struct TaskInformation {
     uv_loop_t *runLoop;
     void *taskClass;
     void *ownerSessionClass;
+    uint32_t closeRetryCount;
 };
 using HTaskInfo = TaskInformation *;
 
@@ -325,6 +327,7 @@ struct HdcSession {
     bool serverOrDaemon;  // instance of daemon or server
     bool handshakeOK;     // Is an expected peer side
     bool isDead;
+    bool voteReset;
     string connectKey;
     uint8_t connType;  // ConnType
     uint32_t sessionId;
