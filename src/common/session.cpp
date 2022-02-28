@@ -259,7 +259,7 @@ void HdcSessionBase::AsyncMainLoopTask(uv_idle_t *handle)
     switch (param->method) {
         case ASYNC_FREE_SESSION:
             // Destruction is unified in the main thread
-            thisClass->FreeSession(param->sid);  // todo Double lock
+            thisClass->FreeSession(param->sid);
             break;
         case ASYNC_STOP_MAINLOOP:
             uv_stop(&thisClass->loopMain);
