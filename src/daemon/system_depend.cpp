@@ -75,7 +75,6 @@ namespace SystemDepend {
 #ifdef HARMONY_PROJECT
         return DoReboot(reason);
 #else
-        // todo
         return false;
 #endif
     }
