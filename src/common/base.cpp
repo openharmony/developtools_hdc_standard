@@ -537,7 +537,11 @@ namespace Base {
             return nullptr;
         }
         i = ((len + extraBufSize) / extraBufSize) * sizeof(void *) + sizeof(void *);
-        argv = reinterpret_cast<char **>(new char[i + (len + extraBufSize) * sizeof(char)]);
+        argv = reinterpret_cast<char **>(new(std::nothrow) char[i + (len + extraBufSize) * sizeof(char)]);
+        if (argv == nullptr) {
+            WRITE_LOG(LOG_FATAL, "SplitCommandToArgs new argv failed");
+            return nullptr;
+        }
         temp = reinterpret_cast<char *>((reinterpret_cast<uint8_t *>(argv)) + i);
         argc = 0;
         argv[argc] = temp;

@@ -38,7 +38,7 @@ public:
     bool Initial(uv_loop_t *loopIn, const CmdResultCallback callback, uint32_t optionsIn = 0);
     void DoRelease();  // Release process resources
     bool ExecuteCommand(const string &command);
-    bool ReadyForRelease() const;
+    bool ReadyForRelease();
 
 private:
     static bool FinishShellProc(const void *context, const bool result, const string exitMsg);

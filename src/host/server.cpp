@@ -158,7 +158,10 @@ bool HdcServer::PullupServer(const char *listenString)
     size_t nPathSize = sizeof(path);
     int ret = uv_exepath(path, &nPathSize);
     if (ret < 0) {
-        WRITE_LOG(LOG_WARN, "uvexepath ret:%d error:%s", ret, uv_err_name(ret));
+        constexpr int bufSize = 1024;
+        char buf[bufSize] = { 0 };
+        uv_err_name_r(ret, buf, bufSize);
+        WRITE_LOG(LOG_WARN, "uvexepath ret:%d error:%s", ret, buf);
         return false;
     }
 
@@ -299,7 +302,11 @@ string HdcServer::AdminDaemonMap(uint8_t opType, const string &connectKey, HDaem
     string sRet;
     switch (opType) {
         case OP_ADD: {
-            HDaemonInfo pdiNew = new HdcDaemonInformation();
+            HDaemonInfo pdiNew = new(std::nothrow) HdcDaemonInformation();
+            if (pdiNew == nullptr) {
+                WRITE_LOG(LOG_FATAL, "AdminDaemonMap new pdiNew failed");
+                break;
+            }
             *pdiNew = *hDaemonInfoInOut;
             uv_rwlock_wrlock(&daemonAdmin);
             if (!mapDaemon[hDaemonInfoInOut->connectKey]) {
@@ -577,7 +584,11 @@ string HdcServer::AdminForwardMap(uint8_t opType, const string &taskString, HFor
     string sRet;
     switch (opType) {
         case OP_ADD: {
-            HForwardInfo pfiNew = new HdcForwardInformation();
+            HForwardInfo pfiNew = new(std::nothrow) HdcForwardInformation();
+            if (pfiNew == nullptr) {
+                WRITE_LOG(LOG_FATAL, "AdminForwardMap new pfiNew failed");
+                break;
+            }
             *pfiNew = *hForwardInfoInOut;
             uv_rwlock_wrlock(&forwardAdmin);
             if (!mapForward[hForwardInfoInOut->taskString]) {
@@ -692,7 +703,11 @@ void HdcServer::UartPreConnect(uv_timer_t *handle)
 
 void HdcServer::CreatConnectUart(HSession hSession)
 {
-    uv_timer_t *waitTimeDoCmd = new uv_timer_t;
+    uv_timer_t *waitTimeDoCmd = new(std::nothrow) uv_timer_t;
+    if (waitTimeDoCmd == nullptr) {
+        WRITE_LOG(LOG_FATAL, "CreatConnectUart new waitTimeDoCmd failed");
+        return;
+    }
     uv_timer_init(&loopMain, waitTimeDoCmd);
     waitTimeDoCmd->data = hSession;
     uv_timer_start(waitTimeDoCmd, UartPreConnect, UV_TIMEOUT, UV_REPEAT);
@@ -740,7 +755,11 @@ int HdcServer::CreateConnect(const string &connectKey)
     } else {
         hSession = MallocSession(true, CONN_USB, clsUSBClt);
         hSession->connectKey = connectKey;
-        uv_timer_t *waitTimeDoCmd = new uv_timer_t;
+        uv_timer_t *waitTimeDoCmd = new(std::nothrow) uv_timer_t;
+        if (waitTimeDoCmd == nullptr) {
+            WRITE_LOG(LOG_FATAL, "CreateConnect new waitTimeDoCmd failed");
+            return ERR_GENERIC;
+        }
         uv_timer_init(&loopMain, waitTimeDoCmd);
         waitTimeDoCmd->data = hSession;
         uv_timer_start(waitTimeDoCmd, UsbPreConnect, 10, 100);
@@ -771,8 +790,11 @@ void HdcServer::AttachChannel(HSession hSession, const uint32_t channelId)
     hChannel->hChildWorkTCP.data = hChannel;
     hChannel->targetSessionId = hSession->sessionId;
     if ((ret = uv_tcp_open((uv_tcp_t *)&hChannel->hChildWorkTCP, hChannel->fdChildWorkTCP)) < 0) {
+        constexpr int bufSize = 1024;
+        char buf[bufSize] = { 0 };
+        uv_err_name_r(ret, buf, bufSize);
         WRITE_LOG(LOG_DEBUG, "Hdcserver AttachChannel uv_tcp_open failed %s, channelid:%d fdChildWorkTCP:%d",
-                  uv_err_name(ret), hChannel->channelId, hChannel->fdChildWorkTCP);
+                  buf, hChannel->channelId, hChannel->fdChildWorkTCP);
         Base::TryCloseHandle((uv_handle_t *)&hChannel->hChildWorkTCP);
         --hChannel->ref;
         return;

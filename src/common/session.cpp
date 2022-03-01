@@ -212,7 +212,7 @@ void HdcSessionBase::EnumUSBDeviceRegister(void (*pCallBack)(HSession hSession))
 
 // The PC side gives the device information, determines if the USB device is registered
 // PDEV and Busid Devid two choices
-HSession HdcSessionBase::QueryUSBDeviceRegister(void *pDev, int busIDIn, int devIDIn)
+HSession HdcSessionBase::QueryUSBDeviceRegister(void *pDev, uint8_t busIDIn, uint8_t devIDIn)
 {
 #ifdef HDC_HOST
     libusb_device *dev = (libusb_device *)pDev;
@@ -394,8 +394,20 @@ HSession HdcSessionBase::MallocSession(bool serverOrDaemon, const ConnType connT
     hSession->sessionId = ((sessionId == 0) ? GetSessionPseudoUid() : sessionId);
     hSession->serverOrDaemon = serverOrDaemon;
     hSession->hWorkThread = uv_thread_self();
-    hSession->mapTask = new map<uint32_t, HTaskInfo>();
-    hSession->listKey = new list<void *>;
+    hSession->mapTask = new(std::nothrow) map<uint32_t, HTaskInfo>();
+    if (hSession->mapTask == nullptr) {
+        WRITE_LOG(LOG_FATAL, "MallocSession new hSession->mapTask failed");
+        delete hSession;
+        hSession = nullptr;
+        return nullptr;
+    }
+    hSession->listKey = new(std::nothrow) list<void *>;
+    if (hSession->listKey == nullptr) {
+        WRITE_LOG(LOG_FATAL, "MallocSession new hSession->listKey failed");
+        delete hSession;
+        hSession = nullptr;
+        return nullptr;
+    }
     hSession->uvHandleRef = 0;
     // pullup child
     WRITE_LOG(LOG_DEBUG, "HdcSessionBase NewSession, sessionId:%u, connType:%d.",
@@ -1231,7 +1243,11 @@ bool HdcSessionBase::DispatchTaskData(HSession hSession, const uint32_t channelI
         // Some basic commands do not have a local task constructor. example: Interactive shell, some uinty commands
         if (NeedNewTaskInfo(command, masterTask)) {
             WRITE_LOG(LOG_DEBUG, "New HTaskInfo");
-            hTaskInfo = new TaskInformation();
+            hTaskInfo = new(std::nothrow) TaskInformation();
+            if (hTaskInfo == nullptr) {
+                WRITE_LOG(LOG_FATAL, "DispatchTaskData new hTaskInfo failed");
+                break;
+            }
             hTaskInfo->channelId = channelId;
             hTaskInfo->sessionId = hSession->sessionId;
             hTaskInfo->runLoop = &hSession->childLoop;

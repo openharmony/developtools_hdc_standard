@@ -82,7 +82,7 @@ public:
     static void SessionWorkThread(uv_work_t *arg);
     static void ReadCtrlFromMain(uv_stream_t *uvpipe, ssize_t nread, const uv_buf_t *buf);
     static void ReadCtrlFromSession(uv_stream_t *uvpipe, ssize_t nread, const uv_buf_t *buf);
-    HSession QueryUSBDeviceRegister(void *pDev, int busIDIn, int devIDIn);
+    HSession QueryUSBDeviceRegister(void *pDev, uint8_t busIDIn, uint8_t devIDIn);
     virtual HSession MallocSession(bool serverOrDaemon, const ConnType connType, void *classModule, uint32_t sessionId = 0);
     virtual void FreeSession(const uint32_t sessionId);
     void WorkerPendding();
@@ -149,7 +149,10 @@ protected:
         T *ptrTask = nullptr;
         if (!hTaskInfo->hasInitial) {
             hTaskInfo->taskType = taskType;
-            ptrTask = new T(hTaskInfo);
+            ptrTask = new(std::nothrow) T(hTaskInfo);
+            if (ptrTask == nullptr) {
+                return false;
+            }
             hTaskInfo->hasInitial = true;
             hTaskInfo->taskClass = ptrTask;
         } else {

@@ -217,7 +217,12 @@ int HdcShell::StartShell()
             ret = ERR_PROCESS_SUB_FAIL;
             break;
         }
-        childShell = new HdcFileDescriptor(loopTask, fdPTY, this, ChildReadCallback, FinishShellProc);
+        childShell = new(std::nothrow) HdcFileDescriptor(loopTask, fdPTY, this, ChildReadCallback, FinishShellProc);
+        if (childShell == nullptr) {
+            WRITE_LOG(LOG_FATAL, "StartShell new childShell failed");
+            ret = ERR_GENERIC;
+            break;
+        }
         if (!childShell->StartWork()) {
             ret = ERR_API_FAIL;
             break;
