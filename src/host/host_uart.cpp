@@ -359,7 +359,8 @@ int HdcHostUART::OpenSerialPort(const std::string &connectKey)
 #endif
 
 #if defined HOST_LINUX
-        uart.devUartHandle = open(portName.c_str(), O_RDWR | O_NOCTTY | O_NONBLOCK);
+        string uartName = Base::CanonicalizeSpecPath(portName);
+        uart.devUartHandle = open(uartName.c_str(), O_RDWR | O_NOCTTY | O_NONBLOCK);
         if (uart.devUartHandle < 0) {
             constexpr int bufSize = 1024;
             char buf[bufSize] = { 0 };
@@ -574,7 +575,11 @@ bool HdcHostUART::ConnectMyNeed(HUART hUART, std::string connectKey)
     hSession->hUART->serialPort = hUART->serialPort;
     WRITE_LOG(LOG_DEBUG, "%s connectkey:%s,port:%s", __FUNCTION__, hSession->connectKey.c_str(),
               hUART->serialPort.c_str());
-    uv_timer_t *waitTimeDoCmd = new uv_timer_t;
+    uv_timer_t *waitTimeDoCmd = new(std::nothrow) uv_timer_t;
+    if (waitTimeDoCmd == nullptr) {
+        WRITE_LOG(LOG_FATAL, "ConnectMyNeed new waitTimeDoCmd failed");
+        return false;
+    }
     uv_timer_init(&server.loopMain, waitTimeDoCmd);
     waitTimeDoCmd->data = hSession;
     if (externInterface.UvTimerStart(waitTimeDoCmd, server.UartPreConnect, UV_TIMEOUT, UV_REPEAT) !=

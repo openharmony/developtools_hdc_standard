@@ -22,10 +22,14 @@ AsyncCmd::AsyncCmd()
 
 AsyncCmd::~AsyncCmd()
 {
+    if (childShell != nullptr) {
+        delete childShell;
+        childShell = nullptr;
+    }
     WRITE_LOG(LOG_DEBUG, "~AsyncCmd");
 };
 
-bool AsyncCmd::ReadyForRelease() const
+bool AsyncCmd::ReadyForRelease()
 {
     if (childShell != nullptr && !childShell->ReadyForRelease()) {
         return false;
@@ -35,6 +39,7 @@ bool AsyncCmd::ReadyForRelease() const
     }
     if (childShell != nullptr) {
         delete childShell;
+        childShell = nullptr;
     }
     if (fd > 0) {
         close(fd);
@@ -140,7 +145,11 @@ bool AsyncCmd::ExecuteCommand(const string &command)
     if ((fd = Popen(cmd, true, pid)) < 0) {
         return false;
     }
-    childShell = new HdcFileDescriptor(loop, fd, this, ChildReadCallback, FinishShellProc);
+    childShell = new(std::nothrow) HdcFileDescriptor(loop, fd, this, ChildReadCallback, FinishShellProc);
+    if (childShell == nullptr) {
+        WRITE_LOG(LOG_FATAL, "ExecuteCommand new childShell failed");
+        return false;
+    }
     if (!childShell->StartWork()) {
         return false;
     }

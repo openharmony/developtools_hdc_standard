@@ -28,8 +28,10 @@ HdcJdwpSimulator::~HdcJdwpSimulator() {}
 
 void HdcJdwpSimulator::FinishWriteCallback(uv_write_t *req, int status)
 {
-    HiLog::Info(LABEL, "FinishWriteCallback:%{public}d error:%{public}s", status,
-                uv_err_name(status));
+    constexpr int bufSize = 1024;
+    char buf[bufSize] = { 0 };
+    uv_err_name_r(status, buf, bufSize);
+    HiLog::Info(LABEL, "FinishWriteCallback:%{public}d error:%{public}s", status, buf);
     delete[](static_cast<uint8_t *>(req->data));
     delete req;
 }
@@ -124,7 +126,10 @@ void HdcJdwpSimulator::ProcessIncoming(uv_stream_t *client, ssize_t nread, const
                          (void *)FinishWriteCallback);
         } else {
             if (nread != UV_EOF) {
-                HiLog::Debug(LABEL, "ProcessIncoming error %s\n", uv_err_name(nread));
+                constexpr int bufSize = 1024;
+                char buffer[bufSize] = { 0 };
+                uv_err_name_r(nread, buffer, bufSize);
+                HiLog::Debug(LABEL, "ProcessIncoming error %s\n", buffer);
             }
             uv_close((uv_handle_t *)client, NULL);
         }
@@ -142,7 +147,10 @@ void HdcJdwpSimulator::ReceiveNewFd(uv_stream_t *q, ssize_t nread, const uv_buf_
                  pidCurr, nread);
     if (nread < 0) {
         if (nread != UV_EOF) {
-            HiLog::Error(LABEL, "Read error %s\n", uv_err_name(nread));
+            constexpr int bufSize = 1024;
+            char buffer[bufSize] = { 0 };
+            uv_err_name_r(nread, buffer, bufSize);
+            HiLog::Error(LABEL, "Read error %s\n", buffer);
         }
         uv_close((uv_handle_t *)q, NULL);
         return;
@@ -174,7 +182,10 @@ void HdcJdwpSimulator::ReceiveNewFd(uv_stream_t *q, ssize_t nread, const uv_buf_
 
 void HdcJdwpSimulator::ConnectJdwp(uv_connect_t *connection, int status)
 {
-    HiLog::Debug(LABEL, "ConnectJdwp:%{public}d error:%{public}s", status, uv_err_name(status));
+    constexpr int bufSize = 1024;
+    char buf[bufSize] = { 0 };
+    uv_err_name_r(status, buf, bufSize);
+    HiLog::Debug(LABEL, "ConnectJdwp:%{public}d error:%{public}s", status, buf);
     uint32_t pidCurr = static_cast<uint32_t>(getpid());
     HCtxJdwpSimulator ctxJdwp = static_cast<HCtxJdwpSimulator>(connection->data);
     HdcJdwpSimulator *thisClass = static_cast<HdcJdwpSimulator *>(ctxJdwp->thisClass);
