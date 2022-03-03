@@ -642,13 +642,14 @@ HSession HdcSessionBase::AdminSession(const uint8_t op, const uint32_t sessionId
             uv_rwlock_wrunlock(&lockMapSession);
             break;
         case OP_VOTE_RESET:
+            if (mapSession.count(sessionId) == 0) {
+                break;
+            }
             bool needReset;
             uv_rwlock_wrlock(&lockMapSession);
-            if (mapSession.count(sessionId)) {
-                hRet = mapSession[sessionId];
-                hRet->voteReset = true;
-                needReset = true;
-            }
+            hRet = mapSession[sessionId];
+            hRet->voteReset = true;
+            needReset = true;
             for (auto &kv : mapSession) {
                 if (sessionId == kv.first) {
                     continue;
@@ -661,7 +662,7 @@ HSession HdcSessionBase::AdminSession(const uint8_t op, const uint32_t sessionId
             }
             uv_rwlock_wrunlock(&lockMapSession);
             if (needReset) {
-                WRITE_LOG(LOG_FATAL, "!! session:%u vote reset, passed unanimously !!");
+                WRITE_LOG(LOG_FATAL, "!! session:%u vote reset, passed unanimously !!", sessionId);
                 abort();
             }
             break;
@@ -697,9 +698,7 @@ HTaskInfo HdcSessionBase::AdminTask(const uint8_t op, HSession hSession, const u
             }
             break;
         case OP_VOTE_RESET:
-            if (mapTask.size() == 1) {
-                AdminSession(op, hSession->sessionId, nullptr);
-            }
+            AdminSession(op, hSession->sessionId, nullptr);
             break;
         default:
             break;
