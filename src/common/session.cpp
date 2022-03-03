@@ -91,7 +91,7 @@ bool HdcSessionBase::BeginRemoveTask(HTaskInfo hTask)
         return true;
     }
 
-    WRITE_LOG(LOG_DEBUG, "BeginRemoveTask taskType:%d", hTask->taskType);
+    WRITE_LOG(LOG_DEBUG, "BeginRemoveTask taskType:%d channelId:%u", hTask->taskType, hTask->channelId);
     ret = RemoveInstanceTask(OP_CLEAR, hTask);
     auto taskClassDeleteRetry = [](uv_timer_t *handle) -> void {
         HTaskInfo hTask = (HTaskInfo)handle->data;
@@ -380,8 +380,9 @@ uint32_t HdcSessionBase::GetSessionPseudoUid()
 HSession HdcSessionBase::MallocSession(bool serverOrDaemon, const ConnType connType, void *classModule,
                                        uint32_t sessionId)
 {
-    HSession hSession = new HdcSession();
+    HSession hSession = new(std::nothrow) HdcSession();
     if (!hSession) {
+        WRITE_LOG(LOG_FATAL, "MallocSession new hSession failed");
         return nullptr;
     }
     int ret = 0;
@@ -539,8 +540,10 @@ void HdcSessionBase::FreeSessionContinue(HSession hSession)
     Base::TryCloseHandle((uv_handle_t *)&hSession->ctrlPipe[STREAM_MAIN], true, closeSessionTCPHandle);
     Base::TryCloseHandle((uv_handle_t *)&hSession->dataPipe[STREAM_MAIN], true, closeSessionTCPHandle);
     delete hSession->mapTask;
+    hSession->mapTask = nullptr;
     HdcAuth::FreeKey(!hSession->serverOrDaemon, hSession->listKey);
     delete hSession->listKey;  // to clear
+    hSession->listKey = nullptr;
     FreeSessionByConnectType(hSession);
     // finish
     Base::IdleUvTask(&loopMain, hSession, FreeSessionFinally);
