@@ -387,7 +387,7 @@ HSession HdcSessionBase::MallocSession(bool serverOrDaemon, const ConnType connT
     }
     int ret = 0;
     ++sessionRef;
-    memset_s(hSession->ctrlFd, sizeof(hSession->ctrlFd), 0, sizeof(hSession->ctrlFd));
+    (void)memset_s(hSession->ctrlFd, sizeof(hSession->ctrlFd), 0, sizeof(hSession->ctrlFd));
     hSession->classInstance = this;
     hSession->connType = connType;
     hSession->classModule = classModule;
