@@ -148,7 +148,7 @@ int HdcFileDescriptor::Write(uint8_t *data, int size)
     if (!buf) {
         return -1;
     }
-    memcpy_s(buf, size, data, size);
+    (void)memcpy_s(buf, size, data, size);
     return WriteWithMem(buf, size);
 }
 
