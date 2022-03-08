@@ -66,15 +66,6 @@ common_deps = [
   "//utils/native/base:utilsecurec",
 ]
 
-config("hdc_code_flag") {
-  cflags = [
-    "-Wno-error",
-    "-Wno-error=unused-variable",
-    "-Wno-unused-variable",
-    "-Wno-missing-field-initializers",
-  ]
-}
-
 config("hdc_ut_code_flag") {
   cflags = code_check_flag
 }
@@ -138,7 +129,6 @@ ohos_source_set("hdc_common") {
     ":hdc_common_config",
     ":hdc_ut_config",
   ]
-  configs = [ ":hdc_code_flag" ]
 }
 
 ohos_source_set("hdc_daemon") {
@@ -154,7 +144,6 @@ ohos_source_set("hdc_daemon") {
     ":hdc_common_config",
     ":hdc_ut_config",
   ]
-  configs = [ ":hdc_code_flag" ]
 }
 
 ohos_source_set("hdc_host") {
@@ -171,11 +160,9 @@ ohos_source_set("hdc_host") {
     ":hdc_host_common_config",
     ":hdc_ut_config",
   ]
-  configs = [ ":hdc_code_flag" ]
 }
 
 ohos_source_set("hdc_daemon_platform") {
-  configs = [ ":hdc_code_flag" ]
   public_configs = [ ":hdc_ut_config" ]
   public_configs += [ "//third_party/googletest:gtest_config" ]
 
@@ -225,7 +212,6 @@ ohos_source_set("hdc_daemon_platform") {
 
 ohos_unittest("hdc_jdwp_unittest") {
   module_out_path = module_output_path
-  configs = [ ":hdc_code_flag" ]
   public_configs = [ ":hdc_ut_config" ]
   defines = [ "HARMONY_PROJECT" ]
   if (hdc_test_coverage && is_ohos) {
