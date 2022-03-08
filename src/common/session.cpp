@@ -1223,9 +1223,6 @@ bool HdcSessionBase::NeedNewTaskInfo(const uint16_t command, bool &masterTask)
         && (command == CMD_SHELL_INIT || (command > CMD_UNITY_COMMAND_HEAD && command < CMD_UNITY_COMMAND_TAIL))) {
         // daemon's single side command
         ret = true;
-    } else if (command == CMD_KERNEL_WAKEUP_SLAVETASK) {
-        // slave tasks
-        ret = true;
     } else if (taskMasterInit) {
         // task init command
         masterTask = true;
@@ -1244,7 +1241,7 @@ bool HdcSessionBase::DispatchTaskData(HSession hSession, const uint32_t channelI
     while (true) {
         // Some basic commands do not have a local task constructor. example: Interactive shell, some uinty commands
         if (NeedNewTaskInfo(command, masterTask)) {
-            WRITE_LOG(LOG_DEBUG, "New HTaskInfo");
+            WRITE_LOG(LOG_DEBUG, "New HTaskInfo channelId:%u command:%u", channelId, command);
             hTaskInfo = new(std::nothrow) TaskInformation();
             if (hTaskInfo == nullptr) {
                 WRITE_LOG(LOG_FATAL, "DispatchTaskData new hTaskInfo failed");
