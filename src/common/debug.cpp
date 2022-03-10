@@ -78,7 +78,7 @@ namespace Debug {
         }
 
         struct stat statbuf;
-        stat(filePath.c_str(), &statbuf);
+        stat(filePath., &statbuf);
         int size = statbuf.st_size;
         if (size > bufLen) {
             fclose(fp);
@@ -93,11 +93,11 @@ namespace Debug {
         return size;
     }
 
-    void DetermineThread(HSessionPtr hSessionPtr)
+    void DetermineThread(HSession hSession)
     {
-        if (uv_thread_self() == hSessionPtr->hWorkThread) {
+        if (uv_thread_self() == hSession->hWorkThread) {
             WRITE_LOG(LOG_WARN, "At main workthread");
-        } else if (uv_thread_self() == hSessionPtr->hWorkChildThread) {
+        } else if (uv_thread_self() == hSession->hWorkChildThread) {
             WRITE_LOG(LOG_WARN, "At child workthread");
         } else {
             WRITE_LOG(LOG_WARN, "At unknow workthread");

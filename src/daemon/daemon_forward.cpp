@@ -15,7 +15,7 @@
 #include "daemon_forward.h"
 
 namespace Hdc {
-HdcDaemonForward::HdcDaemonForward(HTaskInfoPtr hTaskInfo)
+HdcDaemonForward::HdcDaemonForward(HTaskInfo hTaskInfo)
     : HdcForwardBase(hTaskInfo)
 {
 }

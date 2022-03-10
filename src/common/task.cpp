@@ -18,7 +18,7 @@ namespace Hdc {
 // -----------------------------------------------------------
 // notice!!! The constructor is called at the Child thread, so in addition to initialization, do not excess actions, if
 // destructor is required, please clean up in the subclasses.
-HdcTaskBase::HdcTaskBase(HTaskInfoPtr hTaskInfo)
+HdcTaskBase::HdcTaskBase(HTaskInfo hTaskInfo)
 {
     taskInfo = hTaskInfo;
     if (hTaskInfo != nullptr) {
@@ -83,8 +83,8 @@ bool HdcTaskBase::ServerCommand(const uint16_t command, uint8_t *bufPtr, const i
     if (taskInfo == nullptr || taskInfo->ownerSessionClass == nullptr) {
         return false;
     }
-    HdcSessionBase *hSessionPtr = (HdcSessionBase *)taskInfo->ownerSessionClass;
-    return hSessionPtr->ServerCommand(taskInfo->sessionId, taskInfo->channelId, command, bufPtr, size);
+    HdcSessionBase *hSession = (HdcSessionBase *)taskInfo->ownerSessionClass;
+    return hSession->ServerCommand(taskInfo->sessionId, taskInfo->channelId, command, bufPtr, size);
 }
 
 // cross thread
@@ -94,15 +94,15 @@ int HdcTaskBase::ThreadCtrlCommunicate(const uint8_t *bufPtr, const int size)
         return false;
     }
     HdcSessionBase *sessionBase = (HdcSessionBase *)taskInfo->ownerSessionClass;
-    HSessionPtr hSessionPtr = sessionBase->AdminSession(OP_QUERY, taskInfo->sessionId, nullptr);
-    if (!hSessionPtr) {
+    HSession hSession = sessionBase->AdminSession(OP_QUERY, taskInfo->sessionId, nullptr);
+    if (!hSession) {
         return -1;
     }
     uv_stream_t *handleStream = nullptr;
-    if (uv_thread_self() == hSessionPtr->hWorkThread) {
-        handleStream = (uv_stream_t *)&hSessionPtr->ctrlPipe[STREAM_MAIN];
-    } else if (uv_thread_self() == hSessionPtr->hWorkChildThread) {
-        handleStream = (uv_stream_t *)&hSessionPtr->ctrlPipe[STREAM_WORK];
+    if (uv_thread_self() == hSession->hWorkThread) {
+        handleStream = (uv_stream_t *)&hSession->ctrlPipe[STREAM_MAIN];
+    } else if (uv_thread_self() == hSession->hWorkChildThread) {
+        handleStream = (uv_stream_t *)&hSession->ctrlPipe[STREAM_WORK];
     } else {
         return ERR_GENERIC;
     }

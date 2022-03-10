@@ -21,7 +21,7 @@ class HdcChannelBase {
 public:
     HdcChannelBase(const bool serverOrClient, const string &addrString, uv_loop_t *loopMainIn);
     virtual ~HdcChannelBase();
-    HChannelPtr AdminChannel(const uint8_t op, const uint32_t channelId, HChannelPtr hInput);
+    HChannel AdminChannel(const uint8_t op, const uint32_t channelId, HChannel hInput);
     static void AllocCallback(uv_handle_t *handle, size_t sizeWanted, uv_buf_t *buf);
     static void ReadStream(uv_stream_t *tcp, ssize_t nread, const uv_buf_t *buf);
     void PushAsyncMessage(const uint32_t channelId, const uint8_t method, const void *data, const int dataSize);
@@ -38,15 +38,15 @@ protected:
             char connectKey[MAX_CONNECTKEY_SIZE];
         };
     } __attribute__((packed));
-    uint32_t MallocChannel(HChannelPtr *hOutChannel);
-    virtual int ReadChannel(HChannelPtr hChannel, uint8_t *bufPtr, const int bytesIO)
+    uint32_t MallocChannel(HChannel *hOutChannel);
+    virtual int ReadChannel(HChannel hChannel, uint8_t *bufPtr, const int bytesIO)
     {
         return 0;
     }
-    virtual void NotifyInstanceChannelFree(HChannelPtr hChannel) {};
+    virtual void NotifyInstanceChannelFree(HChannel hChannel) {};
     void Send(const uint32_t channelId, uint8_t *bufPtr, const int size);
-    void SendChannel(HChannelPtr hChannel, uint8_t *bufPtr, const int size);
-    void EchoToClient(HChannelPtr hChannel, uint8_t *bufPtr, const int size);
+    void SendChannel(HChannel hChannel, uint8_t *bufPtr, const int size);
+    void EchoToClient(HChannel hChannel, uint8_t *bufPtr, const int size);
     virtual bool ChannelSendSessionCtrlMsg(vector<uint8_t> &ctrlMsg, uint32_t sessionId)
     {
         return true;  // just server use
@@ -68,12 +68,12 @@ private:
     static void FreeChannelOpeate(uv_timer_t *handle);
     static void FreeChannelFinally(uv_idle_t *handle);
     void ClearChannels();
-    void FreeChannelContinue(HChannelPtr hChannel);
+    void FreeChannelContinue(HChannel hChannel);
     bool SetChannelTCPString(const string &addrString);
     uint32_t GetChannelPseudoUid();
 
     uv_rwlock_t lockMapChannel;  // protect mapChannel
-    map<uint32_t, HChannelPtr> mapChannel;
+    map<uint32_t, HChannel> mapChannel;
     uv_thread_t threadChanneMain;
 };
 }  // namespace Hdc

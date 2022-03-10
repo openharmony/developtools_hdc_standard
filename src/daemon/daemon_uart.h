@@ -29,8 +29,8 @@ public:
     void OnNewHandshakeOK(const uint32_t sessionId);
     void Stop();
 protected:
-    virtual HSessionPtr GetSession(const uint32_t sessionId, bool create) override;
-    virtual void OnTransferError(const HSessionPtr session) override;
+    virtual HSession GetSession(const uint32_t sessionId, bool create) override;
+    virtual void OnTransferError(const HSession session) override;
 
 private:
     static inline void UvWatchTimer(uv_timer_t *handle)
@@ -49,9 +49,9 @@ private:
     virtual int OpenUartDevice();
     virtual int LoopUARTRead();
     virtual int LoopUARTWrite();
-    virtual bool IsSendReady(HSessionPtr hSessionPtr);
+    virtual bool IsSendReady(HSession hSession);
     virtual int PrepareBufForRead();
-    virtual HSessionPtr PrepareNewSession(uint32_t sessionId);
+    virtual HSession PrepareNewSession(uint32_t sessionId);
     virtual void DeamonReadThread();
     virtual void DeamonWriteThread();
     std::vector<uint8_t> dataReadBuf; // from uart dev

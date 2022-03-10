@@ -16,7 +16,7 @@
 #include <sys/mount.h>
 
 namespace Hdc {
-HdcDaemonUnity::HdcDaemonUnity(HTaskInfoPtr hTaskInfo)
+HdcDaemonUnity::HdcDaemonUnity(HTaskInfo hTaskInfo)
     : HdcTaskBase(hTaskInfo)
 {
     currentDataCommand = CMD_KERNEL_ECHO_RAW;  // Default output to shelldata

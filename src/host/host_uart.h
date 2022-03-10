@@ -37,18 +37,18 @@ public:
     ~HdcHostUART();
     int Initial();
     virtual void Stop();
-    HSessionPtr ConnectDaemonByUart(const HSessionPtr hSessionPtr,
-                                 [[maybe_unused]] const HDaemonInfoPtr = nullptr);
+    HSession ConnectDaemonByUart(const HSession hSession,
+                                 [[maybe_unused]] const HDaemonInfo = nullptr);
 
     // logic layer will free the session
     // all the thread maybe need exit if needed.
-    void StopSession(HSessionPtr hSessionPtr) override;
-    HSessionPtr ConnectDaemon(const std::string &connectKey);
+    void StopSession(HSession hSession) override;
+    HSession ConnectDaemon(const std::string &connectKey);
 
 protected:
-    virtual void OnTransferError(const HSessionPtr session) override;
-    virtual HSessionPtr GetSession(const uint32_t sessionId, bool create) override;
-    virtual void Restartession(const HSessionPtr session) override;
+    virtual void OnTransferError(const HSession session) override;
+    virtual HSession GetSession(const uint32_t sessionId, bool create) override;
+    virtual void Restartession(const HSession session) override;
 
 private:
     enum UartCheckStatus {
@@ -59,9 +59,9 @@ private:
     };
     // review maybe merge to base ?
     virtual bool StartUartSendThread();
-    virtual bool StartUartReadThread(HSessionPtr hSessionPtr);
+    virtual bool StartUartReadThread(HSession hSession);
 
-    size_t SendUARTDev(HSessionPtr hSessionPtr, uint8_t *data, const size_t length);
+    size_t SendUARTDev(HSession hSession, uint8_t *data, const size_t length);
     static inline void UvWatchUartDevPlugin(uv_timer_t *handle)
     {
         if (handle != nullptr) {
@@ -74,11 +74,11 @@ private:
         WRITE_LOG(LOG_FATAL, "%s have not got correct class parameter", __FUNCTION__);
     };
     virtual void WatchUartDevPlugin();
-    void KickoutZombie(HSessionPtr hSessionPtr);
-    virtual void UpdateUARTDaemonInfo(const std::string &connectKey, HSessionPtr hSessionPtr, ConnStatus connStatus);
-    bool ConnectMyNeed(HUARTPtr hUART, std::string connectKey = "");
+    void KickoutZombie(HSession hSession);
+    virtual void UpdateUARTDaemonInfo(const std::string &connectKey, HSession hSession, ConnStatus connStatus);
+    bool ConnectMyNeed(HUART hUART, std::string connectKey = "");
     virtual int OpenSerialPort(const std::string &portName = "");
-    virtual void CloseSerialPort(const HUARTPtr hUART);
+    virtual void CloseSerialPort(const HUART hUART);
     virtual RetErrCode StartupUARTWork();
 
     // we use this function check if the uart read nothing in a timeout
@@ -86,14 +86,14 @@ private:
     // More importantly, the bootloader will output data. We use this to detect whether it is the
     // bootloader stage.
     virtual bool WaitUartIdle(HdcUART &uart, bool retry = true);
-    virtual void SendUartSoftReset(HSessionPtr hSessionPtr, uint32_t sessionId) override;
+    virtual void SendUartSoftReset(HSession hSession, uint32_t sessionId) override;
 
     virtual bool EnumSerialPort(bool &portChange);
     virtual bool IsDeviceOpened(const HdcUART &uart);
-    virtual bool NeedStop(const HSessionPtr hSessionPtr);
-    virtual void UartReadThread(HSessionPtr hSessionPtr);
+    virtual bool NeedStop(const HSession hSession);
+    virtual void UartReadThread(HSession hSession);
 #ifdef HOST_MINGW
-    int WinSetSerial(HUARTPtr hUART, string serialPort, int byteSize, int eqBaudRate);
+    int WinSetSerial(HUART hUART, string serialPort, int byteSize, int eqBaudRate);
     bool enumDetailsSerialPorts(bool *portChange);
     static constexpr uint8_t PORT_NAME_LEN = 10;
     static constexpr uint8_t PORT_NUM = 100;

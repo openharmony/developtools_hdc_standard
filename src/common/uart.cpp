@@ -333,8 +333,8 @@ int HdcUARTBase::UartToHdcProtocol(uv_stream_t *stream, uint8_t *data, int dataS
     if (stream == nullptr || stream->data == nullptr) {
         return ERR_IO_FAIL;
     }
-    HSessionPtr hSessionPtr = (HSessionPtr)stream->data;
-    unsigned int fd = hSessionPtr->dataFd[STREAM_MAIN];
+    HSession hSession = (HSession)stream->data;
+    unsigned int fd = hSession->dataFd[STREAM_MAIN];
     fd_set fdSet;
     struct timeval timeout = {3, 0};
     FD_ZERO(&fdSet);
@@ -377,18 +377,18 @@ int HdcUARTBase::UartToHdcProtocol(uv_stream_t *stream, uint8_t *data, int dataS
     return index;
 }
 
-RetErrCode HdcUARTBase::DispatchToWorkThread(HSessionPtr hSessionPtr, uint8_t *readBuf, int readBytes)
+RetErrCode HdcUARTBase::DispatchToWorkThread(HSession hSession, uint8_t *readBuf, int readBytes)
 {
-    if (hSessionPtr == nullptr) {
+    if (hSession == nullptr) {
         return ERR_SESSION_NOFOUND;
     }
-    if (!UartSendToHdcStream(hSessionPtr, readBuf, readBytes)) {
+    if (!UartSendToHdcStream(hSession, readBuf, readBytes)) {
         return ERR_IO_FAIL;
     }
     return RET_SUCCESS;
 }
 
-size_t HdcUARTBase::PackageProcess(vector<uint8_t> &data, HSessionPtr hSessionPtr)
+size_t HdcUARTBase::PackageProcess(vector<uint8_t> &data, HSession hSession)
 {
     while (data.size() >= sizeof(UartHead)) {
         // is size more than one head
@@ -409,25 +409,25 @@ size_t HdcUARTBase::PackageProcess(vector<uint8_t> &data, HSessionPtr hSessionPt
             // if the size of packge have all received ?
             if (data.size() >= packetSize) {
                 // send the data to logic level (link to logic)
-                if (hSessionPtr == nullptr) {
+                if (hSession == nullptr) {
 #ifdef HDC_HOST
-                    hSessionPtr = GetSession(sessionId);
+                    hSession = GetSession(sessionId);
 #else
                     // for daemon side we can make a new session for it
-                    hSessionPtr = GetSession(sessionId, true);
+                    hSession = GetSession(sessionId, true);
 #endif
                 }
-                if (hSessionPtr == nullptr) {
+                if (hSession == nullptr) {
                     WRITE_LOG(LOG_WARN, "%s have not found seesion (%u). skip it", sessionId);
                 } else {
-                    if (hSessionPtr->hUART->dispatchedPackageIndex == packageIndex) {
+                    if (hSession->hUART->dispatchedPackageIndex == packageIndex) {
                         // we need check if the duplication pacakge we have already send
                         WRITE_LOG(LOG_WARN, "%s dup package %u, skip send to session logic",
                                   __FUNCTION__, packageIndex);
                     } else {
                         // update the last package we will send to hdc
-                        hSessionPtr->hUART->dispatchedPackageIndex = packageIndex;
-                        RetErrCode ret = DispatchToWorkThread(hSessionPtr, data.data(), packetSize);
+                        hSession->hUART->dispatchedPackageIndex = packageIndex;
+                        RetErrCode ret = DispatchToWorkThread(hSession, data.data(), packetSize);
                         if (ret == RET_SUCCESS) {
                             WRITE_LOG(LOG_DEBUG, "%s DispatchToWorkThread successful",
                                       __FUNCTION__);
@@ -438,7 +438,7 @@ size_t HdcUARTBase::PackageProcess(vector<uint8_t> &data, HSessionPtr hSessionPt
                                       "%s DispatchToWorkThread fail %d. requeset free session in "
                                       "other side",
                                       __FUNCTION__, ret);
-                            ResponseUartTrans(hSessionPtr->sessionId, ++hSessionPtr->hUART->packageIndex,
+                            ResponseUartTrans(hSession->sessionId, ++hSession->hUART->packageIndex,
                                               PKG_OPTION_FREE);
                         }
                     }
@@ -461,7 +461,7 @@ size_t HdcUARTBase::PackageProcess(vector<uint8_t> &data, HSessionPtr hSessionPt
     return data.size() > 1 ? sizeof(UartHead) : 0;
 }
 
-bool HdcUARTBase::SendUARTRaw(HSessionPtr hSessionPtr, uint8_t *data, const size_t length)
+bool HdcUARTBase::SendUARTRaw(HSession hSession, uint8_t *data, const size_t length)
 {
     struct UartHead *uartHeader = (struct UartHead *)data;
     if (uartHeader == nullptr) {
@@ -480,36 +480,36 @@ bool HdcUARTBase::SendUARTRaw(HSessionPtr hSessionPtr, uint8_t *data, const size
 #endif
 
     // for normal package
-    if (hSessionPtr == nullptr) {
-        hSessionPtr = GetSession(uartHeader->sessionId);
-        if (hSessionPtr == nullptr) {
+    if (hSession == nullptr) {
+        hSession = GetSession(uartHeader->sessionId);
+        if (hSession == nullptr) {
             // session is not found
-            WRITE_LOG(LOG_WARN, "%s hSessionPtr not found:%zu", __FUNCTION__, uartHeader->sessionId);
+            WRITE_LOG(LOG_WARN, "%s hSession not found:%zu", __FUNCTION__, uartHeader->sessionId);
             return false;
         }
     }
-    hSessionPtr->ref++;
+    hSession->ref++;
     WRITE_LOG(LOG_DEBUG, "%s length:%d", __FUNCTION__, length);
 #ifdef HDC_HOST
-    ssize_t sendBytes = WriteUartDev(data, length, *hSessionPtr->hUART);
+    ssize_t sendBytes = WriteUartDev(data, length, *hSession->hUART);
 #else
     ssize_t sendBytes = WriteUartDev(data, length, deamonUart);
 #endif
     WRITE_LOG(LOG_DEBUG, "%s sendBytes %zu", __FUNCTION__, sendBytes);
     if (sendBytes < 0) {
         WRITE_LOG(LOG_DEBUG, "%s send fail. try to freesession", __FUNCTION__);
-        OnTransferError(hSessionPtr);
+        OnTransferError(hSession);
     }
-    hSessionPtr->ref--;
+    hSession->ref--;
     return sendBytes > 0;
 }
 
 // this function will not check the data correct again
 // just send the data to hdc session side
-bool HdcUARTBase::UartSendToHdcStream(HSessionPtr hSessionPtr, uint8_t *data, size_t size)
+bool HdcUARTBase::UartSendToHdcStream(HSession hSession, uint8_t *data, size_t size)
 {
     WRITE_LOG(LOG_DEBUG, "%s send to session %s package size %zu", __FUNCTION__,
-              hSessionPtr->ToDebugString().c_str(), size);
+              hSession->ToDebugString().c_str(), size);
 
     int ret = RET_SUCCESS;
 
@@ -527,21 +527,21 @@ bool HdcUARTBase::UartSendToHdcStream(HSessionPtr hSessionPtr, uint8_t *data, si
               *(data + sizeof(UartHead) + 1));
 
     // review need check logic again here or err process
-    if (head->sessionId != hSessionPtr->sessionId) {
-        if (hSessionPtr->serverOrDaemon && !hSessionPtr->hUART->resetIO) {
+    if (head->sessionId != hSession->sessionId) {
+        if (hSession->serverOrDaemon && !hSession->hUART->resetIO) {
             WRITE_LOG(LOG_FATAL, "%s sessionId not matched, reset sessionId:%d.", __FUNCTION__,
                       head->sessionId);
-            SendUartSoftReset(hSessionPtr, head->sessionId);
-            hSessionPtr->hUART->resetIO = true;
+            SendUartSoftReset(hSession, head->sessionId);
+            hSession->hUART->resetIO = true;
             ret = ERR_IO_SOFT_RESET;
             // dont break ,we need rease these data in recv buffer
         }
     } else {
         //  data to session
-        hSessionPtr->hUART->streamSize += head->dataSize; // this is only for debug,
+        hSession->hUART->streamSize += head->dataSize; // this is only for debug,
         WRITE_LOG(LOG_ALL, "%s stream wait session read size: %zu", __FUNCTION__,
-                  hSessionPtr->hUART->streamSize.load());
-        if (UartToHdcProtocol(reinterpret_cast<uv_stream_t *>(&hSessionPtr->dataPipe[STREAM_MAIN]),
+                  hSession->hUART->streamSize.load());
+        if (UartToHdcProtocol(reinterpret_cast<uv_stream_t *>(&hSession->dataPipe[STREAM_MAIN]),
                               data + sizeof(UartHead), head->dataSize) < 0) {
             ret = ERR_IO_FAIL;
             WRITE_LOG(LOG_FATAL, "%s Error uart send to stream", __FUNCTION__);
@@ -837,13 +837,13 @@ void HdcUARTBase::ResponseUartTrans(uint32_t sessionId, uint32_t packageIndex,
     RequestSendPackage(reinterpret_cast<uint8_t *>(&uartHeader), sizeof(UartHead), false);
 }
 
-int HdcUARTBase::SendUARTData(HSessionPtr hSessionPtr, uint8_t *data, const size_t length)
+int HdcUARTBase::SendUARTData(HSession hSession, uint8_t *data, const size_t length)
 {
-    if (hSessionPtr == nullptr) {
+    if (hSession == nullptr) {
         return ERR_GENERIC;
     }
     constexpr int maxIOSize = MAX_UART_SIZE_IOBUF;
-    WRITE_LOG(LOG_DEBUG, "SendUARTData hSessionPtr:%u, total length:%d", hSessionPtr->sessionId, length);
+    WRITE_LOG(LOG_DEBUG, "SendUARTData hSession:%u, total length:%d", hSession->sessionId, length);
     const int packageDataMaxSize = maxIOSize - sizeof(UartHead);
     size_t offset = 0;
     uint8_t sendDataBuf[MAX_UART_SIZE_IOBUF];
@@ -859,8 +859,8 @@ int HdcUARTBase::SendUARTData(HSessionPtr hSessionPtr, uint8_t *data, const size
             EOK) {
             return ERR_BUF_COPY;
         }
-        head->sessionId = hSessionPtr->sessionId;
-        head->packageIndex = ++hSessionPtr->hUART->packageIndex;
+        head->sessionId = hSession->sessionId;
+        head->packageIndex = ++hSession->hUART->packageIndex;
 
         int RemainingDataSize = length - offset;
         if (RemainingDataSize > packageDataMaxSize) {
@@ -896,9 +896,9 @@ void HdcUARTBase::ReadDataFromUARTStream(uv_stream_t *stream, ssize_t nread, con
     if (stream == nullptr || stream->data == nullptr) {
         return;
     }
-    HSessionPtr hSessionPtr = (HSessionPtr)stream->data;
-    HdcUARTBase *hUARTBase = (HdcUARTBase *)hSessionPtr->classModule;
-    if (hUARTBase == nullptr || hSessionPtr->hUART == nullptr) {
+    HSession hSession = (HSession)stream->data;
+    HdcUARTBase *hUARTBase = (HdcUARTBase *)hSession->classModule;
+    if (hUARTBase == nullptr || hSession->hUART == nullptr) {
         return;
     }
     std::lock_guard<std::mutex> lock(hUARTBase->workThreadProcessingData);
@@ -909,47 +909,47 @@ void HdcUARTBase::ReadDataFromUARTStream(uv_stream_t *stream, ssize_t nread, con
         uv_err_name_r(nread, buffer, bufSize);
     }
     WRITE_LOG(LOG_DEBUG, "%s sessionId:%u, nread:%zd %s streamSize %zu", __FUNCTION__,
-              hSessionPtr->sessionId, nread, buffer,
-              hSessionPtr->hUART->streamSize.load());
-    HdcSessionBase *hSessionBase = (HdcSessionBase *)hSessionPtr->classInstance;
+              hSession->sessionId, nread, buffer,
+              hSession->hUART->streamSize.load());
+    HdcSessionBase *hSessionBase = (HdcSessionBase *)hSession->classInstance;
     if (hSessionBase == nullptr) {
         return;
     }
-    if (nread <= 0 or nread > signed(hSessionPtr->hUART->streamSize)) {
+    if (nread <= 0 or nread > signed(hSession->hUART->streamSize)) {
         WRITE_LOG(LOG_FATAL, "%s nothing need to do ! because no data here", __FUNCTION__);
         return;
     }
-    if (hSessionBase->FetchIOBuf(hSessionPtr, hSessionPtr->ioBuf, nread) < 0) {
+    if (hSessionBase->FetchIOBuf(hSession, hSession->ioBuf, nread) < 0) {
         WRITE_LOG(LOG_FATAL, "%s FetchIOBuf failed , free the other side session", __FUNCTION__);
         // seesion side said the dont understand this seesion data
         // so we also need tell other side to free it session.
-        hUARTBase->ResponseUartTrans(hSessionPtr->sessionId, ++hSessionPtr->hUART->packageIndex,
+        hUARTBase->ResponseUartTrans(hSession->sessionId, ++hSession->hUART->packageIndex,
                                      PKG_OPTION_FREE);
 
         WRITE_LOG(LOG_FATAL, "%s FetchIOBuf failed , free the session", __FUNCTION__);
-        hSessionBase->FreeSession(hSessionPtr->sessionId);
+        hSessionBase->FreeSession(hSession->sessionId);
     }
-    hSessionPtr->hUART->streamSize -= nread;
-    WRITE_LOG(LOG_DEBUG, "%s sessionId:%u, nread:%d", __FUNCTION__, hSessionPtr->sessionId, nread);
+    hSession->hUART->streamSize -= nread;
+    WRITE_LOG(LOG_DEBUG, "%s sessionId:%u, nread:%d", __FUNCTION__, hSession->sessionId, nread);
 }
 
-bool HdcUARTBase::ReadyForWorkThread(HSessionPtr hSessionPtr)
+bool HdcUARTBase::ReadyForWorkThread(HSession hSession)
 {
-    if (hSessionPtr == nullptr) {
+    if (hSession == nullptr) {
         return false;
     }
-    if (externInterface.UvTcpInit(&hSessionPtr->childLoop, &hSessionPtr->dataPipe[STREAM_WORK],
-                                  hSessionPtr->dataFd[STREAM_WORK])) {
+    if (externInterface.UvTcpInit(&hSession->childLoop, &hSession->dataPipe[STREAM_WORK],
+                                  hSession->dataFd[STREAM_WORK])) {
         WRITE_LOG(LOG_FATAL, "%s init child TCP failed", __FUNCTION__);
         return false;
     }
-    hSessionPtr->dataPipe[STREAM_WORK].data = hSessionPtr;
-    HdcSessionBase *pSession = (HdcSessionBase *)hSessionPtr->classInstance;
+    hSession->dataPipe[STREAM_WORK].data = hSession;
+    HdcSessionBase *pSession = (HdcSessionBase *)hSession->classInstance;
     if (pSession == nullptr) {
         return false;
     }
-    externInterface.SetTcpOptions(&hSessionPtr->dataPipe[STREAM_WORK]);
-    if (externInterface.UvRead((uv_stream_t *)&hSessionPtr->dataPipe[STREAM_WORK],
+    externInterface.SetTcpOptions(&hSession->dataPipe[STREAM_WORK]);
+    if (externInterface.UvRead((uv_stream_t *)&hSession->dataPipe[STREAM_WORK],
                                pSession->AllocCallback, &HdcUARTBase::ReadDataFromUARTStream)) {
         WRITE_LOG(LOG_FATAL, "%s child TCP read failed", __FUNCTION__);
         return false;
@@ -958,7 +958,7 @@ bool HdcUARTBase::ReadyForWorkThread(HSessionPtr hSessionPtr)
     return true;
 }
 
-void HdcUARTBase::Restartession(const HSessionPtr session)
+void HdcUARTBase::Restartession(const HSession session)
 {
     if (session != nullptr) {
         WRITE_LOG(LOG_FATAL, "%s:%s", __FUNCTION__, session->ToDebugString().c_str());
@@ -967,11 +967,11 @@ void HdcUARTBase::Restartession(const HSessionPtr session)
     }
 }
 
-void HdcUARTBase::StopSession(HSessionPtr hSessionPtr)
+void HdcUARTBase::StopSession(HSession hSession)
 {
-    if (hSessionPtr != nullptr) {
-        WRITE_LOG(LOG_WARN, "%s:%s", __FUNCTION__, hSessionPtr->ToDebugString().c_str());
-        ClearUARTOutMap(hSessionPtr->sessionId);
+    if (hSession != nullptr) {
+        WRITE_LOG(LOG_WARN, "%s:%s", __FUNCTION__, hSession->ToDebugString().c_str());
+        ClearUARTOutMap(hSession->sessionId);
     } else {
         WRITE_LOG(LOG_FATAL, "%s: clean null session", __FUNCTION__);
     }

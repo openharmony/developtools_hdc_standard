@@ -22,8 +22,8 @@ public:
     HdcHostUSB(const bool serverOrDaemonIn, void *ptrMainBase, void *ctxUSBin);
     virtual ~HdcHostUSB();
     int Initial();
-    int SendUSBRaw(HSessionPtr hSessionPtr, uint8_t *data, const int length);
-    HSessionPtr ConnectDetectDaemon(const HSessionPtr hSessionPtr, const HDaemonInfoPtr pdi);
+    int SendUSBRaw(HSession hSession, uint8_t *data, const int length);
+    HSession ConnectDetectDaemon(const HSession hSession, const HDaemonInfo pdi);
     void Stop();
     void RemoveIgnoreDevice(string &mountInfo);
 
@@ -37,23 +37,23 @@ private:
                                                   libusb_hotplug_event event, void *userData);
     static void UsbWorkThread(void *arg);  // 3rd thread
     static void WatchUsbNodeChange(uv_timer_t *handle);
-    static void KickoutZombie(HSessionPtr hSessionPtr);
+    static void KickoutZombie(HSession hSession);
     static void LIBUSB_CALL USBBulkCallback(struct libusb_transfer *transfer);
     int StartupUSBWork();
-    int CheckActiveConfig(libusb_device *device, HUSBPtr hUSB);
-    int OpenDeviceMyNeed(HUSBPtr hUSB);
-    int CheckDescriptor(HUSBPtr hUSB);
+    int CheckActiveConfig(libusb_device *device, HUSB hUSB);
+    int OpenDeviceMyNeed(HUSB hUSB);
+    int CheckDescriptor(HUSB hUSB);
     bool IsDebuggableDev(const struct libusb_interface_descriptor *ifDescriptor);
-    bool ReadyForWorkThread(HSessionPtr hSessionPtr);
-    bool FindDeviceByID(HUSBPtr hUSB, const char *usbMountPoint, libusb_context *ctxUSB);
+    bool ReadyForWorkThread(HSession hSession);
+    bool FindDeviceByID(HUSB hUSB, const char *usbMountPoint, libusb_context *ctxUSB);
     bool DetectMyNeed(libusb_device *device, string &sn);
-    void RestoreHdcProtocol(HUSBPtr hUsb, const uint8_t *buf, int bufSize);
-    void UpdateUSBDaemonInfo(HUSBPtr hUSB, HSessionPtr hSessionPtr, uint8_t connStatus);
-    void BeginUsbRead(HSessionPtr hSessionPtr);
+    void RestoreHdcProtocol(HUSB hUsb, const uint8_t *buf, int bufSize);
+    void UpdateUSBDaemonInfo(HUSB hUSB, HSession hSession, uint8_t connStatus);
+    void BeginUsbRead(HSession hSession);
     void ReviewUsbNodeLater(string &nodeKey);
-    void CancelUsbIo(HSessionPtr hSessionPtr);
+    void CancelUsbIo(HSession hSession);
     int UsbToHdcProtocol(uv_stream_t *stream, uint8_t *appendData, int dataSize);
-    int SubmitUsbBio(HSessionPtr hSessionPtr, bool sendOrRecv, uint8_t *buf, int bufSize);
+    int SubmitUsbBio(HSession hSession, bool sendOrRecv, uint8_t *buf, int bufSize);
 
     libusb_context *ctxUSB;
     uv_timer_t devListWatcher;

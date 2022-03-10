@@ -19,7 +19,7 @@
 namespace Hdc {
 class HdcHostApp : public HdcTransferBase {
 public:
-    HdcHostApp(HTaskInfoPtr hTaskInfo);
+    HdcHostApp(HTaskInfo hTaskInfo);
     virtual ~HdcHostApp();
     bool CommandDispatch(const uint16_t command, uint8_t *payload, const int payloadSize);
 

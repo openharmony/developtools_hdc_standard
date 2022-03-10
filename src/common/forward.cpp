@@ -16,7 +16,7 @@
 #include "base.h"
 
 namespace Hdc {
-HdcForwardBase::HdcForwardBase(HTaskInfoPtr hTaskInfo)
+HdcForwardBase::HdcForwardBase(HTaskInfo hTaskInfo)
     : HdcTaskBase(hTaskInfo)
 {
 }

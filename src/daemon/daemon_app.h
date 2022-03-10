@@ -19,7 +19,7 @@
 namespace Hdc {
 class HdcDaemonApp : public HdcTransferBase {
 public:
-    HdcDaemonApp(HTaskInfoPtr hTaskInfo);
+    HdcDaemonApp(HTaskInfo hTaskInfo);
     virtual ~HdcDaemonApp();
     bool CommandDispatch(const uint16_t command, uint8_t *payload, const int payloadSize);
     bool ReadyForRelease();

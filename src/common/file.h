@@ -20,7 +20,7 @@
 namespace Hdc {
 class HdcFile : public HdcTransferBase {
 public:
-    HdcFile(HTaskInfoPtr hTaskInfo);
+    HdcFile(HTaskInfo hTaskInfo);
     virtual ~HdcFile();
     void StopTask();
     bool CommandDispatch(const uint16_t command, uint8_t *payload, const int payloadSize);
