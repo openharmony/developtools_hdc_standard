@@ -192,7 +192,8 @@ bool ParseServerListenString(string &serverListenString, char *optarg)
         return false;
     }
     char buf[BUF_SIZE_TINY] = "";
-    if (strcpy_s(buf, sizeof(buf), optarg) < 0) {
+    if (strcpy_s(buf, sizeof(buf), optarg) != 0) {
+        Base::PrintMessage("strcpy_s error %d", errno);
         return false;
     }
     char *p = strchr(buf, ':');

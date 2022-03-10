@@ -41,7 +41,7 @@ namespace Base {
 // Commenting the code will optimize and tune all log codes, and the compilation volume will be greatly reduced
 #define ENABLE_DEBUGLOG
 #ifdef ENABLE_DEBUGLOG
-    void GetLogDebugFunctioname(string &debugInfo, int line, string &threadIdString)
+    void GetLogDebugFunctionName(string &debugInfo, int line, string &threadIdString)
     {
         string tmpString = GetFileNameAny(debugInfo);
         debugInfo = StringFormat("%s:%d", tmpString.c_str(), line);
@@ -212,7 +212,7 @@ namespace Base {
             sep = "\r\n";
         }
         debugInfo = functionName;
-        GetLogDebugFunctioname(debugInfo, line, threadIdString);
+        GetLogDebugFunctionName(debugInfo, line, threadIdString);
         GetLogLevelAndTime(logLevel, logLevelString, timeString);
         logBuf = StringFormat("[%s][%s]%s%s %s%s", logLevelString.c_str(), timeString.c_str(), threadIdString.c_str(),
                               debugInfo.c_str(), logDetail.c_str(), sep.c_str());
@@ -276,7 +276,7 @@ namespace Base {
     {
         if (*nOrigSize > 0)
             return;
-        if (sizeWanted <= 0) {
+        if (sizeWanted <= 0 || sizeWanted >= HDC_BUF_MAX_BYTES) {
             WRITE_LOG(LOG_WARN, "ReallocBuf failed, sizeWanted:%d", sizeWanted);
             return;
         }
