@@ -192,7 +192,8 @@ bool ParseServerListenString(string &serverListenString, char *optarg)
         return false;
     }
     char buf[BUF_SIZE_TINY] = "";
-    if (strcpy_s(buf, sizeof(buf), optarg) < 0) {
+    if (strcpy_s(buf, sizeof(buf), optarg) != 0) {
+        Base::PrintMessage("strcpy_s error %d", errno);
         return false;
     }
     char *p = strchr(buf, ':');
@@ -206,7 +207,7 @@ bool ParseServerListenString(string &serverListenString, char *optarg)
             Base::PrintMessage("Port range incorrect");
             return false;
         }
-        snprintf_s(buf, sizeof(buf), sizeof(buf) - 1, "127.0.0.1:%d", port);
+        (void)snprintf_s(buf, sizeof(buf), sizeof(buf) - 1, "127.0.0.1:%d", port);
         serverListenString = buf;
     } else {
         *p = '\0';

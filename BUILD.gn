@@ -121,11 +121,6 @@ ohos_executable("hdc_std") {
   if (hdc_debug) {
     defines += [ "HDC_DEBUG" ]
   }
-  cflags_cc = [
-    "-Wno-error",
-    "-Wno-error=unused-variable",
-    "-Wno-unused-variable",
-  ]
   sources = [
     "src/host/client.cpp",
     "src/host/host_app.cpp",
@@ -185,7 +180,6 @@ ohos_executable("hdc_std") {
       "-lrt",
       "-Wl,--no-whole-archive",
     ]
-    cflags_cc += [ "-g" ]
   }
 
   subsystem_name = "developtools"
