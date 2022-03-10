@@ -332,7 +332,7 @@ int HdcHostUART::OpenSerialPort(const std::string &connectKey)
                   baudRate);
 
 #ifdef HOST_MINGW
-	constexpr int numTmp = 2;
+        constexpr int numTmp = 2;
         // review change to wstring ?
         TCHAR apiBuf[PORT_NAME_LEN * numTmp];
 #ifdef UNICODE
