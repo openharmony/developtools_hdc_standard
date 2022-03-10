@@ -33,15 +33,15 @@ private:
     static void ReadStd(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf);
     static void CommandWorker(uv_timer_t *handle);
     int ConnectServerForClient(const char *ip, uint16_t port);
-    int ReadChannel(HChannel hChannel, uint8_t *buf, const int bytesIO);
-    int PreHandshake(HChannel hChannel, const uint8_t *buf);
+    int ReadChannel(HChannelPtr hChannel, uint8_t *buf, const int bytesIO);
+    int PreHandshake(HChannelPtr hChannel, const uint8_t *buf);
     string AutoConnectKey(string &doCommand, const string &preConnectKey) const;
     uint32_t GetLastPID();
     bool StartKillServer(const char *cmd, bool startOrKill);
     void BindLocalStd();
-    void BindLocalStd(HChannel hChannel);
+    void BindLocalStd(HChannelPtr hChannel);
     void ModifyTty(bool setOrRestore, uv_tty_t *tty);
-    void NotifyInstanceChannelFree(HChannel hChannel);
+    void NotifyInstanceChannelFree(HChannelPtr hChannel);
 
 #ifndef _WIN32
     termios terminalState;
@@ -52,7 +52,7 @@ private:
     bool bShellInteractive = false;
     uv_timer_t waitTimeDoCmd;
     uv_check_t ctrlServerWork;
-    HChannel channel;
+    HChannelPtr channel;
 };
 }  // namespace Hdc
 #endif

@@ -57,16 +57,16 @@ public:
 
     HdcSessionBase(bool serverOrDaemonIn);
     virtual ~HdcSessionBase();
-    virtual void AttachChannel(HSession hSession, const uint32_t channelId)
+    virtual void AttachChannel(HSessionPtr hSessionPtr, const uint32_t channelId)
     {
     }
-    virtual void DeatchChannel(HSession hSession, const uint32_t channelId)
+    virtual void DeatchChannel(HSessionPtr hSessionPtr, const uint32_t channelId)
     {
     }
-    virtual void NotifyInstanceSessionFree(HSession hSession, bool freeOrClear)
+    virtual void NotifyInstanceSessionFree(HSessionPtr hSessionPtr, bool freeOrClear)
     {
     }
-    virtual bool RedirectToTask(HTaskInfo hTaskInfo, HSession hSession, const uint32_t channelId,
+    virtual bool RedirectToTask(HTaskInfoPtr hTaskInfo, HSessionPtr hSessionPtr, const uint32_t channelId,
                                 const uint16_t command, uint8_t *payload, const int payloadSize)
     {
         return true;
@@ -82,27 +82,27 @@ public:
     static void SessionWorkThread(uv_work_t *arg);
     static void ReadCtrlFromMain(uv_stream_t *uvpipe, ssize_t nread, const uv_buf_t *buf);
     static void ReadCtrlFromSession(uv_stream_t *uvpipe, ssize_t nread, const uv_buf_t *buf);
-    HSession QueryUSBDeviceRegister(void *pDev, uint8_t busIDIn, uint8_t devIDIn);
-    virtual HSession MallocSession(bool serverOrDaemon, const ConnType connType, void *classModule, uint32_t sessionId = 0);
+    HSessionPtr QueryUSBDeviceRegister(void *pDev, uint8_t busIDIn, uint8_t devIDIn);
+    virtual HSessionPtr MallocSession(bool serverOrDaemon, const ConnType connType, void *classModule, uint32_t sessionId = 0);
     virtual void FreeSession(const uint32_t sessionId);
     void WorkerPendding();
-    int OnRead(HSession hSession, uint8_t *bufPtr, const int bufLen);
+    int OnRead(HSessionPtr hSessionPtr, uint8_t *bufPtr, const int bufLen);
     int Send(const uint32_t sessionId, const uint32_t channelId, const uint16_t commandFlag, const uint8_t *data,
              const int dataSize);
-    int SendByProtocol(HSession hSession, uint8_t *bufPtr, const int bufLen);
-    virtual HSession AdminSession(const uint8_t op, const uint32_t sessionId, HSession hInput);
-    virtual int FetchIOBuf(HSession hSession, uint8_t *ioBuf, int read);
+    int SendByProtocol(HSessionPtr hSessionPtr, uint8_t *bufPtr, const int bufLen);
+    virtual HSessionPtr AdminSession(const uint8_t op, const uint32_t sessionId, HSessionPtr hInput);
+    virtual int FetchIOBuf(HSessionPtr hSessionPtr, uint8_t *ioBuf, int read);
     virtual void PushAsyncMessage(const uint32_t sessionId, const uint8_t method, const void *data, const int dataSize);
-    HTaskInfo AdminTask(const uint8_t op, HSession hSession, const uint32_t channelId, HTaskInfo hInput);
-    bool DispatchTaskData(HSession hSession, const uint32_t channelId, const uint16_t command, uint8_t *payload,
+    HTaskInfoPtr AdminTask(const uint8_t op, HSessionPtr hSessionPtr, const uint32_t channelId, HTaskInfoPtr hInput);
+    bool DispatchTaskData(HSessionPtr hSessionPtr, const uint32_t channelId, const uint16_t command, uint8_t *payload,
                           int payloadSize);
-    void EnumUSBDeviceRegister(void (*pCallBack)(HSession hSession));
+    void EnumUSBDeviceRegister(void (*pCallBack)(HSessionPtr hSessionPtr));
 #ifdef HDC_SUPPORT_UART
-    using UartKickoutZombie = const std::function<void(HSession hSession)>;
+    using UartKickoutZombie = const std::function<void(HSessionPtr hSessionPtr)>;
     virtual void EnumUARTDeviceRegister(UartKickoutZombie);
 #endif
-    void ClearOwnTasks(HSession hSession, const uint32_t channelIDInput);
-    virtual bool FetchCommand(HSession hSession, const uint32_t channelId, const uint16_t command, uint8_t *payload,
+    void ClearOwnTasks(HSessionPtr hSessionPtr, const uint32_t channelIDInput);
+    virtual bool FetchCommand(HSessionPtr hSessionPtr, const uint32_t channelId, const uint16_t command, uint8_t *payload,
                               int payloadSize)
     {
         return true;
@@ -112,7 +112,7 @@ public:
     {
         return true;
     }
-    virtual bool RemoveInstanceTask(const uint8_t op, HTaskInfo hTask)
+    virtual bool RemoveInstanceTask(const uint8_t op, HTaskInfoPtr hTask)
     {
         return true;
     }
@@ -142,7 +142,7 @@ protected:
     }
     // must be define in haderfile, cannot in cpp file
     template<class T>
-    bool TaskCommandDispatch(HTaskInfo hTaskInfo, uint8_t taskType, const uint16_t command, uint8_t *payload,
+    bool TaskCommandDispatch(HTaskInfoPtr hTaskInfo, uint8_t taskType, const uint16_t command, uint8_t *payload,
                              const int payloadSize)
     {
         bool ret = true;
@@ -163,7 +163,7 @@ protected:
         }
         return ret;
     }
-    template<class T> bool DoTaskRemove(HTaskInfo hTaskInfo, const uint8_t op)
+    template<class T> bool DoTaskRemove(HTaskInfoPtr hTaskInfo, const uint8_t op)
     {
         T *ptrTask = (T *)hTaskInfo->taskClass;
         if (OP_CLEAR == op) {
@@ -182,24 +182,24 @@ private:
     virtual void ClearInstanceResource()
     {
     }
-    int DecryptPayload(HSession hSession, PayloadHead *payloadHeadBe, uint8_t *encBuf);
-    bool DispatchMainThreadCommand(HSession hSession, const CtrlStruct *ctrl);
-    bool DispatchSessionThreadCommand(uv_stream_t *uvpipe, HSession hSession, const uint8_t *baseBuf,
+    int DecryptPayload(HSessionPtr hSessionPtr, PayloadHead *payloadHeadBe, uint8_t *encBuf);
+    bool DispatchMainThreadCommand(HSessionPtr hSessionPtr, const CtrlStruct *ctrl);
+    bool DispatchSessionThreadCommand(uv_stream_t *uvpipe, HSessionPtr hSessionPtr, const uint8_t *baseBuf,
                                       const int bytesIO);
-    bool BeginRemoveTask(HTaskInfo hTask);
-    bool TryRemoveTask(HTaskInfo hTask);
-    void ReChildLoopForSessionClear(HSession hSession);
-    void FreeSessionContinue(HSession hSession);
+    bool BeginRemoveTask(HTaskInfoPtr hTask);
+    bool TryRemoveTask(HTaskInfoPtr hTask);
+    void ReChildLoopForSessionClear(HSessionPtr hSessionPtr);
+    void FreeSessionContinue(HSessionPtr hSessionPtr);
     static void FreeSessionFinally(uv_idle_t *handle);
     static void AsyncMainLoopTask(uv_idle_t *handle);
     static void FreeSessionOpeate(uv_timer_t *handle);
-    int MallocSessionByConnectType(HSession hSession);
-    void FreeSessionByConnectType(HSession hSession);
-    bool WorkThreadStartSession(HSession hSession);
+    int MallocSessionByConnectType(HSessionPtr hSessionPtr);
+    void FreeSessionByConnectType(HSessionPtr hSessionPtr);
+    bool WorkThreadStartSession(HSessionPtr hSessionPtr);
     uint32_t GetSessionPseudoUid();
     bool NeedNewTaskInfo(const uint16_t command, bool &masterTask);
 
-    map<uint32_t, HSession> mapSession;
+    map<uint32_t, HSessionPtr> mapSession;
     uv_rwlock_t lockMapSession;
     std::atomic<uint32_t> sessionRef = 0;
     const uint8_t payloadProtectStaticVcode = 0x09;

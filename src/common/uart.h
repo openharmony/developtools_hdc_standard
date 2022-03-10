@@ -160,11 +160,11 @@ public:
     static ExternInterface defaultInterface;
     HdcUARTBase(HdcSessionBase &, ExternInterface & = defaultInterface);
     virtual ~HdcUARTBase();
-    bool ReadyForWorkThread(HSession hSession);
-    int SendUARTData(HSession hSession, uint8_t *data, const size_t length);
+    bool ReadyForWorkThread(HSessionPtr hSessionPtr);
+    int SendUARTData(HSessionPtr hSessionPtr, uint8_t *data, const size_t length);
     // call from session side
     // we need know when we need clear the pending send data
-    virtual void StopSession(HSession hSession);
+    virtual void StopSession(HSessionPtr hSessionPtr);
 
 protected:
     static constexpr uint32_t DEFAULT_BAUD_RATE_VALUE = 921600;
@@ -175,10 +175,10 @@ protected:
     // Mainly used to reply a data back before stop.
     std::mutex workThreadProcessingData;
 
-    // review how about make a HUART in daemon side and put the devhandle in it ?
+    // review how about make a HUARTPtr in daemon side and put the devhandle in it ?
     int uartHandle = -1;
-    virtual bool SendUARTRaw(HSession hSession, uint8_t *data, const size_t length);
-    virtual void SendUartSoftReset(HSession hUART, uint32_t sessionId) {};
+    virtual bool SendUARTRaw(HSessionPtr hSessionPtr, uint8_t *data, const size_t length);
+    virtual void SendUartSoftReset(HSessionPtr hUART, uint32_t sessionId) {};
     virtual RetErrCode ValidateUartPacket(vector<uint8_t> &data, uint32_t &sessionId,
                                           uint32_t &packageIndex, size_t &fullPackageLength);
     virtual void NotifyTransfer();
@@ -186,12 +186,12 @@ protected:
     {
         return;
     }
-    virtual void Restartession(const HSession session);
+    virtual void Restartession(const HSessionPtr session);
 
 #ifndef _WIN32
     int SetSerial(int fd, int nSpeed, int nBits, char nEvent, int nStop);
 #endif // _WIN32
-    virtual bool UartSendToHdcStream(HSession hSession, uint8_t *data, size_t size);
+    virtual bool UartSendToHdcStream(HSessionPtr hSessionPtr, uint8_t *data, size_t size);
     static void ReadDataFromUARTStream(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf);
     bool uartOpened;
 
@@ -203,11 +203,11 @@ protected:
     virtual void ResponseUartTrans(uint32_t sessionId, uint32_t packageIndex,
                                    UartProtocolOption option);
 
-    virtual size_t PackageProcess(vector<uint8_t> &data, HSession hSession = nullptr);
-    virtual RetErrCode DispatchToWorkThread(HSession hSession, uint8_t *readBuf, int readBytes);
+    virtual size_t PackageProcess(vector<uint8_t> &data, HSessionPtr hSessionPtr = nullptr);
+    virtual RetErrCode DispatchToWorkThread(HSessionPtr hSessionPtr, uint8_t *readBuf, int readBytes);
 
-    virtual void OnTransferError(const HSession session) = 0;
-    virtual HSession GetSession(const uint32_t sessionId, bool create = false) = 0;
+    virtual void OnTransferError(const HSessionPtr session) = 0;
+    virtual HSessionPtr GetSession(const uint32_t sessionId, bool create = false) = 0;
 
     /*
         read data from uart devices

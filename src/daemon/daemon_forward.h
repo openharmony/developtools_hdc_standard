@@ -19,11 +19,11 @@
 namespace Hdc {
 class HdcDaemonForward : public HdcForwardBase {
 public:
-    HdcDaemonForward(HTaskInfo hTaskInfo);
+    HdcDaemonForward(HTaskInfoPtr hTaskInfo);
     virtual ~HdcDaemonForward();
 
 private:
-    bool SetupJdwpPoint(HCtxForward ctxPoint);
+    bool SetupJdwpPoint(HCtxForwardPtr ctxPoint);
     static void SetupJdwpPointCallBack(uv_idle_t *handle);
 };
 }  // namespace Hdc

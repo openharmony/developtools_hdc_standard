@@ -21,23 +21,23 @@ class HdcServer : public HdcSessionBase {
 public:
     HdcServer(bool serverOrDaemonIn);
     virtual ~HdcServer();
-    bool FetchCommand(HSession hSession, const uint32_t channelId, const uint16_t command, uint8_t *payload,
+    bool FetchCommand(HSessionPtr hSessionPtr, const uint32_t channelId, const uint16_t command, uint8_t *payload,
                       const int payloadSize);
-    virtual string AdminDaemonMap(uint8_t opType, const string &connectKey, HDaemonInfo &hDaemonInfoInOut);
-    string AdminForwardMap(uint8_t opType, const string &taskString, HForwardInfo &hForwardInfoInOut);
+    virtual string AdminDaemonMap(uint8_t opType, const string &connectKey, HDaemonInfoPtr &hDaemonInfoInOut);
+    string AdminForwardMap(uint8_t opType, const string &taskString, HForwardInfoPtr &hForwardInfoInOut);
     int CreateConnect(const string &connectKey);
     bool Initial(const char *listenString);
-    void AttachChannel(HSession hSession, const uint32_t channelId);
-    void DeatchChannel(HSession hSession, const uint32_t channelId);
+    void AttachChannel(HSessionPtr hSessionPtr, const uint32_t channelId);
+    void DeatchChannel(HSessionPtr hSessionPtr, const uint32_t channelId);
     virtual void EchoToClientsForSession(uint32_t targetSessionId, const string &echo);
     static bool PullupServer(const char *listenString);
     static void UsbPreConnect(uv_timer_t *handle);
-    void NotifyInstanceSessionFree(HSession hSession, bool freeOrClear);
+    void NotifyInstanceSessionFree(HSessionPtr hSessionPtr, bool freeOrClear);
 
     HdcHostTCP *clsTCPClt;
     HdcHostUSB *clsUSBClt;
 #ifdef HDC_SUPPORT_UART
-    void CreatConnectUart(HSession hSession);
+    void CreatConnectUart(HSessionPtr hSessionPtr);
     static void UartPreConnect(uv_timer_t *handle);
     HdcHostUART *clsUARTClt = nullptr;
 #endif
@@ -45,26 +45,26 @@ public:
 
 private:
     void ClearInstanceResource();
-    void BuildDaemonVisableLine(HDaemonInfo hdi, bool fullDisplay, string &out);
-    void BuildForwardVisableLine(bool fullOrSimble, HForwardInfo hfi, string &echo);
+    void BuildDaemonVisableLine(HDaemonInfoPtr hdi, bool fullDisplay, string &out);
+    void BuildForwardVisableLine(bool fullOrSimble, HForwardInfoPtr hfi, string &echo);
     void ClearMapDaemonInfo();
     bool ServerCommand(const uint32_t sessionId, const uint32_t channelId, const uint16_t command, uint8_t *bufPtr,
                        const int size);
-    bool RedirectToTask(HTaskInfo hTaskInfo, HSession hSession, const uint32_t channelId, const uint16_t command,
+    bool RedirectToTask(HTaskInfoPtr hTaskInfo, HSessionPtr hSessionPtr, const uint32_t channelId, const uint16_t command,
                         uint8_t *payload, const int payloadSize);
-    bool RemoveInstanceTask(const uint8_t op, HTaskInfo hTask);
-    void BuildForwardVisableLine(HDaemonInfo hdi, char *out, int sizeOutBuf);
-    bool HandServerAuth(HSession hSession, SessionHandShake &handshake);
+    bool RemoveInstanceTask(const uint8_t op, HTaskInfoPtr hTask);
+    void BuildForwardVisableLine(HDaemonInfoPtr hdi, char *out, int sizeOutBuf);
+    bool HandServerAuth(HSessionPtr hSessionPtr, SessionHandShake &handshake);
     string GetDaemonMapList(uint8_t opType);
-    bool ServerSessionHandshake(HSession hSession, uint8_t *payload, int payloadSize);
-    void GetDaemonMapOnlyOne(HDaemonInfo &hDaemonInfoInOut);
+    bool ServerSessionHandshake(HSessionPtr hSessionPtr, uint8_t *payload, int payloadSize);
+    void GetDaemonMapOnlyOne(HDaemonInfoPtr &hDaemonInfoInOut);
     void TryStopInstance();
     static bool PullupServerWin32(const char *path, const char *listenString);
 
     uv_rwlock_t daemonAdmin;
-    map<string, HDaemonInfo> mapDaemon;
+    map<string, HDaemonInfoPtr> mapDaemon;
     uv_rwlock_t forwardAdmin;
-    map<string, HForwardInfo> mapForward;
+    map<string, HForwardInfoPtr> mapForward;
 };
 }  // namespace Hdc
 #endif

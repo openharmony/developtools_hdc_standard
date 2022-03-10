@@ -15,7 +15,7 @@
 #include "daemon_forward.h"
 
 namespace Hdc {
-HdcDaemonForward::HdcDaemonForward(HTaskInfo hTaskInfo)
+HdcDaemonForward::HdcDaemonForward(HTaskInfoPtr hTaskInfo)
     : HdcForwardBase(hTaskInfo)
 {
 }
@@ -26,7 +26,7 @@ HdcDaemonForward::~HdcDaemonForward()
 
 void HdcDaemonForward::SetupJdwpPointCallBack(uv_idle_t *handle)
 {
-    HCtxForward ctxPoint = (HCtxForward)handle->data;
+    HCtxForwardPtr ctxPoint = (HCtxForwardPtr)handle->data;
     HdcDaemonForward *thisClass = reinterpret_cast<HdcDaemonForward *>(ctxPoint->thisClass);
     thisClass->SetupPointContinue(ctxPoint, 1);  // It usually works
     Base::TryCloseHandle((const uv_handle_t *)handle, Base::CloseIdleCallback);
@@ -35,7 +35,7 @@ void HdcDaemonForward::SetupJdwpPointCallBack(uv_idle_t *handle)
     return;
 }
 
-bool HdcDaemonForward::SetupJdwpPoint(HCtxForward ctxPoint)
+bool HdcDaemonForward::SetupJdwpPoint(HCtxForwardPtr ctxPoint)
 {
     HdcDaemon *daemon = (HdcDaemon *)taskInfo->ownerSessionClass;
     HdcJdwp *clsJdwp = (HdcJdwp *)daemon->clsJdwp;

@@ -19,7 +19,7 @@
 namespace Hdc {
 class HdcHostUnity : public HdcTaskBase {
 public:
-    HdcHostUnity(HTaskInfo hTaskInfo);
+    HdcHostUnity(HTaskInfoPtr hTaskInfo);
     virtual ~HdcHostUnity();
     bool CommandDispatch(const uint16_t command, uint8_t *payload, const int payloadSize);
     void StopTask();

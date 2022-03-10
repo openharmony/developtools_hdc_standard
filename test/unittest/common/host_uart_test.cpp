@@ -42,11 +42,11 @@ public:
     const std::string nullDevPath = "/dev/null";
     class MockHdcServer : public HdcServer {
         MockHdcServer() : HdcServer(true) {};
-        MOCK_METHOD3(AdminDaemonMap, string(uint8_t, const string &, HDaemonInfo &));
+        MOCK_METHOD3(AdminDaemonMap, string(uint8_t, const string &, HDaemonInfoPtr &));
         MOCK_METHOD1(EnumUARTDeviceRegister, void(UartKickoutZombie));
-        MOCK_METHOD4(MallocSession, HSession(bool, const ConnType, void *, uint32_t));
+        MOCK_METHOD4(MallocSession, HSessionPtr(bool, const ConnType, void *, uint32_t));
         MOCK_METHOD1(FreeSession, void(const uint32_t));
-        MOCK_METHOD3(AdminSession, HSession(const uint8_t, const uint32_t, HSession));
+        MOCK_METHOD3(AdminSession, HSessionPtr(const uint8_t, const uint32_t, HSessionPtr));
         MOCK_METHOD2(EchoToClientsForSession, void(uint32_t, const string &));
     } mockServer;
 
@@ -69,24 +69,24 @@ public:
         }
         MOCK_METHOD0(StartupUARTWork, RetErrCode());
         MOCK_METHOD0(UartWriteThread, void());
-        MOCK_METHOD1(CloseSerialPort, void(const HUART));
+        MOCK_METHOD1(CloseSerialPort, void(const HUARTPtr));
         MOCK_METHOD1(EnumSerialPort, bool(bool &));
         MOCK_METHOD0(Stop, void());
-        MOCK_METHOD3(UpdateUARTDaemonInfo, void(const std::string &, HSession, ConnStatus));
-        MOCK_METHOD1(StartUartReadThread, bool(HSession));
+        MOCK_METHOD3(UpdateUARTDaemonInfo, void(const std::string &, HSessionPtr, ConnStatus));
+        MOCK_METHOD1(StartUartReadThread, bool(HSessionPtr));
         MOCK_METHOD0(StartUartSendThread, bool());
         MOCK_METHOD0(WatchUartDevPlugin, void());
         MOCK_METHOD1(OpenSerialPort, int(const std::string &));
-        MOCK_METHOD1(UartReadThread, void(HSession));
-        MOCK_METHOD3(SendUARTRaw, bool(HSession, uint8_t *, const size_t));
+        MOCK_METHOD1(UartReadThread, void(HSessionPtr));
+        MOCK_METHOD3(SendUARTRaw, bool(HSessionPtr, uint8_t *, const size_t));
         MOCK_METHOD3(RequestSendPackage, void(uint8_t *, const size_t, bool));
-        MOCK_METHOD1(UartSendThread, void(HSession));
+        MOCK_METHOD1(UartSendThread, void(HSessionPtr));
         MOCK_METHOD0(SendPkgInUARTOutMap, void());
         MOCK_METHOD1(IsDeviceOpened, bool(const HdcUART &));
         MOCK_METHOD3(ReadUartDev, ssize_t(std::vector<uint8_t> &, size_t, HdcUART &));
-        MOCK_METHOD1(NeedStop, bool(const HSession));
-        MOCK_METHOD2(PackageProcess, size_t(vector<uint8_t> &, HSession hSession));
-        MOCK_METHOD1(OnTransferError, void(const HSession));
+        MOCK_METHOD1(NeedStop, bool(const HSessionPtr));
+        MOCK_METHOD2(PackageProcess, size_t(vector<uint8_t> &, HSessionPtr hSessionPtr));
+        MOCK_METHOD1(OnTransferError, void(const HSessionPtr));
         MOCK_METHOD1(ClearUARTOutMap, void(uint32_t));
     } mockHostUART;
 
@@ -372,8 +372,8 @@ HWTEST_F(HdcHostUARTTest, UpdateUARTDaemonInfo, TestSize.Level1)
 {
     EXPECT_CALL(mockHostUART, UpdateUARTDaemonInfo)
         .WillRepeatedly(
-            [&](const std::string &connectKey, HSession hSession, ConnStatus connStatus) {
-                mockHostUART.HdcHostUART::UpdateUARTDaemonInfo(connectKey, hSession, connStatus);
+            [&](const std::string &connectKey, HSessionPtr hSessionPtr, ConnStatus connStatus) {
+                mockHostUART.HdcHostUART::UpdateUARTDaemonInfo(connectKey, hSessionPtr, connStatus);
             });
 
     // case 1 STATUS_UNKNOW
@@ -408,8 +408,8 @@ HWTEST_F(HdcHostUARTTest, UpdateUARTDaemonInfo, TestSize.Level1)
  */
 HWTEST_F(HdcHostUARTTest, StartUartReadThread, TestSize.Level1)
 {
-    EXPECT_CALL(mockHostUART, StartUartReadThread).WillOnce(Invoke([&](HSession hSession) {
-        return mockHostUART.HdcHostUART::StartUartReadThread(hSession);
+    EXPECT_CALL(mockHostUART, StartUartReadThread).WillOnce(Invoke([&](HSessionPtr hSessionPtr) {
+        return mockHostUART.HdcHostUART::StartUartReadThread(hSessionPtr);
     }));
 
     EXPECT_CALL(mockHostUART, UartReadThread(&mySession)).Times(1);
@@ -563,8 +563,8 @@ HWTEST_F(HdcHostUARTTest, StartUartSendThread, TestSize.Level1)
  */
 HWTEST_F(HdcHostUARTTest, NeedStop, TestSize.Level1)
 {
-    EXPECT_CALL(mockHostUART, NeedStop).WillRepeatedly([&](const HSession hSession) {
-        return mockHostUART.HdcHostUART::NeedStop(hSession);
+    EXPECT_CALL(mockHostUART, NeedStop).WillRepeatedly([&](const HSessionPtr hSessionPtr) {
+        return mockHostUART.HdcHostUART::NeedStop(hSessionPtr);
     });
     mockHostUART.uartOpened = true;
     mySession.isDead = false;
@@ -644,8 +644,8 @@ HWTEST_F(HdcHostUARTTest, UartWriteThread, TestSize.Level1)
  */
 HWTEST_F(HdcHostUARTTest, UartReadThread, TestSize.Level1)
 {
-    EXPECT_CALL(mockHostUART, UartReadThread).WillRepeatedly(Invoke([&](HSession hSession) {
-        return mockHostUART.HdcHostUART::UartReadThread(hSession);
+    EXPECT_CALL(mockHostUART, UartReadThread).WillRepeatedly(Invoke([&](HSessionPtr hSessionPtr) {
+        return mockHostUART.HdcHostUART::UartReadThread(hSessionPtr);
     }));
 
     // case 1 need stop
@@ -815,7 +815,7 @@ HWTEST_F(HdcHostUARTTest, StopSession, TestSize.Level1)
  */
 HWTEST_F(HdcHostUARTTest, OnTransferError, TestSize.Level1)
 {
-    EXPECT_CALL(mockHostUART, OnTransferError).WillRepeatedly(Invoke([&](const HSession session) {
+    EXPECT_CALL(mockHostUART, OnTransferError).WillRepeatedly(Invoke([&](const HSessionPtr session) {
         return mockHostUART.HdcHostUART::OnTransferError(session);
     }));
     mockHostUART.OnTransferError(nullptr);

@@ -31,7 +31,7 @@ HdcClient::~HdcClient()
     Base::TryCloseLoop(loopMain, "ExecuteCommand finish");
 }
 
-void HdcClient::NotifyInstanceChannelFree(HChannel hChannel)
+void HdcClient::NotifyInstanceChannelFree(HChannelPtr hChannel)
 {
     if (bShellInteractive) {
         WRITE_LOG(LOG_DEBUG, "Restore tty");
@@ -220,7 +220,7 @@ void HdcClient::AllocStdbuf(uv_handle_t *handle, size_t sizeWanted, uv_buf_t *bu
     if (sizeWanted <= 0) {
         return;
     }
-    HChannel context = (HChannel)handle->data;
+    HChannelPtr context = (HChannelPtr)handle->data;
     int availSize = strlen(context->bufStd);
     buf->base = (char *)context->bufStd + availSize;
     buf->len = sizeof(context->bufStd) - availSize - 2;  // reserve 2bytes
@@ -228,7 +228,7 @@ void HdcClient::AllocStdbuf(uv_handle_t *handle, size_t sizeWanted, uv_buf_t *bu
 
 void HdcClient::ReadStd(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 {
-    HChannel hChannel = (HChannel)stream->data;
+    HChannelPtr hChannel = (HChannelPtr)stream->data;
     HdcClient *thisClass = (HdcClient *)hChannel->clsChannel;
     char *command = hChannel->bufStd;
     if (nread <= 0) {
@@ -261,7 +261,7 @@ void HdcClient::ModifyTty(bool setOrRestore, uv_tty_t *tty)
     }
 }
 
-void HdcClient::BindLocalStd(HChannel hChannel)
+void HdcClient::BindLocalStd(HChannelPtr hChannel)
 {
     if (command == CMDSTR_SHELL) {
         bShellInteractive = true;
@@ -292,7 +292,7 @@ void HdcClient::Connect(uv_connect_t *connection, int status)
 {
     HdcClient *thisClass = (HdcClient *)connection->data;
     delete connection;
-    HChannel hChannel = (HChannel)thisClass->channel;
+    HChannelPtr hChannel = (HChannelPtr)thisClass->channel;
     if (status < 0 || uv_is_closing((const uv_handle_t *)&hChannel->hWorkTCP)) {
         WRITE_LOG(LOG_FATAL, "connect failed");
         thisClass->FreeChannel(hChannel->channelId);
@@ -303,7 +303,7 @@ void HdcClient::Connect(uv_connect_t *connection, int status)
     uv_read_start((uv_stream_t *)&hChannel->hWorkTCP, AllocCallback, ReadStream);
 }
 
-int HdcClient::PreHandshake(HChannel hChannel, const uint8_t *buf)
+int HdcClient::PreHandshake(HChannelPtr hChannel, const uint8_t *buf)
 {
     ChannelHandShake *hShake = (ChannelHandShake *)buf;
     if (strncmp(hShake->banner, HANDSHAKE_MESSAGE.c_str(), HANDSHAKE_MESSAGE.size())) {
@@ -335,7 +335,7 @@ int HdcClient::PreHandshake(HChannel hChannel, const uint8_t *buf)
 }
 
 // read serverForClient(server)TCP data
-int HdcClient::ReadChannel(HChannel hChannel, uint8_t *buf, const int bytesIO)
+int HdcClient::ReadChannel(HChannelPtr hChannel, uint8_t *buf, const int bytesIO)
 {
     if (!hChannel->handshakeOK) {
         return PreHandshake(hChannel, buf);

@@ -21,12 +21,12 @@ class HdcUSBBase {
 public:
     HdcUSBBase(const bool serverOrDaemonIn, void *ptrMainBase);
     virtual ~HdcUSBBase();
-    virtual bool ReadyForWorkThread(HSession hSession);
-    virtual void CancelUsbIo(HSession hSession) {};
-    int SendUSBBlock(HSession hSession, uint8_t *data, const int length);
+    virtual bool ReadyForWorkThread(HSessionPtr hSessionPtr);
+    virtual void CancelUsbIo(HSessionPtr hSessionPtr) {};
+    int SendUSBBlock(HSessionPtr hSessionPtr, uint8_t *data, const int length);
 
 protected:
-    virtual int SendUSBRaw(HSession hSession, uint8_t *data, const int length)
+    virtual int SendUSBRaw(HSessionPtr hSessionPtr, uint8_t *data, const int length)
     {
         return 0;
     }
@@ -34,7 +34,7 @@ protected:
     {
         return 0;
     };
-    int SendToHdcStream(HSession hSession, uv_stream_t *stream, uint8_t *appendData, int dataSize);
+    int SendToHdcStream(HSessionPtr hSessionPtr, uv_stream_t *stream, uint8_t *appendData, int dataSize);
     int GetSafeUsbBlockSize(uint16_t wMaxPacketSizeSend);
     bool IsUsbPacketHeader(uint8_t *ioBuf, int ioBytes);
 
@@ -46,8 +46,8 @@ protected:
 private:
     static void ReadUSB(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf);
     vector<uint8_t> BuildPacketHeader(uint32_t sessionId, uint8_t option, uint32_t dataSize);
-    int CheckPacketOption(HSession hSession, uint8_t *appendData, int dataSize);
-    void PreSendUsbSoftReset(HSession hSession, uint32_t sessionIdOld);
+    int CheckPacketOption(HSessionPtr hSessionPtr, uint8_t *appendData, int dataSize);
+    void PreSendUsbSoftReset(HSessionPtr hSessionPtr, uint32_t sessionIdOld);
 };
 }  // namespace Hdc
 

@@ -64,14 +64,14 @@ public:
     class MockHdcUARTBase : public HdcUARTBase {
     public:
         std::vector<uint8_t> expectRawData;
-        MOCK_METHOD2(SendUartSoftReset, void(HSession, uint32_t));
+        MOCK_METHOD2(SendUartSoftReset, void(HSessionPtr, uint32_t));
         MOCK_METHOD1(ResetOldSession, void(uint32_t));
         MOCK_METHOD3(RequestSendPackage, void(uint8_t *, const size_t, bool));
         MOCK_METHOD1(ProcessResponsePackage, void(const UartHead &));
         MOCK_METHOD3(ResponseUartTrans, void(uint32_t, uint32_t, UartProtocolOption));
         MOCK_METHOD3(UartToHdcProtocol, int(uv_stream_t *, uint8_t *, int));
-        MOCK_METHOD1(OnTransferError, void(const HSession));
-        MOCK_METHOD2(GetSession, HSession(uint32_t, bool));
+        MOCK_METHOD1(OnTransferError, void(const HSessionPtr));
+        MOCK_METHOD2(GetSession, HSessionPtr(uint32_t, bool));
         MOCK_METHOD1(ClearUARTOutMap, void(uint32_t));
 
         MockHdcUARTBase(HdcSessionBase &mockSessionBaseIn, MockBaseInterface &interfaceIn)
@@ -183,12 +183,12 @@ bool HdcUARTBaseTest::MakeData(std::vector<uint8_t> &data, UartHead &head)
  */
 HWTEST_F(HdcUARTBaseTest, SendUARTRaw, TestSize.Level1)
 {
-    HSession hSession = nullptr;
+    HSessionPtr hSessionPtr = nullptr;
     unsigned char dummyData[] = "1234567980";
     uint8_t *dummyPtr = static_cast<unsigned char *>(&dummyData[0]);
     int dummySize = sizeof(dummyData);
     EXPECT_CALL(mockUARTBase, GetSession).Times(1);
-    EXPECT_EQ(mockUARTBase.SendUARTRaw(hSession, dummyPtr, dummySize), 0);
+    EXPECT_EQ(mockUARTBase.SendUARTRaw(hSessionPtr, dummyPtr, dummySize), 0);
 }
 
 /*
@@ -214,13 +214,13 @@ HWTEST_F(HdcUARTBaseTest, ResetOldSession, TestSize.Level1)
 HWTEST_F(HdcUARTBaseTest, SendUartSoftReset, TestSize.Level1)
 {
     EXPECT_CALL(mockUARTBase, SendUartSoftReset)
-        .WillRepeatedly([&](HSession hUART, uint32_t sessionId) {
+        .WillRepeatedly([&](HSessionPtr hUART, uint32_t sessionId) {
             mockUARTBase.HdcUARTBase::SendUartSoftReset(hUART, sessionId);
         });
-    HSession hSession = nullptr;
+    HSessionPtr hSessionPtr = nullptr;
     uint32_t sessionId = 1234567980;
-    EXPECT_CALL(mockUARTBase, SendUartSoftReset(hSession, sessionId)).Times(1);
-    mockUARTBase.SendUartSoftReset(hSession, sessionId);
+    EXPECT_CALL(mockUARTBase, SendUartSoftReset(hSessionPtr, sessionId)).Times(1);
+    mockUARTBase.SendUartSoftReset(hSessionPtr, sessionId);
 }
 
 /*
@@ -454,7 +454,7 @@ HWTEST_F(HdcUARTBaseTest, ReadDataFromUARTStream, TestSize.Level1)
     ssize_t dummySize = sizeof(dummyArray);
     class MockHdcSessionBase : public HdcSessionBase {
     public:
-        MOCK_METHOD3(FetchIOBuf, int(HSession, uint8_t *, int));
+        MOCK_METHOD3(FetchIOBuf, int(HSessionPtr, uint8_t *, int));
         explicit MockHdcSessionBase(bool server) : HdcSessionBase(server) {}
     } mockSession(true);
     hdcSession.classInstance = static_cast<void *>(&mockSession);

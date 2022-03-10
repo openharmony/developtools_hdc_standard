@@ -17,28 +17,49 @@
 
 namespace Hdc {
 namespace Debug {
-    int WriteHexToDebugFile(const char *fileName, const uint8_t *buf, const int bufLen)
+    using namespace std;
+
+    FILE* OpenValidDebugFilePath(const char *fileName, const string& mode, string& filePath)
     {
+        if (fileName == nullptr) {
+            return nullptr;
+        }
         char pathName[BUF_SIZE_DEFAULT];
         if (snprintf_s(pathName, sizeof(pathName), sizeof(pathName) - 1, "/mnt/hgfs/vtmp/%s", fileName) < 0) {
-            return ERR_BUF_OVERFLOW;
+            return nullptr;
         }
         string srcPath = pathName;
         string resolvedPath = Base::CanonicalizeSpecPath(srcPath);
-        FILE *fp = fopen(resolvedPath.c_str(), "a+");
+        FILE *fp = fopen(resolvedPath.c_str(), mode.c_str());
         if (fp == nullptr) {
             if (snprintf_s(pathName, sizeof(pathName), sizeof(pathName) - 1, "/tmp/%s", fileName) < 0) {
                 WRITE_LOG(LOG_DEBUG, "Write hex to %s failed!", pathName);
-                return ERR_FILE_OPEN;
+                return nullptr;
             }
 
             srcPath = pathName;
             resolvedPath = Base::CanonicalizeSpecPath(srcPath);
-            if ((fp = fopen(resolvedPath.c_str(), "a+")) == nullptr) {
+            if ((fp = fopen(resolvedPath.c_str(), mode.c_str())) == nullptr) {
                 WRITE_LOG(LOG_DEBUG, "Write hex to %s failed!", pathName);
-                return ERR_FILE_OPEN;
+                return nullptr;
             }
         }
+        filePath = resolvedPath;
+        return fp;
+    }
+
+    int WriteHexToDebugFile(const char *fileName, const uint8_t *buf, const int bufLen)
+    {
+        if (fileName == nullptr || buf == nullptr) {
+            return ERR_GENERIC;
+        }
+
+        string filePath;
+        FILE* fp = OpenValidDebugFilePath(fileName, "a+", filePath);
+        if (fp == nullptr) {
+            return ERR_FILE_OPEN;
+        }
+
         fwrite(buf, 1, bufLen, fp);
         fflush(fp);
         fclose(fp);
@@ -47,23 +68,17 @@ namespace Debug {
 
     int ReadHexFromDebugFile(const char *fileName, uint8_t *buf, const int bufLen)
     {
-        char pathName[BUF_SIZE_DEFAULT];
-        if (snprintf_s(pathName, sizeof(pathName), sizeof(pathName) - 1, "/mnt/hgfs/vtmp/%s", fileName) < 0) {
-            return ERR_BUF_OVERFLOW;
+        if (fileName == nullptr || buf == nullptr) {
+            return ERR_GENERIC;
         }
-        FILE *fp = fopen(pathName, "r");
+        string filePath;
+        FILE* fp = OpenValidDebugFilePath(fileName, "r", filePath);
         if (fp == nullptr) {
-            if (snprintf_s(pathName, sizeof(pathName), sizeof(pathName) - 1, "/tmp/%s", fileName) < 0
-                || (fp = fopen(pathName, "r")) == nullptr) {
-                if (fp != nullptr) {
-                    fclose(fp);
-                }
-                WRITE_LOG(LOG_DEBUG, "Write hex to %s failed!", pathName);
-                return ERR_FILE_WRITE;
-            }
+            return ERR_FILE_OPEN;
         }
+
         struct stat statbuf;
-        stat(pathName, &statbuf);
+        stat(filePath, &statbuf);
         int size = statbuf.st_size;
         if (size > bufLen) {
             fclose(fp);
@@ -78,11 +93,11 @@ namespace Debug {
         return size;
     }
 
-    void DetermineThread(HSession hSession)
+    void DetermineThread(HSessionPtr hSessionPtr)
     {
-        if (uv_thread_self() == hSession->hWorkThread) {
+        if (uv_thread_self() == hSessionPtr->hWorkThread) {
             WRITE_LOG(LOG_WARN, "At main workthread");
-        } else if (uv_thread_self() == hSession->hWorkChildThread) {
+        } else if (uv_thread_self() == hSessionPtr->hWorkChildThread) {
             WRITE_LOG(LOG_WARN, "At child workthread");
         } else {
             WRITE_LOG(LOG_WARN, "At unknow workthread");
@@ -91,6 +106,9 @@ namespace Debug {
 
     int PrintfHexBuf(const uint8_t *buf, int bufLen)
     {
+        if (buf == nullptr) {
+            return -1;
+        }
         int i = 0;
         for (i = 0; i < bufLen; ++i) {
             printf("0x%02x, ", buf[i]);

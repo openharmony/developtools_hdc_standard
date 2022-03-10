@@ -15,7 +15,7 @@
 #include "daemon_app.h"
 
 namespace Hdc {
-HdcDaemonApp::HdcDaemonApp(HTaskInfo hTaskInfo)
+HdcDaemonApp::HdcDaemonApp(HTaskInfoPtr hTaskInfo)
     : HdcTransferBase(hTaskInfo)
 {
     commandBegin = CMD_APP_BEGIN;
