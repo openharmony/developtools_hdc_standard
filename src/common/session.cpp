@@ -1284,6 +1284,9 @@ bool HdcSessionBase::NeedNewTaskInfo(const uint16_t command, bool &masterTask)
         && (command == CMD_SHELL_INIT || (command > CMD_UNITY_COMMAND_HEAD && command < CMD_UNITY_COMMAND_TAIL))) {
         // daemon's single side command
         ret = true;
+    } else if (command == CMD_KEREL_WAKEUP_SLAVETASK) {
+        // slave tasks
+	ret = true;
     } else if (taskMasterInit) {
         // task init command
         masterTask = true;
