@@ -26,7 +26,7 @@ HdcDaemonForward::~HdcDaemonForward()
 
 void HdcDaemonForward::SetupJdwpPointCallBack(uv_idle_t *handle)
 {
-    HCtxForwardPtr ctxPoint = (HCtxForwardPtr)handle->data;
+    HCtxForward ctxPoint = (HCtxForward)handle->data;
     HdcDaemonForward *thisClass = reinterpret_cast<HdcDaemonForward *>(ctxPoint->thisClass);
     thisClass->SetupPointContinue(ctxPoint, 1);  // It usually works
     Base::TryCloseHandle((const uv_handle_t *)handle, Base::CloseIdleCallback);
@@ -35,7 +35,7 @@ void HdcDaemonForward::SetupJdwpPointCallBack(uv_idle_t *handle)
     return;
 }
 
-bool HdcDaemonForward::SetupJdwpPoint(HCtxForwardPtr ctxPoint)
+bool HdcDaemonForward::SetupJdwpPoint(HCtxForward ctxPoint)
 {
     HdcDaemon *daemon = (HdcDaemon *)taskInfo->ownerSessionClass;
     HdcJdwp *clsJdwp = (HdcJdwp *)daemon->clsJdwp;

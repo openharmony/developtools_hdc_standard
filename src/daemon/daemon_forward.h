@@ -23,7 +23,7 @@ public:
     virtual ~HdcDaemonForward();
 
 private:
-    bool SetupJdwpPoint(HCtxForwardPtr ctxPoint);
+    bool SetupJdwpPoint(HCtxForward ctxPoint);
     static void SetupJdwpPointCallBack(uv_idle_t *handle);
 };
 }  // namespace Hdc
