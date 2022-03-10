@@ -37,6 +37,9 @@ HdcTransferBase::~HdcTransferBase()
 
 bool HdcTransferBase::ResetCtx(CtxFile *context, bool full)
 {
+    if (context == nullptr) {
+        return false;
+    }
     if (full) {
         *context = {};
         context->fsOpenReq.data = context;
@@ -54,6 +57,9 @@ bool HdcTransferBase::ResetCtx(CtxFile *context, bool full)
 
 int HdcTransferBase::SimpleFileIO(CtxFile *context, uint64_t index, uint8_t *sendBuf, int bytes)
 {
+    if (context == nullptr) {
+        return -1;
+    }
     // The first 8 bytes file offset
     uint8_t *buf = new uint8_t[bytes]();
     CtxFileIO *ioContext = new CtxFileIO();
@@ -104,9 +110,15 @@ int HdcTransferBase::SimpleFileIO(CtxFile *context, uint64_t index, uint8_t *sen
 
 void HdcTransferBase::OnFileClose(uv_fs_t *req)
 {
+    if (req == nullptr || req->data == nullptr) {
+        return;
+    }
     uv_fs_req_cleanup(req);
     CtxFile *context = (CtxFile *)req->data;
     HdcTransferBase *thisClass = (HdcTransferBase *)context->thisClass;
+    if (thisClass != nullptr) {
+        return;
+    }
     if (context->closeNotify) {
         // close-step2
         // maybe successful finish or failed finish
@@ -118,6 +130,9 @@ void HdcTransferBase::OnFileClose(uv_fs_t *req)
 
 void HdcTransferBase::SetFileTime(CtxFile *context)
 {
+    if (context == nullptr) {
+        return;
+    }
     if (!context->transferConfig.holdTimestamp) {
         return;
     }
@@ -182,8 +197,14 @@ bool HdcTransferBase::SendIOPayload(CtxFile *context, int index, uint8_t *data, 
 
 void HdcTransferBase::OnFileIO(uv_fs_t *req)
 {
+    if (req == nullptr || req->data == nullptr) {
+        return;
+    }
     CtxFileIO *contextIO = (CtxFileIO *)req->data;
     CtxFile *context = (CtxFile *)contextIO->context;
+    if (context == nullptr || context->thisClass) {
+        return;
+    }
     HdcTransferBase *thisClass = (HdcTransferBase *)context->thisClass;
     uint8_t *bufIO = contextIO->bufIO;
     uv_fs_req_cleanup(req);
@@ -249,8 +270,14 @@ void HdcTransferBase::OnFileIO(uv_fs_t *req)
 
 void HdcTransferBase::OnFileOpen(uv_fs_t *req)
 {
+    if (req == nullptr || req->data == nullptr) {
+        return;
+    }
     CtxFile *context = (CtxFile *)req->data;
     HdcTransferBase *thisClass = (HdcTransferBase *)context->thisClass;
+    if (thisClass == nullptr) {
+        return;
+    }
     uv_fs_req_cleanup(req);
     WRITE_LOG(LOG_DEBUG, "Filemod openfile:%s", context->localPath.c_str());
     --thisClass->refCount;
@@ -300,6 +327,9 @@ bool HdcTransferBase::MatchPackageExtendName(string fileName, string extName)
 // filter can be empty
 int HdcTransferBase::GetSubFiles(const char *path, string filter, vector<string> *out)
 {
+    if (path == nullptr || out == nullptr) {
+        return 0;
+    }
     int retNum = 0;
     uv_fs_t req = {};
     uv_dirent_t dent;
@@ -360,12 +390,15 @@ bool HdcTransferBase::SmartSlavePath(string &cwd, string &localPath, const char 
 
 bool HdcTransferBase::RecvIOPayload(CtxFile *context, uint8_t *data, int dataSize)
 {
+    if (data == nullptr) {
+        return false;
+    }
     uint8_t *clearBuf = nullptr;
     string serialStrring((char *)data, payloadPrefixReserve);
     TransferPayload pld;
     bool ret = false;
     SerialStruct::ParseFromString(pld, serialStrring);
-    clearBuf = new uint8_t[pld.uncompressSize]();
+    clearBuf = new(std::nothrow) uint8_t[pld.uncompressSize]();
     if (!clearBuf) {
         return false;
     }
