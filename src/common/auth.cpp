@@ -383,7 +383,7 @@ cleanup:
 
 void ReadDaemonKeys(const char *file, list<void *> *listPublicKey)
 {
-    if (file == nullptr || listPrivateKey == nullptr) {
+    if (file == nullptr || listPublicKey == nullptr) {
         return;
     }
     char buf[BUF_SIZE_DEFAULT2] = { 0 };
