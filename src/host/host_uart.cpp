@@ -333,7 +333,7 @@ int HdcHostUART::OpenSerialPort(const std::string &connectKey)
 
 #ifdef HOST_MINGW
         // review change to wstring ?
-        TCHAR apiBuf[PORT_NAME_LEN * numTmp];
+        TCHAR apiBuf[PORT_NAME_LEN * 2];
 #ifdef UNICODE
         _stprintf_s(apiBuf, MAX_PATH, _T("%S"), port.c_str());
 #else
