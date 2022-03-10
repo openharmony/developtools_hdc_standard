@@ -710,7 +710,7 @@ HTaskInfo HdcSessionBase::AdminTask(const uint8_t op, HSession hSession, const u
             hRet = mapTask[channelId];
             if (hRet != nullptr) {
                 delete hRet;
-	    }
+            }
             mapTask[channelId] = hInput;
             hRet = hInput;
             break;
