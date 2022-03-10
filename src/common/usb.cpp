@@ -163,7 +163,7 @@ void HdcUSBBase::PreSendUsbSoftReset(HSessionPtr hSessionPtr, uint32_t sessionId
 int HdcUSBBase::CheckPacketOption(HSessionPtr hSessionPtr, uint8_t *appendData, int dataSize)
 {
     if (hSessionPtr == nullptr || hSessionPtr->hUSB == nullptr || appendData == nullptr) {
-        return;
+        return ERR_GENERIC;
     }
     HUSBPtr hUSB = hSessionPtr->hUSB;
     // special short packet
@@ -191,7 +191,7 @@ int HdcUSBBase::CheckPacketOption(HSessionPtr hSessionPtr, uint8_t *appendData, 
 int HdcUSBBase::SendToHdcStream(HSessionPtr hSessionPtr, uv_stream_t *stream, uint8_t *appendData, int dataSize)
 {
     if (hSessionPtr == nullptr || hSessionPtr->hUSB == nullptr) {
-        return;
+        return ERR_GENERIC;
     }
     int childRet = 0;
     HUSBPtr hUSB = hSessionPtr->hUSB;

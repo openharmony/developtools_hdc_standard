@@ -117,7 +117,7 @@ bool HdcFile::SetMasterParameters(CtxFile *context, const char *command, int arg
 void HdcFile::CheckMaster(CtxFile *context)
 {
     if (context == nullptr) {
-        return false;
+        return;
     }
     string s = SerialStruct::SerializeToString(context->transferConfig);
     SendToAnother(CMD_FILE_CHECK, (uint8_t *)s.c_str(), s.size());
@@ -133,7 +133,7 @@ void HdcFile::WhenTransferFinish(CtxFile *context)
 void HdcFile::TransferSummary(CtxFile *context)
 {
     if (context == nullptr) {
-        return false;
+        return;
     }
     uint64_t nMSec = Base::GetRuntimeMSec() - context->transferBegin;
     double fRate = static_cast<double>(context->indexIO) / nMSec;  // / /1000 * 1000 = 0

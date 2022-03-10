@@ -480,7 +480,7 @@ bool KeylistIncrement(list<void *> *listKey, uint8_t &authKeyIndex, void **out)
     if (listKey == nullptr || out == nullptr) {
         return false;
     }
-    if (listKey.empty()) {
+    if (listKey->empty()) {
 #ifdef HDC_HOST
         LoadHostUserKey(listKey);
 #else
