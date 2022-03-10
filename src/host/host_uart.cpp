@@ -38,9 +38,9 @@ int HdcHostUART::Initial()
     return StartupUARTWork();
 }
 
-bool HdcHostUART::NeedStop(const HSessionPtr hSessionPtr)
+bool HdcHostUART::NeedStop(const HSession hSession)
 {
-    return (!uartOpened or (hSessionPtr->isDead and hSessionPtr->ref == 0));
+    return (!uartOpened or (hSession->isDead and hSession->ref == 0));
 }
 
 bool HdcHostUART::IsDeviceOpened(const HdcUART &uart)
@@ -69,22 +69,22 @@ void HdcHostUART::UartWriteThread()
     return;
 }
 
-void HdcHostUART::UartReadThread(HSessionPtr hSessionPtr)
+void HdcHostUART::UartReadThread(HSession hSession)
 {
-    HUARTPtr hUART = hSessionPtr->hUART;
+    HUART hUART = hSession->hUART;
     vector<uint8_t> dataReadBuf; // each thread/session have it own data buff
     // If something unexpected happens , max buffer size we allow
     WRITE_LOG(LOG_DEBUG, "%s devUartHandle:%d", __FUNCTION__, hUART->devUartHandle);
     size_t expectedSize = 0;
     while (dataReadBuf.size() < MAX_READ_BUFFER) {
-        if (NeedStop(hSessionPtr)) {
+        if (NeedStop(hSession)) {
             WRITE_LOG(LOG_FATAL, "%s stop ", __FUNCTION__);
             break;
         }
         ssize_t bytesRead = ReadUartDev(dataReadBuf, expectedSize, *hUART);
         if (bytesRead < 0) {
             WRITE_LOG(LOG_INFO, "%s read got fail , free the session", __FUNCTION__);
-            OnTransferError(hSessionPtr);
+            OnTransferError(hSession);
         } else if (bytesRead == 0) {
             WRITE_LOG(LOG_DEBUG, "%s read %zd, clean the data try read again.", __FUNCTION__,
                       bytesRead);
@@ -102,7 +102,7 @@ void HdcHostUART::UartReadThread(HSessionPtr hSessionPtr)
         }
         WRITE_LOG(LOG_DEBUG, "%s PackageProcess dataReadBuf.size():%d.", __FUNCTION__,
                   dataReadBuf.size());
-        expectedSize = PackageProcess(dataReadBuf, hSessionPtr);
+        expectedSize = PackageProcess(dataReadBuf, hSession);
     }
     WRITE_LOG(LOG_INFO, "Leave %s", __FUNCTION__);
     return;
@@ -233,7 +233,7 @@ std::string WstringToString(const std::wstring &wstr)
 }
 
 // review reanme for same func from linux
-int HdcHostUART::WinSetSerial(HUARTPtr hUART, string serialPort, int byteSize, int eqBaudRate)
+int HdcHostUART::WinSetSerial(HUART hUART, string serialPort, int byteSize, int eqBaudRate)
 {
     int winRet = RET_SUCCESS;
     COMMTIMEOUTS timeouts;
@@ -399,31 +399,31 @@ int HdcHostUART::OpenSerialPort(const std::string &connectKey)
     return ret;
 }
 
-void HdcHostUART::UpdateUARTDaemonInfo(const std::string &connectKey, HSessionPtr hSessionPtr,
+void HdcHostUART::UpdateUARTDaemonInfo(const std::string &connectKey, HSession hSession,
                                        ConnStatus connStatus)
 {
     // add to list
     HdcDaemonInformation diNew;
-    HDaemonInfoPtr diNewPtr = &diNew;
+    HDaemonInfo diNewPtr = &diNew;
     diNew.connectKey = connectKey;
     diNew.connType = CONN_SERIAL;
     diNew.connStatus = connStatus;
-    diNew.hSessionPtr = hSessionPtr;
+    diNew.hSession = hSession;
     WRITE_LOG(LOG_DEBUG, "%s uart connectKey :%s session %s change to %d", __FUNCTION__,
               connectKey.c_str(),
-              hSessionPtr == nullptr ? "<null>" : hSessionPtr->ToDebugString().c_str(), connStatus);
+              hSession == nullptr ? "<null>" : hSession->ToDebugString().c_str(), connStatus);
     if (connStatus == STATUS_UNKNOW) {
         server.AdminDaemonMap(OP_REMOVE, connectKey, diNewPtr);
-        if (hSessionPtr != nullptr and hSessionPtr->hUART != nullptr) {
-            connectedPorts.erase(hSessionPtr->hUART->serialPort);
+        if (hSession != nullptr and hSession->hUART != nullptr) {
+            connectedPorts.erase(hSession->hUART->serialPort);
         }
     } else {
         if (connStatus == STATUS_CONNECTED) {
-            if (hSessionPtr != nullptr and hSessionPtr->hUART != nullptr) {
-                connectedPorts.emplace(hSessionPtr->hUART->serialPort);
+            if (hSession != nullptr and hSession->hUART != nullptr) {
+                connectedPorts.emplace(hSession->hUART->serialPort);
             }
         }
-        HDaemonInfoPtr diOldPtr = nullptr;
+        HDaemonInfo diOldPtr = nullptr;
         server.AdminDaemonMap(OP_QUERY, connectKey, diOldPtr);
         if (diOldPtr == nullptr) {
             WRITE_LOG(LOG_DEBUG, "%s add new di", __FUNCTION__);
@@ -434,14 +434,14 @@ void HdcHostUART::UpdateUARTDaemonInfo(const std::string &connectKey, HSessionPt
     }
 }
 
-bool HdcHostUART::StartUartReadThread(HSessionPtr hSessionPtr)
+bool HdcHostUART::StartUartReadThread(HSession hSession)
 {
     try {
-        HUARTPtr hUART = hSessionPtr->hUART;
-        hUART->readThread = std::thread(&HdcHostUART::UartReadThread, this, hSessionPtr);
+        HUART hUART = hSession->hUART;
+        hUART->readThread = std::thread(&HdcHostUART::UartReadThread, this, hSession);
     } catch (...) {
-        server.FreeSession(hSessionPtr->sessionId);
-        UpdateUARTDaemonInfo(hSessionPtr->connectKey, hSessionPtr, STATUS_UNKNOW);
+        server.FreeSession(hSession->sessionId);
+        UpdateUARTDaemonInfo(hSession->connectKey, hSession, STATUS_UNKNOW);
         WRITE_LOG(LOG_WARN, "%s failed err", __FUNCTION__);
         return false;
     }
@@ -465,30 +465,30 @@ bool HdcHostUART::StartUartSendThread()
 }
 
 // Determines that daemonInfo must have the device
-HSessionPtr HdcHostUART::ConnectDaemonByUart(const HSessionPtr hSessionPtr, const HDaemonInfoPtr)
+HSession HdcHostUART::ConnectDaemonByUart(const HSession hSession, const HDaemonInfo)
 {
     if (!uartOpened) {
         WRITE_LOG(LOG_DEBUG, "%s non uart opened.", __FUNCTION__);
         return nullptr;
     }
-    HUARTPtr hUART = hSessionPtr->hUART;
-    UpdateUARTDaemonInfo(hSessionPtr->connectKey, hSessionPtr, STATUS_READY);
+    HUART hUART = hSession->hUART;
+    UpdateUARTDaemonInfo(hSession->connectKey, hSession, STATUS_READY);
     WRITE_LOG(LOG_DEBUG, "%s :%s", __FUNCTION__, hUART->serialPort.c_str());
-    if (!StartUartReadThread(hSessionPtr)) {
+    if (!StartUartReadThread(hSession)) {
         WRITE_LOG(LOG_DEBUG, "%s StartUartReadThread fail.", __FUNCTION__);
         return nullptr;
     }
 
     externInterface.StartWorkThread(&server.loopMain, server.SessionWorkThread,
-                                    Base::FinishWorkThread, hSessionPtr);
+                                    Base::FinishWorkThread, hSession);
     // wait for thread up
-    while (hSessionPtr->childLoop.active_handles == 0) {
+    while (hSession->childLoop.active_handles == 0) {
         uv_sleep(1);
     }
     auto ctrl = server.BuildCtrlString(SP_START_SESSION, 0, nullptr, 0);
-    externInterface.SendToStream((uv_stream_t *)&hSessionPtr->ctrlPipe[STREAM_MAIN], ctrl.data(),
+    externInterface.SendToStream((uv_stream_t *)&hSession->ctrlPipe[STREAM_MAIN], ctrl.data(),
                                  ctrl.size());
-    return hSessionPtr;
+    return hSession;
 }
 
 RetErrCode HdcHostUART::StartupUARTWork()
@@ -508,7 +508,7 @@ RetErrCode HdcHostUART::StartupUARTWork()
     return RET_SUCCESS;
 }
 
-HSessionPtr HdcHostUART::ConnectDaemon(const std::string &connectKey)
+HSession HdcHostUART::ConnectDaemon(const std::string &connectKey)
 {
     WRITE_LOG(LOG_DEBUG, "%s", __FUNCTION__);
     OpenSerialPort(connectKey);
@@ -532,7 +532,7 @@ void HdcHostUART::WatchUartDevPlugin()
         for (const auto &port : serialPortInfo) {
             WRITE_LOG(LOG_INFO, "%s found uart port :%s", __FUNCTION__, port.c_str());
             // check port have session
-            HDaemonInfoPtr hdi = nullptr;
+            HDaemonInfo hdi = nullptr;
             server.AdminDaemonMap(OP_QUERY, port, hdi);
             if (hdi == nullptr and connectedPorts.find(port) == connectedPorts.end()) {
                 UpdateUARTDaemonInfo(port, nullptr, STATUS_READY);
@@ -541,9 +541,9 @@ void HdcHostUART::WatchUartDevPlugin()
         for (const auto &port : serialPortRemoved) {
             WRITE_LOG(LOG_INFO, "%s remove uart port :%s", __FUNCTION__, port.c_str());
             // check port have session
-            HDaemonInfoPtr hdi = nullptr;
+            HDaemonInfo hdi = nullptr;
             server.AdminDaemonMap(OP_QUERY, port, hdi);
-            if (hdi != nullptr and hdi->hSessionPtr == nullptr) {
+            if (hdi != nullptr and hdi->hSession == nullptr) {
                 // we only remove the empty port
                 UpdateUARTDaemonInfo(port, nullptr, STATUS_UNKNOW);
             }
@@ -551,7 +551,7 @@ void HdcHostUART::WatchUartDevPlugin()
     }
 }
 
-bool HdcHostUART::ConnectMyNeed(HUARTPtr hUART, std::string connectKey)
+bool HdcHostUART::ConnectMyNeed(HUART hUART, std::string connectKey)
 {
     // we never use port to connect, we use connect key
     if (connectKey.empty()) {
@@ -562,16 +562,16 @@ bool HdcHostUART::ConnectMyNeed(HUARTPtr hUART, std::string connectKey)
     }
     UpdateUARTDaemonInfo(connectKey, nullptr, STATUS_READY);
 
-    HSessionPtr hSessionPtr = server.MallocSession(true, CONN_SERIAL, this);
-    hSessionPtr->connectKey = connectKey;
+    HSession hSession = server.MallocSession(true, CONN_SERIAL, this);
+    hSession->connectKey = connectKey;
 #if defined(HOST_LINUX)
-    hSessionPtr->hUART->devUartHandle = hUART->devUartHandle;
+    hSession->hUART->devUartHandle = hUART->devUartHandle;
 #elif defined(HOST_MINGW)
-    hSessionPtr->hUART->devUartHandle = hUART->devUartHandle;
+    hSession->hUART->devUartHandle = hUART->devUartHandle;
 #endif
 
-    hSessionPtr->hUART->serialPort = hUART->serialPort;
-    WRITE_LOG(LOG_DEBUG, "%s connectkey:%s,port:%s", __FUNCTION__, hSessionPtr->connectKey.c_str(),
+    hSession->hUART->serialPort = hUART->serialPort;
+    WRITE_LOG(LOG_DEBUG, "%s connectkey:%s,port:%s", __FUNCTION__, hSession->connectKey.c_str(),
               hUART->serialPort.c_str());
     uv_timer_t *waitTimeDoCmd = new(std::nothrow) uv_timer_t;
     if (waitTimeDoCmd == nullptr) {
@@ -579,10 +579,10 @@ bool HdcHostUART::ConnectMyNeed(HUARTPtr hUART, std::string connectKey)
         return false;
     }
     uv_timer_init(&server.loopMain, waitTimeDoCmd);
-    waitTimeDoCmd->data = hSessionPtr;
+    waitTimeDoCmd->data = hSession;
     if (externInterface.UvTimerStart(waitTimeDoCmd, server.UartPreConnect, UV_TIMEOUT, UV_REPEAT) !=
         RET_SUCCESS) {
-        WRITE_LOG(LOG_DEBUG, "%s for %s:%s fail.", __FUNCTION__, hSessionPtr->connectKey.c_str(),
+        WRITE_LOG(LOG_DEBUG, "%s for %s:%s fail.", __FUNCTION__, hSession->connectKey.c_str(),
                   hUART->serialPort.c_str());
         return false;
     }
@@ -591,29 +591,29 @@ bool HdcHostUART::ConnectMyNeed(HUARTPtr hUART, std::string connectKey)
     return true;
 }
 
-void HdcHostUART::KickoutZombie(HSessionPtr hSessionPtr)
+void HdcHostUART::KickoutZombie(HSession hSession)
 {
-    if (hSessionPtr == nullptr or hSessionPtr->hUART == nullptr or hSessionPtr->isDead) {
+    if (hSession == nullptr or hSession->hUART == nullptr or hSession->isDead) {
         return;
     }
 #ifdef _WIN32
-    if (hSessionPtr->hUART->devUartHandle == INVALID_HANDLE_VALUE) {
+    if (hSession->hUART->devUartHandle == INVALID_HANDLE_VALUE) {
         return;
     }
 #else
-    if (hSessionPtr->hUART->devUartHandle < 0) {
+    if (hSession->hUART->devUartHandle < 0) {
         return;
     }
 #endif
-    WRITE_LOG(LOG_DEBUG, "%s FreeSession %s", __FUNCTION__, hSessionPtr->ToDebugString().c_str());
-    server.FreeSession(hSessionPtr->sessionId);
+    WRITE_LOG(LOG_DEBUG, "%s FreeSession %s", __FUNCTION__, hSession->ToDebugString().c_str());
+    server.FreeSession(hSession->sessionId);
 }
 
-HSessionPtr HdcHostUART::GetSession(const uint32_t sessionId, bool)
+HSession HdcHostUART::GetSession(const uint32_t sessionId, bool)
 {
     return server.AdminSession(OP_QUERY, sessionId, nullptr);
 }
-void HdcHostUART::CloseSerialPort(const HUARTPtr hUART)
+void HdcHostUART::CloseSerialPort(const HUART hUART)
 {
     WRITE_LOG(LOG_DEBUG, "try to close dev handle %d", __FUNCTION__, hUART->devUartHandle);
 
@@ -630,7 +630,7 @@ void HdcHostUART::CloseSerialPort(const HUARTPtr hUART)
 #endif
 }
 
-void HdcHostUART::OnTransferError(const HSessionPtr session)
+void HdcHostUART::OnTransferError(const HSession session)
 {
     if (session != nullptr) {
         WRITE_LOG(LOG_FATAL, "%s:%s", __FUNCTION__, session->ToDebugString().c_str());
@@ -655,7 +655,7 @@ void HdcHostUART::OnTransferError(const HSessionPtr session)
 }
 
 // review what about merge Restartession with OnTransferError ?
-void HdcHostUART::Restartession(const HSessionPtr session)
+void HdcHostUART::Restartession(const HSession session)
 {
     HdcUARTBase::Restartession(session);
     // allow timer watcher make a new session.
@@ -668,15 +668,15 @@ void HdcHostUART::Restartession(const HSessionPtr session)
     }
 }
 
-void HdcHostUART::StopSession(HSessionPtr hSessionPtr)
+void HdcHostUART::StopSession(HSession hSession)
 {
-    if (hSessionPtr == nullptr) {
-        WRITE_LOG(LOG_FATAL, "%s hSessionPtr is null", __FUNCTION__);
+    if (hSession == nullptr) {
+        WRITE_LOG(LOG_FATAL, "%s hSession is null", __FUNCTION__);
         return;
     }
-    WRITE_LOG(LOG_DEBUG, "%s hSessionPtr %s will be stop and free", __FUNCTION__,
-              hSessionPtr->ToDebugString().c_str());
-    HUARTPtr hUART = hSessionPtr->hUART;
+    WRITE_LOG(LOG_DEBUG, "%s hSession %s will be stop and free", __FUNCTION__,
+              hSession->ToDebugString().c_str());
+    HUART hUART = hSession->hUART;
     if (hUART == nullptr) {
         WRITE_LOG(LOG_FATAL, "%s hUART is null", __FUNCTION__);
     } else {
@@ -697,7 +697,7 @@ void HdcHostUART::StopSession(HSessionPtr hSessionPtr)
     }
 
     // call the base side
-    HdcUARTBase::StopSession(hSessionPtr);
+    HdcUARTBase::StopSession(hSession);
 }
 
 std::vector<std::string> HdcHostUART::StringSplit(std::string source, std::string split)
@@ -747,7 +747,7 @@ bool HdcHostUART::GetPortFromKey(const std::string &connectKey, std::string &por
     }
 }
 
-void HdcHostUART::SendUartSoftReset(HSessionPtr hSessionPtr, uint32_t sessionId)
+void HdcHostUART::SendUartSoftReset(HSession hSession, uint32_t sessionId)
 {
     UartHead resetPackage(sessionId, PKG_OPTION_RESET);
     resetPackage.dataSize = sizeof(UartHead);

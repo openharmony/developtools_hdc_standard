@@ -58,7 +58,7 @@ HWTEST_F(HdcJdwpTest, TestCreateJdwpTracker, TestSize.Level1)
     ASSERT_NE(mJdwpTest, nullptr) << "Instanse HdcJdwp fail.";
     ASSERT_EQ(mJdwpTest->Initial(), 0) << "Instanse HdcJdwp fail.";
     ASSERT_EQ(mJdwpTest->CreateJdwpTracker(nullptr), 0) << "CreateJdwpTracker nullptr fail.";
-    HTaskInfoPtr hTaskInfo = new TaskInformation();
+    HTaskInfo hTaskInfo = new TaskInformation();
     HdcSessionBase HdcSessionTest(false);
     hTaskInfo->ownerSessionClass = &HdcSessionTest;
     ASSERT_EQ(mJdwpTest->CreateJdwpTracker(hTaskInfo), 1) << "CreateJdwpTracker valid param fail.";

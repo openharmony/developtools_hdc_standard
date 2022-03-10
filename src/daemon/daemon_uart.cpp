@@ -166,28 +166,28 @@ void HdcDaemonUART::ResetOldSession(uint32_t sessionId)
     if (sessionId == 0) {
         sessionId = currentSessionId;
     }
-    HSessionPtr hSessionPtr = daemon.AdminSession(OP_QUERY, sessionId, nullptr);
-    if (hSessionPtr == nullptr) {
+    HSession hSession = daemon.AdminSession(OP_QUERY, sessionId, nullptr);
+    if (hSession == nullptr) {
         return;
     }
-    if (hSessionPtr->hUART != nullptr) {
-        hSessionPtr->hUART->resetIO = true;
+    if (hSession->hUART != nullptr) {
+        hSession->hUART->resetIO = true;
     }
     // The Host side is restarted, but the USB cable is still connected
     WRITE_LOG(LOG_WARN, "Hostside softreset to restart daemon, old sessionId:%u", sessionId);
-    OnTransferError(hSessionPtr);
+    OnTransferError(hSession);
 }
 
-HSessionPtr HdcDaemonUART::GetSession(const uint32_t sessionId, bool create = false)
+HSession HdcDaemonUART::GetSession(const uint32_t sessionId, bool create = false)
 {
-    HSessionPtr hSessionPtr = daemon.AdminSession(OP_QUERY, sessionId, nullptr);
-    if (hSessionPtr == nullptr and create) {
-        hSessionPtr = PrepareNewSession(sessionId);
+    HSession hSession = daemon.AdminSession(OP_QUERY, sessionId, nullptr);
+    if (hSession == nullptr and create) {
+        hSession = PrepareNewSession(sessionId);
     }
-    return hSessionPtr;
+    return hSession;
 }
 
-void HdcDaemonUART::OnTransferError(const HSessionPtr session)
+void HdcDaemonUART::OnTransferError(const HSession session)
 {
     // review maybe we can do something more ?
     if (session != nullptr) {
@@ -202,11 +202,11 @@ void HdcDaemonUART::OnNewHandshakeOK(const uint32_t sessionId)
     currentSessionId = sessionId;
 }
 
-HSessionPtr HdcDaemonUART::PrepareNewSession(uint32_t sessionId)
+HSession HdcDaemonUART::PrepareNewSession(uint32_t sessionId)
 {
     WRITE_LOG(LOG_FATAL, "%s sessionId:%u", __FUNCTION__, sessionId);
-    HSessionPtr hSessionPtr = daemon.MallocSession(false, CONN_SERIAL, this, sessionId);
-    if (!hSessionPtr) {
+    HSession hSession = daemon.MallocSession(false, CONN_SERIAL, this, sessionId);
+    if (!hSession) {
         WRITE_LOG(LOG_FATAL, "new session malloc failed for sessionId:%u", sessionId);
         return nullptr;
     }
@@ -217,24 +217,24 @@ HSessionPtr HdcDaemonUART::PrepareNewSession(uint32_t sessionId)
         daemon.PushAsyncMessage(currentSessionId, ASYNC_FREE_SESSION, nullptr, 0);
     }
     externInterface.StartWorkThread(&daemon.loopMain, daemon.SessionWorkThread,
-                                    Base::FinishWorkThread, hSessionPtr);
+                                    Base::FinishWorkThread, hSession);
     auto funcNewSessionUp = [](uv_timer_t *handle) -> void {
-        HSessionPtr hSessionPtr = reinterpret_cast<HSessionPtr>(handle->data);
-        HdcDaemon &daemonSession = *reinterpret_cast<HdcDaemon *>(hSessionPtr->classInstance);
-        if (hSessionPtr->childLoop.active_handles == 0) {
+        HSession hSession = reinterpret_cast<HSession>(handle->data);
+        HdcDaemon &daemonSession = *reinterpret_cast<HdcDaemon *>(hSession->classInstance);
+        if (hSession->childLoop.active_handles == 0) {
             WRITE_LOG(LOG_DEBUG, "No active_handles.");
             return;
         }
-        if (!hSessionPtr->isDead) {
+        if (!hSession->isDead) {
             auto ctrl = daemonSession.BuildCtrlString(SP_START_SESSION, 0, nullptr, 0);
-            Base::SendToStream((uv_stream_t *)&hSessionPtr->ctrlPipe[STREAM_MAIN], ctrl.data(),
+            Base::SendToStream((uv_stream_t *)&hSession->ctrlPipe[STREAM_MAIN], ctrl.data(),
                                ctrl.size());
             WRITE_LOG(LOG_DEBUG, "Main thread uartio mirgate finish");
         }
         Base::TryCloseHandle(reinterpret_cast<uv_handle_t *>(handle), Base::CloseTimerCallback);
     };
-    externInterface.TimerUvTask(&daemon.loopMain, hSessionPtr, funcNewSessionUp);
-    return hSessionPtr;
+    externInterface.TimerUvTask(&daemon.loopMain, hSession, funcNewSessionUp);
+    return hSession;
 }
 
 // review Merge this with Host side
@@ -314,18 +314,18 @@ int HdcDaemonUART::LoopUARTWrite()
     return -1;
 }
 
-bool HdcDaemonUART::IsSendReady(HSessionPtr hSessionPtr)
+bool HdcDaemonUART::IsSendReady(HSession hSession)
 {
-    if (isAlive and !hSessionPtr->isDead and uartHandle >= 0 and !hSessionPtr->hUART->resetIO) {
+    if (isAlive and !hSession->isDead and uartHandle >= 0 and !hSession->hUART->resetIO) {
         return true;
     } else {
         if (!isAlive) {
             WRITE_LOG(LOG_WARN, "!isAlive");
-        } else if (hSessionPtr->isDead) {
+        } else if (hSession->isDead) {
             WRITE_LOG(LOG_WARN, "session isDead");
         } else if (uartHandle < 0) {
             WRITE_LOG(LOG_WARN, "uartHandle is not valid");
-        } else if (hSessionPtr->hUART->resetIO) {
+        } else if (hSession->hUART->resetIO) {
             WRITE_LOG(LOG_WARN, "session have resetIO");
         }
         return false;

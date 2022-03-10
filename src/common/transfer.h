@@ -43,7 +43,7 @@ public:
         uint32_t compressSize;
         uint32_t uncompressSize;
     };
-    HdcTransferBase(HTaskInfoPtr hTaskInfo);
+    HdcTransferBase(HTaskInfo hTaskInfo);
     virtual ~HdcTransferBase();
     virtual void StopTask()
     {

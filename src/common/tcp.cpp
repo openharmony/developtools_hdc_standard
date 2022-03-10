@@ -79,8 +79,8 @@ void HdcTCPBase::ReadStream(uv_stream_t *tcp, ssize_t nread, const uv_buf_t *buf
     if (tcp == nullptr || tcp->data == nullptr) {
         return;
     }
-    HSessionPtr hSessionPtr = (HSessionPtr)tcp->data;
-    HdcTCPBase *thisClass = (HdcTCPBase *)hSessionPtr->classModule;
+    HSession hSession = (HSession)tcp->data;
+    HdcTCPBase *thisClass = (HdcTCPBase *)hSession->classModule;
     if (thisClass == nullptr || thisClass->clsMainBase) {
         return;
     }
@@ -99,7 +99,7 @@ void HdcTCPBase::ReadStream(uv_stream_t *tcp, ssize_t nread, const uv_buf_t *buf
             WRITE_LOG(LOG_DEBUG, "HdcTCPBase::ReadStream < 0 %s", buffer);
             break;
         }
-        if (hSessionBase->FetchIOBuf(hSessionPtr, hSessionPtr->ioBuf, nread) < 0) {
+        if (hSessionBase->FetchIOBuf(hSession, hSession->ioBuf, nread) < 0) {
             break;
         }
         ret = true;
@@ -108,7 +108,7 @@ void HdcTCPBase::ReadStream(uv_stream_t *tcp, ssize_t nread, const uv_buf_t *buf
     if (!ret) {
         // The first time is closed first, prevent the write function from continuing to write
         Base::TryCloseHandle(reinterpret_cast<uv_handle_t *>(tcp));
-        hSessionBase->FreeSession(hSessionPtr->sessionId);
+        hSessionBase->FreeSession(hSession->sessionId);
     }
 }
 }  // namespace Hdc

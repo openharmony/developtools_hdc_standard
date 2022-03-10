@@ -15,7 +15,7 @@
 #include "host_app.h"
 
 namespace Hdc {
-HdcHostApp::HdcHostApp(HTaskInfoPtr hTaskInfo)
+HdcHostApp::HdcHostApp(HTaskInfo hTaskInfo)
     : HdcTransferBase(hTaskInfo)
 {
     commandBegin = CMD_APP_BEGIN;

@@ -22,7 +22,7 @@
 namespace Hdc {
 constexpr uint64_t HDC_TIME_CONVERT_BASE = 1000000000;
 
-HdcTransferBase::HdcTransferBase(HTaskInfoPtr hTaskInfo)
+HdcTransferBase::HdcTransferBase(HTaskInfo hTaskInfo)
     : HdcTaskBase(hTaskInfo)
 {
     ResetCtx(&ctxNow, true);

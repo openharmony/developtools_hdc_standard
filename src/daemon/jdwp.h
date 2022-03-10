@@ -24,8 +24,8 @@ public:
     virtual ~HdcJdwp();
     int Initial();
     void Stop();
-    bool CreateJdwpTracker(HTaskInfoPtr taskInfo);
-    void RemoveJdwpTracker(HTaskInfoPtr taskInfo);
+    bool CreateJdwpTracker(HTaskInfo taskInfo);
+    void RemoveJdwpTracker(HTaskInfo taskInfo);
     bool ReadyForRelease();
     string GetProcessList();
     bool SendJdwpNewFD(uint32_t targetPID, int fd);
@@ -85,8 +85,8 @@ private:
     void FreeContext(HCtxJdwp ctx);
     void *AdminContext(const uint8_t op, const uint32_t pid, HCtxJdwp ctxJdwp);
     int CreateFdEventPoll();
-    void ProcessListUpdated(HTaskInfoPtr task = nullptr);
-    void SendProcessList(HTaskInfoPtr t, string data);
+    void ProcessListUpdated(HTaskInfo task = nullptr);
+    void SendProcessList(HTaskInfo t, string data);
     void DrainAwakenPollThread() const;
     void WakePollThread();
     uv_loop_t *loop;
@@ -97,7 +97,7 @@ private:
     uv_rwlock_t lockMapContext;
     uv_rwlock_t lockJdwpTrack;
     std::unordered_map<int, PollNode> pollNodeMap;  // fd, PollNode
-    std::vector<HTaskInfoPtr> jdwpTrackers;
+    std::vector<HTaskInfo> jdwpTrackers;
     bool stop;
 };
 } // namespace Hdc

@@ -19,7 +19,7 @@
 namespace Hdc {
 class HdcDaemonUnity : public HdcTaskBase {
 public:
-    HdcDaemonUnity(HTaskInfoPtr hTaskInfo);
+    HdcDaemonUnity(HTaskInfo hTaskInfo);
     virtual ~HdcDaemonUnity();
     bool CommandDispatch(const uint16_t command, uint8_t *payload, const int payloadSize);
     void StopTask();

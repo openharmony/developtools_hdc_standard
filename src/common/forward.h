@@ -19,7 +19,7 @@
 namespace Hdc {
 class HdcForwardBase : public HdcTaskBase {
 public:
-    HdcForwardBase(HTaskInfoPtr hTaskInfo);
+    HdcForwardBase(HTaskInfo hTaskInfo);
     virtual ~HdcForwardBase();
     bool CommandDispatch(const uint16_t command, uint8_t *payload, const int payloadSize);
     bool BeginForward(const string &command, string &sError);

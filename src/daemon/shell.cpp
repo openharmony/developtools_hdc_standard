@@ -18,7 +18,7 @@
 namespace Hdc {
 std::mutex HdcShell::mutexPty;
 
-HdcShell::HdcShell(HTaskInfoPtr hTaskInfo)
+HdcShell::HdcShell(HTaskInfo hTaskInfo)
     : HdcTaskBase(hTaskInfo)
 {
     childShell = nullptr;

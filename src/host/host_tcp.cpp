@@ -95,32 +95,32 @@ void HdcHostTCP::BroadcatFindDaemon(const char *broadcastLanIP)
 
 void HdcHostTCP::Connect(uv_connect_t *connection, int status)
 {
-    HSessionPtr hSessionPtr = (HSessionPtr)connection->data;
+    HSession hSession = (HSession)connection->data;
     delete connection;
-    HdcSessionBase *ptrConnect = (HdcSessionBase *)hSessionPtr->classInstance;
+    HdcSessionBase *ptrConnect = (HdcSessionBase *)hSession->classInstance;
     auto ctrl = ptrConnect->BuildCtrlString(SP_START_SESSION, 0, nullptr, 0);
     if (status < 0) {
         goto Finish;
     }
-    if ((hSessionPtr->fdChildWorkTCP = Base::DuplicateUvSocket(&hSessionPtr->hWorkTCP)) < 0) {
+    if ((hSession->fdChildWorkTCP = Base::DuplicateUvSocket(&hSession->hWorkTCP)) < 0) {
         goto Finish;
     }
-    uv_read_stop((uv_stream_t *)&hSessionPtr->hWorkTCP);
-    Base::SetTcpOptions((uv_tcp_t *)&hSessionPtr->hWorkTCP);
+    uv_read_stop((uv_stream_t *)&hSession->hWorkTCP);
+    Base::SetTcpOptions((uv_tcp_t *)&hSession->hWorkTCP);
     WRITE_LOG(LOG_DEBUG, "HdcHostTCP::Connect");
-    Base::StartWorkThread(&ptrConnect->loopMain, ptrConnect->SessionWorkThread, Base::FinishWorkThread, hSessionPtr);
+    Base::StartWorkThread(&ptrConnect->loopMain, ptrConnect->SessionWorkThread, Base::FinishWorkThread, hSession);
     // wait for thread up
-    while (hSessionPtr->childLoop.active_handles == 0) {
+    while (hSession->childLoop.active_handles == 0) {
         uv_sleep(MINOR_TIMEOUT);
     }
-    Base::SendToStream((uv_stream_t *)&hSessionPtr->ctrlPipe[STREAM_MAIN], ctrl.data(), ctrl.size());
+    Base::SendToStream((uv_stream_t *)&hSession->ctrlPipe[STREAM_MAIN], ctrl.data(), ctrl.size());
     return;
 Finish:
     WRITE_LOG(LOG_FATAL, "Connect failed");
-    ptrConnect->FreeSession(hSessionPtr->sessionId);
+    ptrConnect->FreeSession(hSession->sessionId);
 }
 
-HSessionPtr HdcHostTCP::ConnectDaemon(const string &connectKey)
+HSession HdcHostTCP::ConnectDaemon(const string &connectKey)
 {
     char ip[BUF_SIZE_TINY] = "";
     uint16_t port = 0;
@@ -129,23 +129,23 @@ HSessionPtr HdcHostTCP::ConnectDaemon(const string &connectKey)
     }
 
     HdcSessionBase *ptrConnect = (HdcSessionBase *)clsMainBase;
-    HSessionPtr hSessionPtr = ptrConnect->MallocSession(true, CONN_TCP, this);
-    if (!hSessionPtr) {
+    HSession hSession = ptrConnect->MallocSession(true, CONN_TCP, this);
+    if (!hSession) {
         return nullptr;
     }
-    hSessionPtr->connectKey = connectKey;
+    hSession->connectKey = connectKey;
     struct sockaddr_in6 dest;
     uv_ip6_addr(ip, port, &dest);
     uv_connect_t *conn = new(std::nothrow) uv_connect_t();
     if (conn == nullptr) {
         WRITE_LOG(LOG_FATAL, "ConnectDaemon new conn failed");
-        delete hSessionPtr;
-        hSessionPtr = nullptr;
+        delete hSession;
+        hSession = nullptr;
         return nullptr;
     }
-    conn->data = hSessionPtr;
-    uv_tcp_connect(conn, (uv_tcp_t *)&hSessionPtr->hWorkTCP, (const struct sockaddr *)&dest, Connect);
-    return hSessionPtr;
+    conn->data = hSession;
+    uv_tcp_connect(conn, (uv_tcp_t *)&hSession->hWorkTCP, (const struct sockaddr *)&dest, Connect);
+    return hSession;
 }
 
 void HdcHostTCP::FindLanDaemon()

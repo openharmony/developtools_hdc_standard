@@ -39,11 +39,11 @@ public:
     std::default_random_engine rnd;
     class MockHdcDaemon : public HdcDaemon {
         MockHdcDaemon() : HdcDaemon(false) {};
-        MOCK_METHOD4(MallocSession, HSessionPtr(bool, const ConnType, void *, uint32_t));
+        MOCK_METHOD4(MallocSession, HSession(bool, const ConnType, void *, uint32_t));
         MOCK_METHOD4(PushAsyncMessage,
                      void(const uint32_t, const uint8_t, const void *, const int));
         MOCK_METHOD1(FreeSession, void(const uint32_t));
-        MOCK_METHOD3(AdminSession, HSessionPtr(const uint8_t, const uint32_t, HSessionPtr));
+        MOCK_METHOD3(AdminSession, HSession(const uint8_t, const uint32_t, HSession));
     } mockDaemon;
     const std::string nullDevPath = "/dev/null";
 
@@ -68,11 +68,11 @@ public:
         MOCK_METHOD0(WatcherTimerCallBack, void(void));
         MOCK_METHOD0(DeamonReadThread, void(void));
         MOCK_METHOD0(DeamonWriteThread, void(void));
-        MOCK_METHOD1(IsSendReady, bool(HSessionPtr));
-        MOCK_METHOD1(PrepareNewSession, HSessionPtr(uint32_t));
-        MOCK_METHOD2(PackageProcess, size_t(vector<uint8_t> &data, HSessionPtr hSessionPtr));
-        MOCK_METHOD3(SendUARTDev, size_t(HSessionPtr, uint8_t *, const size_t));
-        MOCK_METHOD3(UartSendToHdcStream, bool(HSessionPtr, uint8_t *, size_t));
+        MOCK_METHOD1(IsSendReady, bool(HSession));
+        MOCK_METHOD1(PrepareNewSession, HSession(uint32_t));
+        MOCK_METHOD2(PackageProcess, size_t(vector<uint8_t> &data, HSession hSession));
+        MOCK_METHOD3(SendUARTDev, size_t(HSession, uint8_t *, const size_t));
+        MOCK_METHOD3(UartSendToHdcStream, bool(HSession, uint8_t *, size_t));
         MOCK_METHOD4(ValidateUartPacket,
                      RetErrCode(vector<uint8_t> &, uint32_t &, uint32_t &, size_t &));
     } mockDaemonUART;
@@ -351,8 +351,8 @@ HWTEST_F(HdcDaemonUARTTest, LoopUARTWrite, TestSize.Level1)
  */
 HWTEST_F(HdcDaemonUARTTest, IsSendReady, TestSize.Level1)
 {
-    ON_CALL(mockDaemonUART, IsSendReady).WillByDefault([&](HSessionPtr hSessionPtr) {
-        return mockDaemonUART.HdcDaemonUART::IsSendReady(hSessionPtr);
+    ON_CALL(mockDaemonUART, IsSendReady).WillByDefault([&](HSession hSession) {
+        return mockDaemonUART.HdcDaemonUART::IsSendReady(hSession);
     });
     EXPECT_CALL(mockDaemonUART, IsSendReady).Times(AtLeast(1));
 

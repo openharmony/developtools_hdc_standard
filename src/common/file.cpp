@@ -16,7 +16,7 @@
 #include "serial_struct.h"
 
 namespace Hdc {
-HdcFile::HdcFile(HTaskInfoPtr hTaskInfo)
+HdcFile::HdcFile(HTaskInfo hTaskInfo)
     : HdcTransferBase(hTaskInfo)
 {
     commandBegin = CMD_FILE_BEGIN;
