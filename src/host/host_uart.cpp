@@ -317,7 +317,6 @@ int HdcHostUART::OpenSerialPort(const std::string &connectKey)
     std::string portName;
     uint32_t baudRate;
     static int ret = 0;
-    constexpr int numTmp = 2;
 
     if (memset_s(&uart, sizeof(HdcUART), 0, sizeof(HdcUART)) != EOK) {
         return -1;
@@ -524,7 +523,6 @@ This function does the following:
 void HdcHostUART::WatchUartDevPlugin()
 {
     std::lock_guard<std::mutex> lock(semUartDevCheck);
-    HDaemonInfoPtr hdi = nullptr;
     bool portChange = false;
 
     if (!EnumSerialPort(portChange)) {

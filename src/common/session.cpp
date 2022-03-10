@@ -923,7 +923,7 @@ int HdcSessionBase::FetchIOBuf(HSessionPtr hSessionPtr, uint8_t *ioBuf, int read
 void HdcSessionBase::AllocCallback(uv_handle_t *handle, size_t sizeWanted, uv_buf_t *buf)
 {
     if (handle == nullptr || handle->data == nullptr || buf == nullptr) {
-        retrun;
+        return;
     }
     HSessionPtr context = (HSessionPtr)handle->data;
     Base::ReallocBuf(&context->ioBuf, &context->bufSize, HDC_SOCKETPAIR_SIZE);
@@ -935,7 +935,7 @@ void HdcSessionBase::AllocCallback(uv_handle_t *handle, size_t sizeWanted, uv_bu
 void HdcSessionBase::FinishWriteSessionTCP(uv_write_t *req, int status)
 {
     if (req == nullptr || req->handle == nullptr || req->handle->data == nullptr) {
-        retrun;
+        return;
     }
     HSessionPtr hSessionPtr = (HSessionPtr)req->handle->data;
     --hSessionPtr->ref;

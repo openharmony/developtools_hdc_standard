@@ -78,7 +78,7 @@ namespace Debug {
         }
 
         struct stat statbuf;
-        stat(filePath, &statbuf);
+        stat(filePath.c_str(), &statbuf);
         int size = statbuf.st_size;
         if (size > bufLen) {
             fclose(fp);

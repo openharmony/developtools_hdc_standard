@@ -99,7 +99,7 @@ void HdcFileDescriptor::OnFileIO(uv_fs_t *req)
         }
     } while (false);
     uv_fs_req_cleanup(req);
-    if (buff != nullptr) {
+    if (buf != nullptr) {
         delete[] buf;
     }
 
