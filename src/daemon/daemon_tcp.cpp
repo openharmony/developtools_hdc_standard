@@ -66,26 +66,26 @@ void HdcDaemonTCP::AcceptClient(uv_stream_t *server, int status)
     HdcSessionBase *daemon = reinterpret_cast<HdcSessionBase *>(thisClass->clsMainBase);
     const uint16_t maxWaitTime = UV_DEFAULT_INTERVAL;
     auto ctrl = daemon->BuildCtrlString(SP_START_SESSION, 0, nullptr, 0);
-    HSession hSession = ptrConnect->MallocSession(false, CONN_TCP, thisClass);
-    if (!hSession) {
+    HSessionPtr hSessionPtr = ptrConnect->MallocSession(false, CONN_TCP, thisClass);
+    if (!hSessionPtr) {
         return;
     }
-    if (uv_accept(server, (uv_stream_t *)&hSession->hWorkTCP) < 0) {
+    if (uv_accept(server, (uv_stream_t *)&hSessionPtr->hWorkTCP) < 0) {
         goto Finish;
     }
-    if ((hSession->fdChildWorkTCP = Base::DuplicateUvSocket(&hSession->hWorkTCP)) < 0) {
+    if ((hSessionPtr->fdChildWorkTCP = Base::DuplicateUvSocket(&hSessionPtr->hWorkTCP)) < 0) {
         goto Finish;
     };
-    Base::TryCloseHandle((uv_handle_t *)&hSession->hWorkTCP);
-    Base::StartWorkThread(ptrLoop, ptrConnect->SessionWorkThread, Base::FinishWorkThread, hSession);
+    Base::TryCloseHandle((uv_handle_t *)&hSessionPtr->hWorkTCP);
+    Base::StartWorkThread(ptrLoop, ptrConnect->SessionWorkThread, Base::FinishWorkThread, hSessionPtr);
     // wait for thread up
-    while (hSession->childLoop.active_handles == 0) {
+    while (hSessionPtr->childLoop.active_handles == 0) {
         usleep(maxWaitTime);
     }
-    Base::SendToStream((uv_stream_t *)&hSession->ctrlPipe[STREAM_MAIN], ctrl.data(), ctrl.size());
+    Base::SendToStream((uv_stream_t *)&hSessionPtr->ctrlPipe[STREAM_MAIN], ctrl.data(), ctrl.size());
     return;
 Finish:
-    ptrConnect->FreeSession(hSession->sessionId);
+    ptrConnect->FreeSession(hSessionPtr->sessionId);
 }
 
 void HdcDaemonTCP::RecvUDPEntry(const sockaddr *addrSrc, uv_udp_t *handle, const uv_buf_t *rcvbuf)

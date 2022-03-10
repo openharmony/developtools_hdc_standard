@@ -23,8 +23,8 @@ public:
     HdcServerForClient(const bool serverOrClient, const string &addrString, void *pClsServer, uv_loop_t *loopMainIn);
     virtual ~HdcServerForClient();
     int Initial();
-    void EchoClient(HChannel hChannel, MessageLevel level, const char *msg, ...);
-    void EchoClientRaw(const HChannel hChannel, uint8_t *payload, const int payloadSize);
+    void EchoClient(HChannelPtr hChannel, MessageLevel level, const char *msg, ...);
+    void EchoClientRaw(const HChannelPtr hChannel, uint8_t *payload, const int payloadSize);
     uint16_t GetTCPListenPort();
     void Stop();
 
@@ -32,26 +32,26 @@ protected:
 private:
     static void AcceptClient(uv_stream_t *server, int status);
     void SetTCPListen();
-    int ReadChannel(HChannel hChannel, uint8_t *bufPtr, const int bytesIO);
-    bool DoCommand(HChannel hChannel, void *formatCommandInput);
-    void OrderFindTargets(HChannel hChannel);
-    bool NewConnectTry(void *ptrServer, HChannel hChannel, const string &connectKey);
+    int ReadChannel(HChannelPtr hChannel, uint8_t *bufPtr, const int bytesIO);
+    bool DoCommand(HChannelPtr hChannel, void *formatCommandInput);
+    void OrderFindTargets(HChannelPtr hChannel);
+    bool NewConnectTry(void *ptrServer, HChannelPtr hChannel, const string &connectKey);
     static void OrderConnecTargetResult(uv_timer_t *req);
-    bool SendToDaemon(HChannel hChannel, const uint16_t commandFlag, uint8_t *bufPtr, const int bufSize);
-    int BindChannelToSession(HChannel hChannel, uint8_t *bufPtr, const int bytesIO);
-    bool CheckAutoFillTarget(HChannel hChannel);
-    bool CommandRemoveSession(HChannel hChannel, const char *connectKey);
+    bool SendToDaemon(HChannelPtr hChannel, const uint16_t commandFlag, uint8_t *bufPtr, const int bufSize);
+    int BindChannelToSession(HChannelPtr hChannel, uint8_t *bufPtr, const int bytesIO);
+    bool CheckAutoFillTarget(HChannelPtr hChannel);
+    bool CommandRemoveSession(HChannelPtr hChannel, const char *connectKey);
     bool CommandRemoveForward(const string &forwardKey);
-    bool DoCommandLocal(HChannel hChannel, void *formatCommandInput);
-    bool DoCommandRemote(HChannel hChannel, void *formatCommandInput);
-    void GetTargetList(HChannel hChannel, void *formatCommandInput);
-    bool GetAnyTarget(HChannel hChannel);
-    bool RemoveForward(HChannel hChannel, const char *parameterString);
-    bool TaskCommand(HChannel hChannel, void *formatCommandInput);
-    int ChannelHandShake(HChannel hChannel, uint8_t *bufPtr, const int bytesIO);
+    bool DoCommandLocal(HChannelPtr hChannel, void *formatCommandInput);
+    bool DoCommandRemote(HChannelPtr hChannel, void *formatCommandInput);
+    void GetTargetList(HChannelPtr hChannel, void *formatCommandInput);
+    bool GetAnyTarget(HChannelPtr hChannel);
+    bool RemoveForward(HChannelPtr hChannel, const char *parameterString);
+    bool TaskCommand(HChannelPtr hChannel, void *formatCommandInput);
+    int ChannelHandShake(HChannelPtr hChannel, uint8_t *bufPtr, const int bytesIO);
     bool ChannelSendSessionCtrlMsg(vector<uint8_t> &ctrlMsg, uint32_t sessionId);
-    HSession FindAliveSession(uint32_t sessionId);
-    HSession FindAliveSessionFromDaemonMap(const HChannel hChannel);
+    HSessionPtr FindAliveSession(uint32_t sessionId);
+    HSessionPtr FindAliveSessionFromDaemonMap(const HChannelPtr hChannel);
 
     uv_tcp_t tcpListen;
     void *clsServer;

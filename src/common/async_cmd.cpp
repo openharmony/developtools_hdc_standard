@@ -73,6 +73,9 @@ bool AsyncCmd::Initial(uv_loop_t *loopIn, const CmdResultCallback callback, uint
 bool AsyncCmd::FinishShellProc(const void *context, const bool result, const string exitMsg)
 {
     WRITE_LOG(LOG_DEBUG, "FinishShellProc finish");
+    if (context == nullptr) {
+        return false;
+    }
     AsyncCmd *thisClass = (AsyncCmd *)context;
     thisClass->resultCallback(true, result, thisClass->cmdResult + exitMsg);
     --thisClass->refCount;
@@ -81,6 +84,10 @@ bool AsyncCmd::FinishShellProc(const void *context, const bool result, const str
 
 bool AsyncCmd::ChildReadCallback(const void *context, uint8_t *buf, const int size)
 {
+    if (context == nullptr || buf == nullptr) {
+        return false;
+    }
+
     AsyncCmd *thisClass = (AsyncCmd *)context;
     if (thisClass->options & OPTION_COMMAND_ONETIME) {
         string s((char *)buf, size);

@@ -193,11 +193,11 @@ bool HdcServer::PullupServer(const char *listenString)
 
 void HdcServer::ClearMapDaemonInfo()
 {
-    map<string, HDaemonInfo>::iterator iter;
+    map<string, HDaemonInfoPtr>::iterator iter;
     uv_rwlock_rdlock(&daemonAdmin);
     for (iter = mapDaemon.begin(); iter != mapDaemon.end();) {
         string sKey = iter->first;
-        HDaemonInfo hDi = iter->second;
+        HDaemonInfoPtr hDi = iter->second;
         delete hDi;
         ++iter;
     }
@@ -207,7 +207,7 @@ void HdcServer::ClearMapDaemonInfo()
     uv_rwlock_wrunlock(&daemonAdmin);
 }
 
-void HdcServer::BuildDaemonVisableLine(HDaemonInfo hdi, bool fullDisplay, string &out)
+void HdcServer::BuildDaemonVisableLine(HDaemonInfoPtr hdi, bool fullDisplay, string &out)
 {
     if (fullDisplay) {
         string sConn;
@@ -262,10 +262,10 @@ string HdcServer::GetDaemonMapList(uint8_t opType)
         fullDisplay = true;
     }
     uv_rwlock_rdlock(&daemonAdmin);
-    map<string, HDaemonInfo>::iterator iter;
+    map<string, HDaemonInfoPtr>::iterator iter;
     string echoLine;
     for (iter = mapDaemon.begin(); iter != mapDaemon.end(); ++iter) {
-        HDaemonInfo di = iter->second;
+        HDaemonInfoPtr di = iter->second;
         if (!di) {
             continue;
         }
@@ -277,7 +277,7 @@ string HdcServer::GetDaemonMapList(uint8_t opType)
     return ret;
 }
 
-void HdcServer::GetDaemonMapOnlyOne(HDaemonInfo &hDaemonInfoInOut)
+void HdcServer::GetDaemonMapOnlyOne(HDaemonInfoPtr &hDaemonInfoInOut)
 {
     uv_rwlock_rdlock(&daemonAdmin);
     string key;
@@ -297,12 +297,12 @@ void HdcServer::GetDaemonMapOnlyOne(HDaemonInfo &hDaemonInfoInOut)
     uv_rwlock_rdunlock(&daemonAdmin);
 }
 
-string HdcServer::AdminDaemonMap(uint8_t opType, const string &connectKey, HDaemonInfo &hDaemonInfoInOut)
+string HdcServer::AdminDaemonMap(uint8_t opType, const string &connectKey, HDaemonInfoPtr &hDaemonInfoInOut)
 {
     string sRet;
     switch (opType) {
         case OP_ADD: {
-            HDaemonInfo pdiNew = new(std::nothrow) HdcDaemonInformation();
+            HDaemonInfoPtr pdiNew = new(std::nothrow) HdcDaemonInformation();
             if (pdiNew == nullptr) {
                 WRITE_LOG(LOG_FATAL, "AdminDaemonMap new pdiNew failed");
                 break;
@@ -338,9 +338,9 @@ string HdcServer::AdminDaemonMap(uint8_t opType, const string &connectKey, HDaem
         }
         case OP_GET_ANY: {
             uv_rwlock_rdlock(&daemonAdmin);
-            map<string, HDaemonInfo>::iterator iter;
+            map<string, HDaemonInfoPtr>::iterator iter;
             for (iter = mapDaemon.begin(); iter != mapDaemon.end(); ++iter) {
-                HDaemonInfo di = iter->second;
+                HDaemonInfoPtr di = iter->second;
                 // usb will be auto connected
                 if (di->connStatus == STATUS_READY || di->connStatus == STATUS_CONNECTED) {
                     hDaemonInfoInOut = di;
@@ -356,7 +356,7 @@ string HdcServer::AdminDaemonMap(uint8_t opType, const string &connectKey, HDaem
         }
         case OP_UPDATE: {  // Cannot update the Object HDi lower key value by direct value
             uv_rwlock_wrlock(&daemonAdmin);
-            HDaemonInfo hdi = mapDaemon[hDaemonInfoInOut->connectKey];
+            HDaemonInfoPtr hdi = mapDaemon[hDaemonInfoInOut->connectKey];
             if (hdi) {
                 *mapDaemon[hDaemonInfoInOut->connectKey] = *hDaemonInfoInOut;
             }
@@ -369,10 +369,10 @@ string HdcServer::AdminDaemonMap(uint8_t opType, const string &connectKey, HDaem
     return sRet;
 }
 
-void HdcServer::NotifyInstanceSessionFree(HSession hSession, bool freeOrClear)
+void HdcServer::NotifyInstanceSessionFree(HSessionPtr hSessionPtr, bool freeOrClear)
 {
-    HDaemonInfo hdiOld = nullptr;
-    AdminDaemonMap(OP_QUERY, hSession->connectKey, hdiOld);
+    HDaemonInfoPtr hdiOld = nullptr;
+    AdminDaemonMap(OP_QUERY, hSessionPtr->connectKey, hdiOld);
     if (hdiOld == nullptr) {
         return;
     }
@@ -380,8 +380,8 @@ void HdcServer::NotifyInstanceSessionFree(HSession hSession, bool freeOrClear)
         // update
         HdcDaemonInformation diNew = *hdiOld;
         diNew.connStatus = STATUS_OFFLINE;
-        HDaemonInfo hdiNew = &diNew;
-        AdminDaemonMap(OP_UPDATE, hSession->connectKey, hdiNew);
+        HDaemonInfoPtr hdiNew = &diNew;
+        AdminDaemonMap(OP_UPDATE, hSessionPtr->connectKey, hdiNew);
     } else {  // step2
         string usbMountPoint = hdiOld->usbMountPoint;
         // The waiting time must be longer than DEVICE_CHECK_INTERVAL. Wait the method WatchUsbNodeChange
@@ -399,7 +399,7 @@ void HdcServer::NotifyInstanceSessionFree(HSession hSession, bool freeOrClear)
     }
 }
 
-bool HdcServer::HandServerAuth(HSession hSession, SessionHandShake &handshake)
+bool HdcServer::HandServerAuth(HSessionPtr hSessionPtr, SessionHandShake &handshake)
 {
     bool ret = false;
     int retChild = 0;
@@ -407,12 +407,12 @@ bool HdcServer::HandServerAuth(HSession hSession, SessionHandShake &handshake)
     switch (handshake.authType) {
         case AUTH_TOKEN: {
             void *ptr = nullptr;
-            bool retChild = HdcAuth::KeylistIncrement(hSession->listKey, hSession->authKeyIndex, &ptr);
+            bool retChild = HdcAuth::KeylistIncrement(hSessionPtr->listKey, hSessionPtr->authKeyIndex, &ptr);
             // HdcAuth::FreeKey will be effect at funciton 'FreeSession'
             if (!retChild) {
                 // Iteration call certificate authentication
                 handshake.authType = AUTH_PUBLICKEY;
-                ret = HandServerAuth(hSession, handshake);
+                ret = HandServerAuth(hSessionPtr, handshake);
                 break;
             }
             char sign[BUF_SIZE_DEFAULT2] = { 0 };
@@ -423,7 +423,7 @@ bool HdcServer::HandServerAuth(HSession hSession, SessionHandShake &handshake)
             handshake.buf = string(sign, retChild);
             handshake.authType = AUTH_SIGNATURE;
             bufString = SerialStruct::SerializeToString(handshake);
-            Send(hSession->sessionId, 0, CMD_KERNEL_HANDSHAKE, (uint8_t *)bufString.c_str(), bufString.size());
+            Send(hSessionPtr->sessionId, 0, CMD_KERNEL_HANDSHAKE, (uint8_t *)bufString.c_str(), bufString.size());
             ret = true;
             break;
         }
@@ -436,7 +436,7 @@ bool HdcServer::HandServerAuth(HSession hSession, SessionHandShake &handshake)
             handshake.buf = string(bufPrivateKey, retChild);
             handshake.authType = AUTH_PUBLICKEY;
             bufString = SerialStruct::SerializeToString(handshake);
-            Send(hSession->sessionId, 0, CMD_KERNEL_HANDSHAKE, (uint8_t *)bufString.c_str(), bufString.size());
+            Send(hSessionPtr->sessionId, 0, CMD_KERNEL_HANDSHAKE, (uint8_t *)bufString.c_str(), bufString.size());
             ret = true;
             break;
         }
@@ -446,7 +446,7 @@ bool HdcServer::HandServerAuth(HSession hSession, SessionHandShake &handshake)
     return ret;
 }
 
-bool HdcServer::ServerSessionHandshake(HSession hSession, uint8_t *payload, int payloadSize)
+bool HdcServer::ServerSessionHandshake(HSessionPtr hSessionPtr, uint8_t *payload, int payloadSize)
 {
     // session handshake step3
     string s = string((char *)payload, payloadSize);
@@ -460,20 +460,20 @@ bool HdcServer::ServerSessionHandshake(HSession hSession, uint8_t *payload, int 
         return false;
     }
     if (handshake.authType != AUTH_OK) {
-        if (!HandServerAuth(hSession, handshake)) {
+        if (!HandServerAuth(hSessionPtr, handshake)) {
             WRITE_LOG(LOG_DEBUG, "Auth failed");
             return false;
         }
         return true;
     }
     // handshake auth OK
-    HDaemonInfo hdiOld = nullptr;
-    AdminDaemonMap(OP_QUERY, hSession->connectKey, hdiOld);
+    HDaemonInfoPtr hdiOld = nullptr;
+    AdminDaemonMap(OP_QUERY, hSessionPtr->connectKey, hdiOld);
     if (!hdiOld) {
         return false;
     }
     HdcDaemonInformation diNew = *hdiOld;
-    HDaemonInfo hdiNew = &diNew;
+    HDaemonInfoPtr hdiNew = &diNew;
     // update
     hdiNew->connStatus = STATUS_CONNECTED;
     if (handshake.buf.size() > sizeof(hdiNew->devName) || !handshake.buf.size()) {
@@ -481,25 +481,25 @@ bool HdcServer::ServerSessionHandshake(HSession hSession, uint8_t *payload, int 
     } else {
         hdiNew->devName = handshake.buf;
     }
-    AdminDaemonMap(OP_UPDATE, hSession->connectKey, hdiNew);
-    hSession->handshakeOK = true;
+    AdminDaemonMap(OP_UPDATE, hSessionPtr->connectKey, hdiNew);
+    hSessionPtr->handshakeOK = true;
     return true;
 }
 
 // call in child thread
-bool HdcServer::FetchCommand(HSession hSession, const uint32_t channelId, const uint16_t command, uint8_t *payload,
+bool HdcServer::FetchCommand(HSessionPtr hSessionPtr, const uint32_t channelId, const uint16_t command, uint8_t *payload,
                              const int payloadSize)
 {
     bool ret = true;
     HdcServerForClient *sfc = static_cast<HdcServerForClient *>(clsServerForClient);
     if (CMD_KERNEL_HANDSHAKE == command) {
-        ret = ServerSessionHandshake(hSession, payload, payloadSize);
+        ret = ServerSessionHandshake(hSessionPtr, payload, payloadSize);
         WRITE_LOG(LOG_DEBUG, "Session handshake %s connType:%d", ret ? "successful" : "failed",
-                  hSession->connType);
+                  hSessionPtr->connType);
         return ret;
     }
     // When you first initialize, ChannelID may be 0
-    HChannel hChannel = sfc->AdminChannel(OP_QUERY_REF, channelId, nullptr);
+    HChannelPtr hChannel = sfc->AdminChannel(OP_QUERY_REF, channelId, nullptr);
     if (!hChannel) {
         if (command == CMD_KERNEL_CHANNEL_CLOSE) {
             // Daemon close channel and want to notify server close channel also, but it may has been
@@ -510,7 +510,7 @@ bool HdcServer::FetchCommand(HSession hSession, const uint32_t channelId, const 
             WRITE_LOG(LOG_DEBUG, "channelId :%lu die", channelId);
         }
         uint8_t flag = 0;
-        Send(hSession->sessionId, channelId, CMD_KERNEL_CHANNEL_CLOSE, &flag, 1);
+        Send(hSessionPtr->sessionId, channelId, CMD_KERNEL_CHANNEL_CLOSE, &flag, 1);
         return ret;
     }
     if (hChannel->isDead) {
@@ -532,21 +532,21 @@ bool HdcServer::FetchCommand(HSession hSession, const uint32_t channelId, const 
         case CMD_KERNEL_CHANNEL_CLOSE: {
             WRITE_LOG(LOG_DEBUG, "CMD_KERNEL_CHANNEL_CLOSE channelid:%u", channelId);
             // Forcibly closing the tcp handle here may result in incomplete data reception on the client side
-            ClearOwnTasks(hSession, channelId);
+            ClearOwnTasks(hSessionPtr, channelId);
             // crossthread free
             sfc->PushAsyncMessage(channelId, ASYNC_FREE_CHANNEL, nullptr, 0);
             if (*payload != 0) {
                 --(*payload);
-                Send(hSession->sessionId, channelId, CMD_KERNEL_CHANNEL_CLOSE, payload, 1);
+                Send(hSessionPtr->sessionId, channelId, CMD_KERNEL_CHANNEL_CLOSE, payload, 1);
             }
             break;
         }
         case CMD_FORWARD_SUCCESS: {
             // add to local
             HdcForwardInformation di;
-            HForwardInfo pdiNew = &di;
+            HForwardInfoPtr pdiNew = &di;
             pdiNew->channelId = channelId;
-            pdiNew->sessionId = hSession->sessionId;
+            pdiNew->sessionId = hSessionPtr->sessionId;
             pdiNew->forwardDirection = ((char *)payload)[0] == '1';
             pdiNew->taskString = (char *)payload + 2;
             AdminForwardMap(OP_ADD, STRING_EMPTY, pdiNew);
@@ -554,12 +554,12 @@ bool HdcServer::FetchCommand(HSession hSession, const uint32_t channelId, const 
             break;
         }
         default: {
-            HSession hSession = AdminSession(OP_QUERY, hChannel->targetSessionId, nullptr);
-            if (!hSession) {
+            HSessionPtr hSessionPtr = AdminSession(OP_QUERY, hChannel->targetSessionId, nullptr);
+            if (!hSessionPtr) {
                 ret = false;
                 break;
             }
-            ret = DispatchTaskData(hSession, channelId, command, payload, payloadSize);
+            ret = DispatchTaskData(hSessionPtr, channelId, command, payload, payloadSize);
             break;
         }
     }
@@ -567,7 +567,7 @@ bool HdcServer::FetchCommand(HSession hSession, const uint32_t channelId, const 
     return ret;
 }
 
-void HdcServer::BuildForwardVisableLine(bool fullOrSimble, HForwardInfo hfi, string &echo)
+void HdcServer::BuildForwardVisableLine(bool fullOrSimble, HForwardInfoPtr hfi, string &echo)
 {
     string buf;
     if (fullOrSimble) {
@@ -579,12 +579,12 @@ void HdcServer::BuildForwardVisableLine(bool fullOrSimble, HForwardInfo hfi, str
     echo += buf;
 }
 
-string HdcServer::AdminForwardMap(uint8_t opType, const string &taskString, HForwardInfo &hForwardInfoInOut)
+string HdcServer::AdminForwardMap(uint8_t opType, const string &taskString, HForwardInfoPtr &hForwardInfoInOut)
 {
     string sRet;
     switch (opType) {
         case OP_ADD: {
-            HForwardInfo pfiNew = new(std::nothrow) HdcForwardInformation();
+            HForwardInfoPtr pfiNew = new(std::nothrow) HdcForwardInformation();
             if (pfiNew == nullptr) {
                 WRITE_LOG(LOG_FATAL, "AdminForwardMap new pfiNew failed");
                 break;
@@ -600,9 +600,9 @@ string HdcServer::AdminForwardMap(uint8_t opType, const string &taskString, HFor
         case OP_GET_STRLIST:
         case OP_GET_STRLIST_FULL: {
             uv_rwlock_rdlock(&forwardAdmin);
-            map<string, HForwardInfo>::iterator iter;
+            map<string, HForwardInfoPtr>::iterator iter;
             for (iter = mapForward.begin(); iter != mapForward.end(); ++iter) {
-                HForwardInfo di = iter->second;
+                HForwardInfoPtr di = iter->second;
                 if (!di) {
                     continue;
                 }
@@ -635,28 +635,28 @@ string HdcServer::AdminForwardMap(uint8_t opType, const string &taskString, HFor
 
 void HdcServer::UsbPreConnect(uv_timer_t *handle)
 {
-    HSession hSession = (HSession)handle->data;
+    HSessionPtr hSessionPtr = (HSessionPtr)handle->data;
     bool stopLoop = false;
-    HdcServer *hdcServer = (HdcServer *)hSession->classInstance;
+    HdcServer *hdcServer = (HdcServer *)hSessionPtr->classInstance;
     const int usbConnectRetryMax = 5;
     while (true) {
         WRITE_LOG(LOG_DEBUG, "HdcServer::UsbPreConnect");
-        if (++hSession->hUSB->retryCount > usbConnectRetryMax) {  // max 15s
-            hdcServer->FreeSession(hSession->sessionId);
+        if (++hSessionPtr->hUSB->retryCount > usbConnectRetryMax) {  // max 15s
+            hdcServer->FreeSession(hSessionPtr->sessionId);
             stopLoop = true;
             break;
         }
-        HDaemonInfo pDi = nullptr;
-        if (hSession->connectKey == "any") {
-            hdcServer->AdminDaemonMap(OP_GET_ANY, hSession->connectKey, pDi);
+        HDaemonInfoPtr pDi = nullptr;
+        if (hSessionPtr->connectKey == "any") {
+            hdcServer->AdminDaemonMap(OP_GET_ANY, hSessionPtr->connectKey, pDi);
         } else {
-            hdcServer->AdminDaemonMap(OP_QUERY, hSession->connectKey, pDi);
+            hdcServer->AdminDaemonMap(OP_QUERY, hSessionPtr->connectKey, pDi);
         }
         if (!pDi || !pDi->usbMountPoint.size()) {
             break;
         }
-        HdcHostUSB *hdcHostUSB = (HdcHostUSB *)hSession->classModule;
-        hdcHostUSB->ConnectDetectDaemon(hSession, pDi);
+        HdcHostUSB *hdcHostUSB = (HdcHostUSB *)hSessionPtr->classModule;
+        hdcHostUSB->ConnectDetectDaemon(hSessionPtr, pDi);
         stopLoop = true;
         break;
     }
@@ -668,29 +668,29 @@ void HdcServer::UsbPreConnect(uv_timer_t *handle)
 void HdcServer::UartPreConnect(uv_timer_t *handle)
 {
     WRITE_LOG(LOG_DEBUG, "%s", __FUNCTION__);
-    HSession hSession = (HSession)handle->data;
+    HSessionPtr hSessionPtr = (HSessionPtr)handle->data;
     bool stopLoop = false;
-    HdcServer *hdcServer = (HdcServer *)hSession->classInstance;
+    HdcServer *hdcServer = (HdcServer *)hSessionPtr->classInstance;
     const int uartConnectRetryMax = 100; // max 6s
     while (true) {
-        if (hSession->hUART->retryCount > uartConnectRetryMax) {
+        if (hSessionPtr->hUART->retryCount > uartConnectRetryMax) {
             WRITE_LOG(LOG_DEBUG, "%s failed because max retry limit %d", __FUNCTION__,
-                      hSession->hUART->retryCount);
-            hdcServer->FreeSession(hSession->sessionId);
+                      hSessionPtr->hUART->retryCount);
+            hdcServer->FreeSession(hSessionPtr->sessionId);
             stopLoop = true;
             break;
         }
-        hSession->hUART->retryCount++;
-        HDaemonInfo pDi = nullptr;
+        hSessionPtr->hUART->retryCount++;
+        HDaemonInfoPtr pDi = nullptr;
 
-        WRITE_LOG(LOG_DEBUG, "%s query %s", __FUNCTION__, hSession->ToDebugString().c_str());
-        hdcServer->AdminDaemonMap(OP_QUERY, hSession->connectKey, pDi);
+        WRITE_LOG(LOG_DEBUG, "%s query %s", __FUNCTION__, hSessionPtr->ToDebugString().c_str());
+        hdcServer->AdminDaemonMap(OP_QUERY, hSessionPtr->connectKey, pDi);
         if (!pDi) {
             WRITE_LOG(LOG_DEBUG, "%s not found", __FUNCTION__);
             break;
         }
-        HdcHostUART *hdcHostUART = (HdcHostUART *)hSession->classModule;
-        hdcHostUART->ConnectDaemonByUart(hSession, pDi);
+        HdcHostUART *hdcHostUART = (HdcHostUART *)hSessionPtr->classModule;
+        hdcHostUART->ConnectDaemonByUart(hSessionPtr, pDi);
         WRITE_LOG(LOG_DEBUG, "%s ConnectDaemonByUart done", __FUNCTION__);
 
         stopLoop = true;
@@ -701,7 +701,7 @@ void HdcServer::UartPreConnect(uv_timer_t *handle)
     }
 }
 
-void HdcServer::CreatConnectUart(HSession hSession)
+void HdcServer::CreatConnectUart(HSessionPtr hSessionPtr)
 {
     uv_timer_t *waitTimeDoCmd = new(std::nothrow) uv_timer_t;
     if (waitTimeDoCmd == nullptr) {
@@ -709,7 +709,7 @@ void HdcServer::CreatConnectUart(HSession hSession)
         return;
     }
     uv_timer_init(&loopMain, waitTimeDoCmd);
-    waitTimeDoCmd->data = hSession;
+    waitTimeDoCmd->data = hSessionPtr;
     uv_timer_start(waitTimeDoCmd, UartPreConnect, UV_TIMEOUT, UV_REPEAT);
 }
 #endif
@@ -728,7 +728,7 @@ int HdcServer::CreateConnect(const string &connectKey)
     else { // USB
         connType = CONN_USB;
     }
-    HDaemonInfo hdi = nullptr;
+    HDaemonInfoPtr hdi = nullptr;
     if (connectKey == "any") {
         return RET_SUCCESS;
     }
@@ -738,57 +738,57 @@ int HdcServer::CreateConnect(const string &connectKey)
         di.connectKey = connectKey;
         di.connType = connType;
         di.connStatus = STATUS_UNKNOW;
-        HDaemonInfo pDi = (HDaemonInfo)&di;
+        HDaemonInfoPtr pDi = (HDaemonInfoPtr)&di;
         AdminDaemonMap(OP_ADD, "", pDi);
         AdminDaemonMap(OP_QUERY, connectKey, hdi);
     }
     if (!hdi || hdi->connStatus == STATUS_CONNECTED) {
         return ERR_GENERIC;
     }
-    HSession hSession = nullptr;
+    HSessionPtr hSessionPtr = nullptr;
     if (CONN_TCP == connType) {
-        hSession = clsTCPClt->ConnectDaemon(connectKey);
+        hSessionPtr = clsTCPClt->ConnectDaemon(connectKey);
     } else if (CONN_SERIAL == connType) {
 #ifdef HDC_SUPPORT_UART
-        hSession = clsUARTClt->ConnectDaemon(connectKey);
+        hSessionPtr = clsUARTClt->ConnectDaemon(connectKey);
 #endif
     } else {
-        hSession = MallocSession(true, CONN_USB, clsUSBClt);
-        hSession->connectKey = connectKey;
+        hSessionPtr = MallocSession(true, CONN_USB, clsUSBClt);
+        hSessionPtr->connectKey = connectKey;
         uv_timer_t *waitTimeDoCmd = new(std::nothrow) uv_timer_t;
         if (waitTimeDoCmd == nullptr) {
             WRITE_LOG(LOG_FATAL, "CreateConnect new waitTimeDoCmd failed");
             return ERR_GENERIC;
         }
         uv_timer_init(&loopMain, waitTimeDoCmd);
-        waitTimeDoCmd->data = hSession;
+        waitTimeDoCmd->data = hSessionPtr;
         uv_timer_start(waitTimeDoCmd, UsbPreConnect, 10, 100);
     }
-    if (!hSession) {
+    if (!hSessionPtr) {
         return ERR_BUF_ALLOC;
     }
-    HDaemonInfo hdiQuery = nullptr;
+    HDaemonInfoPtr hdiQuery = nullptr;
     AdminDaemonMap(OP_QUERY, connectKey, hdiQuery);
     if (hdiQuery) {
         HdcDaemonInformation diNew = *hdiQuery;
-        diNew.hSession = hSession;
-        HDaemonInfo hdiNew = &diNew;
+        diNew.hSessionPtr = hSessionPtr;
+        HDaemonInfoPtr hdiNew = &diNew;
         AdminDaemonMap(OP_UPDATE, hdiQuery->connectKey, hdiNew);
     }
     return RET_SUCCESS;
 }
 
-void HdcServer::AttachChannel(HSession hSession, const uint32_t channelId)
+void HdcServer::AttachChannel(HSessionPtr hSessionPtr, const uint32_t channelId)
 {
     int ret = 0;
     HdcServerForClient *hSfc = static_cast<HdcServerForClient *>(clsServerForClient);
-    HChannel hChannel = hSfc->AdminChannel(OP_QUERY_REF, channelId, nullptr);
+    HChannelPtr hChannel = hSfc->AdminChannel(OP_QUERY_REF, channelId, nullptr);
     if (!hChannel) {
         return;
     }
-    uv_tcp_init(&hSession->childLoop, &hChannel->hChildWorkTCP);
+    uv_tcp_init(&hSessionPtr->childLoop, &hChannel->hChildWorkTCP);
     hChannel->hChildWorkTCP.data = hChannel;
-    hChannel->targetSessionId = hSession->sessionId;
+    hChannel->targetSessionId = hSessionPtr->sessionId;
     if ((ret = uv_tcp_open((uv_tcp_t *)&hChannel->hChildWorkTCP, hChannel->fdChildWorkTCP)) < 0) {
         constexpr int bufSize = 1024;
         char buf[bufSize] = { 0 };
@@ -804,11 +804,11 @@ void HdcServer::AttachChannel(HSession hSession, const uint32_t channelId)
     --hChannel->ref;
 };
 
-void HdcServer::DeatchChannel(HSession hSession, const uint32_t channelId)
+void HdcServer::DeatchChannel(HSessionPtr hSessionPtr, const uint32_t channelId)
 {
     HdcServerForClient *hSfc = static_cast<HdcServerForClient *>(clsServerForClient);
     // childCleared has not set, no need OP_QUERY_REF
-    HChannel hChannel = hSfc->AdminChannel(OP_QUERY, channelId, nullptr);
+    HChannelPtr hChannel = hSfc->AdminChannel(OP_QUERY, channelId, nullptr);
     if (!hChannel) {
         return;
     }
@@ -817,18 +817,18 @@ void HdcServer::DeatchChannel(HSession hSession, const uint32_t channelId)
         return;
     }
     // The own task for this channel must be clear before free channel
-    ClearOwnTasks(hSession, channelId);
+    ClearOwnTasks(hSessionPtr, channelId);
     uint8_t count = 0;
-    Send(hSession->sessionId, hChannel->channelId, CMD_KERNEL_CHANNEL_CLOSE, &count, 1);
+    Send(hSessionPtr->sessionId, hChannel->channelId, CMD_KERNEL_CHANNEL_CLOSE, &count, 1);
     if (uv_is_closing((const uv_handle_t *)&hChannel->hChildWorkTCP)) {
-        Base::DoNextLoop(&hSession->childLoop, hChannel, [](const uint8_t flag, string &msg, const void *data) {
-            HChannel hChannel = (HChannel)data;
+        Base::DoNextLoop(&hSessionPtr->childLoop, hChannel, [](const uint8_t flag, string &msg, const void *data) {
+            HChannelPtr hChannel = (HChannelPtr)data;
             hChannel->childCleared = true;
             WRITE_LOG(LOG_DEBUG, "Childchannel free direct, cid:%u", hChannel->channelId);
         });
     } else {
         Base::TryCloseHandle((uv_handle_t *)&hChannel->hChildWorkTCP, [](uv_handle_t *handle) -> void {
-            HChannel hChannel = (HChannel)handle->data;
+            HChannelPtr hChannel = (HChannelPtr)handle->data;
             hChannel->childCleared = true;
             WRITE_LOG(LOG_DEBUG, "Childchannel free callback, cid:%u", hChannel->channelId);
         });
@@ -839,16 +839,16 @@ bool HdcServer::ServerCommand(const uint32_t sessionId, const uint32_t channelId
                               uint8_t *bufPtr, const int size)
 {
     HdcServerForClient *hSfc = static_cast<HdcServerForClient *>(clsServerForClient);
-    HChannel hChannel = hSfc->AdminChannel(OP_QUERY, channelId, nullptr);
-    HSession hSession = AdminSession(OP_QUERY, sessionId, nullptr);
-    if (!hChannel || !hSession) {
+    HChannelPtr hChannel = hSfc->AdminChannel(OP_QUERY, channelId, nullptr);
+    HSessionPtr hSessionPtr = AdminSession(OP_QUERY, sessionId, nullptr);
+    if (!hChannel || !hSessionPtr) {
         return false;
     }
-    return FetchCommand(hSession, channelId, command, bufPtr, size);
+    return FetchCommand(hSessionPtr, channelId, command, bufPtr, size);
 }
 
 // clang-format off
-bool HdcServer::RedirectToTask(HTaskInfo hTaskInfo, HSession hSession, const uint32_t channelId,
+bool HdcServer::RedirectToTask(HTaskInfoPtr hTaskInfo, HSessionPtr hSessionPtr, const uint32_t channelId,
                                const uint16_t command, uint8_t *payload, const int payloadSize)
 // clang-format on
 {
@@ -889,7 +889,7 @@ bool HdcServer::RedirectToTask(HTaskInfo hTaskInfo, HSession hSession, const uin
     return ret;
 }
 
-bool HdcServer::RemoveInstanceTask(const uint8_t op, HTaskInfo hTask)
+bool HdcServer::RemoveInstanceTask(const uint8_t op, HTaskInfoPtr hTask)
 {
     bool ret = true;
     switch (hTask->taskType) {

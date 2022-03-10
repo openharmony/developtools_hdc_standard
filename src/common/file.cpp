@@ -16,7 +16,7 @@
 #include "serial_struct.h"
 
 namespace Hdc {
-HdcFile::HdcFile(HTaskInfo hTaskInfo)
+HdcFile::HdcFile(HTaskInfoPtr hTaskInfo)
     : HdcTransferBase(hTaskInfo)
 {
     commandBegin = CMD_FILE_BEGIN;
@@ -36,6 +36,9 @@ void HdcFile::StopTask()
 
 bool HdcFile::BeginTransfer(CtxFile *context, const string &command)
 {
+    if (context == nullptr) {
+        return false;
+    }
     int argc = 0;
     bool ret = false;
     char **argv = Base::SplitCommandToArgs(command.c_str(), &argc);
@@ -66,6 +69,9 @@ bool HdcFile::BeginTransfer(CtxFile *context, const string &command)
 
 bool HdcFile::SetMasterParameters(CtxFile *context, const char *command, int argc, char **argv)
 {
+    if (context == nullptr || command == nullptr || argv == nullptr) {
+        return false;
+    }
     int srcArgvIndex = 0;
     string errStr;
     const string CMD_OPTION_TSTMP = "-a";
@@ -110,6 +116,9 @@ bool HdcFile::SetMasterParameters(CtxFile *context, const char *command, int arg
 
 void HdcFile::CheckMaster(CtxFile *context)
 {
+    if (context == nullptr) {
+        return false;
+    }
     string s = SerialStruct::SerializeToString(context->transferConfig);
     SendToAnother(CMD_FILE_CHECK, (uint8_t *)s.c_str(), s.size());
 }
@@ -123,6 +132,9 @@ void HdcFile::WhenTransferFinish(CtxFile *context)
 
 void HdcFile::TransferSummary(CtxFile *context)
 {
+    if (context == nullptr) {
+        return false;
+    }
     uint64_t nMSec = Base::GetRuntimeMSec() - context->transferBegin;
     double fRate = static_cast<double>(context->indexIO) / nMSec;  // / /1000 * 1000 = 0
     if (context->indexIO >= context->fileSize) {
@@ -138,6 +150,9 @@ void HdcFile::TransferSummary(CtxFile *context)
 
 bool HdcFile::SlaveCheck(uint8_t *payload, const int payloadSize)
 {
+    if (payload == nullptr) {
+        return false;
+    }
     bool ret = true;
     bool childRet = false;
     // parse option
@@ -173,6 +188,9 @@ bool HdcFile::SlaveCheck(uint8_t *payload, const int payloadSize)
 
 bool HdcFile::CommandDispatch(const uint16_t command, uint8_t *payload, const int payloadSize)
 {
+    if (payload == nullptr) {
+        return false;
+    }
     HdcTransferBase::CommandDispatch(command, payload, payloadSize);
     bool ret = true;
     switch (command) {

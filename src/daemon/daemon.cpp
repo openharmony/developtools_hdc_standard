@@ -135,7 +135,7 @@ void HdcDaemon::InitMod(bool bEnableTCP, bool bEnableUSB)
 }
 
 // clang-format off
-bool HdcDaemon::RedirectToTask(HTaskInfo hTaskInfo, HSession hSession, const uint32_t channelId,
+bool HdcDaemon::RedirectToTask(HTaskInfoPtr hTaskInfo, HSessionPtr hSessionPtr, const uint32_t channelId,
                                const uint16_t command, uint8_t *payload, const int payloadSize)
 {
     bool ret = true;
@@ -187,16 +187,16 @@ bool HdcDaemon::RedirectToTask(HTaskInfo hTaskInfo, HSession hSession, const uin
 }
 // clang-format on
 
-bool HdcDaemon::HandDaemonAuth(HSession hSession, const uint32_t channelId, SessionHandShake &handshake)
+bool HdcDaemon::HandDaemonAuth(HSessionPtr hSessionPtr, const uint32_t channelId, SessionHandShake &handshake)
 {
     bool ret = false;
     switch (handshake.authType) {
         case AUTH_NONE: {  // AUTH_NONE -> AUTH
-            hSession->tokenRSA = Base::GetRandomString(SHA_DIGEST_LENGTH);
+            hSessionPtr->tokenRSA = Base::GetRandomString(SHA_DIGEST_LENGTH);
             handshake.authType = AUTH_TOKEN;
-            handshake.buf = hSession->tokenRSA;
+            handshake.buf = hSessionPtr->tokenRSA;
             string bufString = SerialStruct::SerializeToString(handshake);
-            Send(hSession->sessionId, channelId, CMD_KERNEL_HANDSHAKE, (uint8_t *)bufString.c_str(), bufString.size());
+            Send(hSessionPtr->sessionId, channelId, CMD_KERNEL_HANDSHAKE, (uint8_t *)bufString.c_str(), bufString.size());
             ret = true;
             break;
         }
@@ -208,13 +208,13 @@ bool HdcDaemon::HandDaemonAuth(HSession hSession, const uint32_t channelId, Sess
             // jump out dialog, and click the system, the system will store the Host public key certificate in the
             // device locally, and the signature authentication will be correct when the subsequent connection is
             // connected.
-            if (!HdcAuth::AuthVerify((uint8_t *)hSession->tokenRSA.c_str(), (uint8_t *)handshake.buf.c_str(),
+            if (!HdcAuth::AuthVerify((uint8_t *)hSessionPtr->tokenRSA.c_str(), (uint8_t *)handshake.buf.c_str(),
                                      handshake.buf.size())) {
                 // Next auth
                 handshake.authType = AUTH_TOKEN;
-                handshake.buf = hSession->tokenRSA;
+                handshake.buf = hSessionPtr->tokenRSA;
                 string bufString = SerialStruct::SerializeToString(handshake);
-                Send(hSession->sessionId, channelId, CMD_KERNEL_HANDSHAKE, (uint8_t *)bufString.c_str(),
+                Send(hSessionPtr->sessionId, channelId, CMD_KERNEL_HANDSHAKE, (uint8_t *)bufString.c_str(),
                      bufString.size());
                 break;
             }
@@ -232,7 +232,7 @@ bool HdcDaemon::HandDaemonAuth(HSession hSession, const uint32_t channelId, Sess
     return ret;
 }
 
-bool HdcDaemon::DaemonSessionHandshake(HSession hSession, const uint32_t channelId, uint8_t *payload, int payloadSize)
+bool HdcDaemon::DaemonSessionHandshake(HSessionPtr hSessionPtr, const uint32_t channelId, uint8_t *payload, int payloadSize)
 {
     // session handshake step2
     string s = string((char *)payload, payloadSize);
@@ -240,42 +240,42 @@ bool HdcDaemon::DaemonSessionHandshake(HSession hSession, const uint32_t channel
     string err;
     SerialStruct::ParseFromString(handshake, s);
 #ifdef HDC_DEBUG
-    WRITE_LOG(LOG_DEBUG, "session %s try to handshake", hSession->ToDebugString().c_str());
+    WRITE_LOG(LOG_DEBUG, "session %s try to handshake", hSessionPtr->ToDebugString().c_str());
 #endif
     // banner to check is parse ok...
     if (handshake.banner != HANDSHAKE_MESSAGE) {
-        hSession->availTailIndex = 0;
+        hSessionPtr->availTailIndex = 0;
         WRITE_LOG(LOG_FATAL, "Recv server-hello failed");
         return false;
     }
     if (handshake.authType == AUTH_NONE) {
         // daemon handshake 1st packet
-        uint32_t unOld = hSession->sessionId;
-        hSession->sessionId = handshake.sessionId;
-        hSession->connectKey = handshake.connectKey;
-        AdminSession(OP_UPDATE, unOld, hSession);
+        uint32_t unOld = hSessionPtr->sessionId;
+        hSessionPtr->sessionId = handshake.sessionId;
+        hSessionPtr->connectKey = handshake.connectKey;
+        AdminSession(OP_UPDATE, unOld, hSessionPtr);
 #ifdef HDC_SUPPORT_UART
-        if (hSession->connType == CONN_SERIAL and clsUARTServ!= nullptr) {
+        if (hSessionPtr->connType == CONN_SERIAL and clsUARTServ!= nullptr) {
             WRITE_LOG(LOG_DEBUG, " HdcDaemon::DaemonSessionHandshake %s",
                       handshake.ToDebugString().c_str());
             if (clsUARTServ != nullptr) {
-                (static_cast<HdcDaemonUART *>(clsUARTServ))->OnNewHandshakeOK(hSession->sessionId);
+                (static_cast<HdcDaemonUART *>(clsUARTServ))->OnNewHandshakeOK(hSessionPtr->sessionId);
             }
         } else
 #endif // HDC_SUPPORT_UART
         if (clsUSBServ != nullptr) {
-            (reinterpret_cast<HdcDaemonUSB *>(clsUSBServ))->OnNewHandshakeOK(hSession->sessionId);
+            (reinterpret_cast<HdcDaemonUSB *>(clsUSBServ))->OnNewHandshakeOK(hSessionPtr->sessionId);
         }
 
         handshake.sessionId = 0;
         handshake.connectKey = "";
     }
-    if (enableSecure && !HandDaemonAuth(hSession, channelId, handshake)) {
+    if (enableSecure && !HandDaemonAuth(hSessionPtr, channelId, handshake)) {
         return false;
     }
     // handshake auth OK.Can append the sending device information to HOST
 #ifdef HDC_DEBUG
-    WRITE_LOG(LOG_INFO, "session %u handshakeOK send back CMD_KERNEL_HANDSHAKE", hSession->sessionId);
+    WRITE_LOG(LOG_INFO, "session %u handshakeOK send back CMD_KERNEL_HANDSHAKE", hSessionPtr->sessionId);
 #endif
     char hostName[BUF_SIZE_MEDIUM] = "";
     size_t len = sizeof(hostName);
@@ -283,18 +283,18 @@ bool HdcDaemon::DaemonSessionHandshake(HSession hSession, const uint32_t channel
     handshake.authType = AUTH_OK;
     handshake.buf = hostName;
     string bufString = SerialStruct::SerializeToString(handshake);
-    Send(hSession->sessionId, channelId, CMD_KERNEL_HANDSHAKE, (uint8_t *)bufString.c_str(), bufString.size());
-    hSession->handshakeOK = true;
+    Send(hSessionPtr->sessionId, channelId, CMD_KERNEL_HANDSHAKE, (uint8_t *)bufString.c_str(), bufString.size());
+    hSessionPtr->handshakeOK = true;
     return true;
 }
 
-bool HdcDaemon::FetchCommand(HSession hSession, const uint32_t channelId, const uint16_t command, uint8_t *payload,
+bool HdcDaemon::FetchCommand(HSessionPtr hSessionPtr, const uint32_t channelId, const uint16_t command, uint8_t *payload,
                              const int payloadSize)
 {
     bool ret = true;
-    if (!hSession->handshakeOK and command != CMD_KERNEL_HANDSHAKE) {
+    if (!hSessionPtr->handshakeOK and command != CMD_KERNEL_HANDSHAKE) {
         WRITE_LOG(LOG_WARN, "session %u wait CMD_KERNEL_HANDSHAKE , but got command %u",
-                  hSession->sessionId, command);
+                  hSessionPtr->sessionId, command);
         ret = false;
         return ret;
     }
@@ -302,26 +302,26 @@ bool HdcDaemon::FetchCommand(HSession hSession, const uint32_t channelId, const 
     switch (command) {
         case CMD_KERNEL_HANDSHAKE: {
             // session handshake step2
-            ret = DaemonSessionHandshake(hSession, channelId, payload, payloadSize);
+            ret = DaemonSessionHandshake(hSessionPtr, channelId, payload, payloadSize);
             break;
         }
         case CMD_KERNEL_CHANNEL_CLOSE: {  // Daemon is only cleaning up the Channel task
-            ClearOwnTasks(hSession, channelId);
+            ClearOwnTasks(hSessionPtr, channelId);
             if (*payload != 0) {
                 --(*payload);
-                Send(hSession->sessionId, channelId, CMD_KERNEL_CHANNEL_CLOSE, payload, 1);
+                Send(hSessionPtr->sessionId, channelId, CMD_KERNEL_CHANNEL_CLOSE, payload, 1);
             }
             ret = true;
             break;
         }
         default:
-            ret = DispatchTaskData(hSession, channelId, command, payload, payloadSize);
+            ret = DispatchTaskData(hSessionPtr, channelId, command, payload, payloadSize);
             break;
     }
     return ret;
 }
 
-bool HdcDaemon::RemoveInstanceTask(const uint8_t op, HTaskInfo hTask)
+bool HdcDaemon::RemoveInstanceTask(const uint8_t op, HTaskInfoPtr hTask)
 {
     bool ret = true;
     switch (hTask->taskType) {
@@ -360,14 +360,14 @@ void HdcDaemon::JdwpNewFileDescriptor(const uint8_t *buf, const int bytesIO)
     ((HdcJdwp *)clsJdwp)->SendJdwpNewFD(pid, fd);
 }
 
-void HdcDaemon::NotifyInstanceSessionFree(HSession hSession, bool freeOrClear)
+void HdcDaemon::NotifyInstanceSessionFree(HSessionPtr hSessionPtr, bool freeOrClear)
 {
     if (!freeOrClear) {
         return;  // ignore step 1
     }
     if (clsUSBServ != nullptr) {
         auto clsUsbModule = reinterpret_cast<HdcDaemonUSB *>(clsUSBServ);
-        clsUsbModule->OnSessionFreeFinally(hSession);
+        clsUsbModule->OnSessionFreeFinally(hSessionPtr);
     }
 }
 }  // namespace Hdc

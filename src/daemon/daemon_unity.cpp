@@ -16,7 +16,7 @@
 #include <sys/mount.h>
 
 namespace Hdc {
-HdcDaemonUnity::HdcDaemonUnity(HTaskInfo hTaskInfo)
+HdcDaemonUnity::HdcDaemonUnity(HTaskInfoPtr hTaskInfo)
     : HdcTaskBase(hTaskInfo)
 {
     currentDataCommand = CMD_KERNEL_ECHO_RAW;  // Default output to shelldata
@@ -246,7 +246,7 @@ bool HdcDaemonUnity::CommandDispatch(const uint16_t command, uint8_t *payload, c
     string strPayload = string((char *)payload, payloadSize);
 #ifdef HDC_DEBUG
     WRITE_LOG(LOG_DEBUG, "CommandDispatch command:%d", command);
-#endif // HDC_DEBUG
+#endif // HDC_LOCAL_DEBUG
     switch (command) {
         case CMD_UNITY_EXECUTE: {
             ExecuteShell((char *)strPayload.c_str());
@@ -273,13 +273,11 @@ bool HdcDaemonUnity::CommandDispatch(const uint16_t command, uint8_t *payload, c
         }
         case CMD_UNITY_ROOTRUN: {
             ret = false;
-#ifdef HDC_DEBUG
             if (payloadSize != 0 && !strcmp((char *)strPayload.c_str(), "r")) {
                 SystemDepend::SetDevItem("persist.hdc.root", "0");
             } else {
                 SystemDepend::SetDevItem("persist.hdc.root", "1");
             }
-#endif // HDC_DEBUG
             daemon->PostStopInstanceMessage(true);
             break;
         }

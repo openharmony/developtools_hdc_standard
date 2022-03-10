@@ -22,7 +22,7 @@ public:
     HdcHostTCP(const bool serverOrDaemonIn, void *ptrMainBase);
     virtual ~HdcHostTCP();
     void FindLanDaemon();
-    HSession ConnectDaemon(const string &connectKey);
+    HSessionPtr ConnectDaemon(const string &connectKey);
     void Stop();
     list<string> lstDaemonResult;
 

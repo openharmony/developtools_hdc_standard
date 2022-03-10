@@ -26,7 +26,7 @@ public:
 #else
     void InitMod(bool bEnableTCP, bool bEnableUSB);
 #endif
-    bool FetchCommand(HSession hSession, const uint32_t channelId, const uint16_t command, uint8_t *payload,
+    bool FetchCommand(HSessionPtr hSessionPtr, const uint32_t channelId, const uint16_t command, uint8_t *payload,
                       const int payloadSize);
     bool ServerCommand(const uint32_t sessionId, const uint32_t channelId, const uint16_t command, uint8_t *bufPtr,
                        const int size);
@@ -38,19 +38,19 @@ public:
     void *clsJdwp;
 
 private:
-    bool RemoveInstanceTask(const uint8_t op, HTaskInfo hTask);
-    bool RedirectToTask(HTaskInfo hTaskInfo, HSession hSession, const uint32_t channelId, const uint16_t command,
+    bool RemoveInstanceTask(const uint8_t op, HTaskInfoPtr hTask);
+    bool RedirectToTask(HTaskInfoPtr hTaskInfo, HSessionPtr hSessionPtr, const uint32_t channelId, const uint16_t command,
                         uint8_t *payload, const int payloadSize);
     void JdwpNewFileDescriptor(const uint8_t *buf, const int bytesIO);
-    bool HandDaemonAuth(HSession hSession, const uint32_t channelId, SessionHandShake &handshake);
+    bool HandDaemonAuth(HSessionPtr hSessionPtr, const uint32_t channelId, SessionHandShake &handshake);
     void ClearInstanceResource();
-    bool DaemonSessionHandshake(HSession hSession, const uint32_t channelId, uint8_t *payload, int payloadSize);
+    bool DaemonSessionHandshake(HSessionPtr hSessionPtr, const uint32_t channelId, uint8_t *payload, int payloadSize);
     void TryStopInstance();
 // deprecated, remove later
 #ifdef HDC_SUPPORT_FLASHD
 // null
 #else
-    void NotifyInstanceSessionFree(HSession hSession, bool freeOrClear);
+    void NotifyInstanceSessionFree(HSessionPtr hSessionPtr, bool freeOrClear);
 #endif
 
     bool enableSecure;

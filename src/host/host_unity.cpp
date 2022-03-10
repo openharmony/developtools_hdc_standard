@@ -15,7 +15,7 @@
 #include "host_unity.h"
 
 namespace Hdc {
-HdcHostUnity::HdcHostUnity(HTaskInfo hTaskInfo)
+HdcHostUnity::HdcHostUnity(HTaskInfoPtr hTaskInfo)
     : HdcTaskBase(hTaskInfo)
 {
     opContext.thisClass = this;

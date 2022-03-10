@@ -15,7 +15,7 @@
 #include "host_forward.h"
 
 namespace Hdc {
-HdcHostForward::HdcHostForward(HTaskInfo hTaskInfo)
+HdcHostForward::HdcHostForward(HTaskInfoPtr hTaskInfo)
     : HdcForwardBase(hTaskInfo)
 {
 }

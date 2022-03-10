@@ -19,7 +19,7 @@
 namespace Hdc {
 class HdcHostForward : public HdcForwardBase {
 public:
-    HdcHostForward(HTaskInfo hTaskInfo);
+    HdcHostForward(HTaskInfoPtr hTaskInfo);
     virtual ~HdcHostForward();
 
 private:

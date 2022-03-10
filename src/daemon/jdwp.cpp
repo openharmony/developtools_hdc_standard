@@ -377,7 +377,7 @@ size_t HdcJdwp::JdwpProcessListMsg(char *buffer, size_t bufferlen)
     return len + headerLen;
 }
 
-void HdcJdwp::SendProcessList(HTaskInfo t, string data)
+void HdcJdwp::SendProcessList(HTaskInfoPtr t, string data)
 {
     if (t == nullptr || data.size() == 0) {
         WRITE_LOG(LOG_WARN, " SendProcessList, Nothing needs to be sent.");
@@ -388,7 +388,7 @@ void HdcJdwp::SendProcessList(HTaskInfo t, string data)
     sessionBase->LogMsg(t->sessionId, t->channelId, MSG_OK, data.c_str());
 }
 
-void HdcJdwp::ProcessListUpdated(HTaskInfo task)
+void HdcJdwp::ProcessListUpdated(HTaskInfoPtr task)
 {
     if (jdwpTrackers.size() <= 0) {
         WRITE_LOG(LOG_DEBUG, "None jdwpTrackers.");
@@ -425,7 +425,7 @@ void HdcJdwp::ProcessListUpdated(HTaskInfo task)
     }
 }
 
-bool HdcJdwp::CreateJdwpTracker(HTaskInfo taskInfo)
+bool HdcJdwp::CreateJdwpTracker(HTaskInfoPtr taskInfo)
 {
     if (taskInfo == nullptr) {
         return false;
@@ -440,7 +440,7 @@ bool HdcJdwp::CreateJdwpTracker(HTaskInfo taskInfo)
     return true;
 }
 
-void HdcJdwp::RemoveJdwpTracker(HTaskInfo taskInfo)
+void HdcJdwp::RemoveJdwpTracker(HTaskInfoPtr taskInfo)
 {
     if (taskInfo == nullptr) {
         return;

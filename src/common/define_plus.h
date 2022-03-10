@@ -236,7 +236,7 @@ struct TaskInformation {
     void *ownerSessionClass;
     uint32_t closeRetryCount;
 };
-using HTaskInfo = TaskInformation *;
+using HTaskInfoPtr = TaskInformation *;
 
 #pragma pack(pop)
 
@@ -295,7 +295,7 @@ struct HdcUSB {
     mutex lockDeviceHandle;
     mutex lockSendUsbBlock;
 };
-using HUSB = struct HdcUSB *;
+using HUSBPtr = struct HdcUSB *;
 
 #ifdef HDC_SUPPORT_UART
 struct HdcUART {
@@ -322,7 +322,7 @@ struct HdcUART {
     HdcUART();
     ~HdcUART();
 };
-using HUART = struct HdcUART *;
+using HUARTPtr = struct HdcUART *;
 #endif
 
 struct HdcSession {
@@ -337,7 +337,7 @@ struct HdcSession {
     uint8_t uvHandleRef;  // libuv handle ref -- just main thread now
     uint8_t uvChildRef;   // libuv handle ref -- just main thread now
     bool childCleared;
-    map<uint32_t, HTaskInfo> *mapTask;
+    map<uint32_t, HTaskInfoPtr> *mapTask;
     // class ptr
     void *classInstance;  //  HdcSessionBase instance, HdcServer or HdcDaemon
     void *classModule;    //  Communicate module, TCP or USB instance,HdcDaemonUSB HdcDaemonTCP etc...
@@ -360,9 +360,9 @@ struct HdcSession {
     uv_tcp_t hChildWorkTCP;  // work channel，separate thread for server/daemon
     uv_os_sock_t fdChildWorkTCP;
     // usb handle
-    HUSB hUSB;
+    HUSBPtr hUSB;
 #ifdef HDC_SUPPORT_UART
-    HUART hUART = nullptr;
+    HUARTPtr hUART = nullptr;
 #endif
     // tcp handle
     uv_tcp_t hWorkTCP;
@@ -393,7 +393,7 @@ struct HdcSession {
         }
     }
 };
-using HSession = struct HdcSession *;
+using HSessionPtr = struct HdcSession *;
 
 struct HdcChannel {
     void *clsChannel;  // ptr Class of serverForClient or client
@@ -422,7 +422,7 @@ struct HdcChannel {
     uv_tty_t stdoutTty;
     char bufStd[128];
 };
-using HChannel = struct HdcChannel *;
+using HChannelPtr = struct HdcChannel *;
 
 struct HdcDaemonInformation {
     uint8_t connType;
@@ -430,9 +430,9 @@ struct HdcDaemonInformation {
     string connectKey;
     string usbMountPoint;
     string devName;
-    HSession hSession;
+    HSessionPtr hSessionPtr;
 };
-using HDaemonInfo = struct HdcDaemonInformation *;
+using HDaemonInfoPtr = struct HdcDaemonInformation *;
 
 struct HdcForwardInformation {
     string taskString;
@@ -440,6 +440,6 @@ struct HdcForwardInformation {
     uint32_t sessionId;
     uint32_t channelId;
 };
-using HForwardInfo = struct HdcForwardInformation *;
+using HForwardInfoPtr = struct HdcForwardInformation *;
 }
 #endif

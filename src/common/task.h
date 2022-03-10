@@ -20,7 +20,7 @@ namespace Hdc {
 // Only allow inheritance
 class HdcTaskBase {
 public:
-    HdcTaskBase(HTaskInfo hTaskInfo);
+    HdcTaskBase(HTaskInfoPtr hTaskInfo);
     virtual ~HdcTaskBase();
     virtual bool CommandDispatch(const uint16_t command, uint8_t *payload, const int payloadSize)
     {
@@ -47,7 +47,7 @@ protected:                                                                      
     // step, when the value is false, the Task class will be destructured as soon as possible
     bool childReady;  // Subcompulents have been prepared
     bool singalStop;  // Request stop signal
-    HTaskInfo taskInfo;
+    HTaskInfoPtr taskInfo;
     uint32_t refCount;
 
 private:
