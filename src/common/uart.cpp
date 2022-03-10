@@ -330,6 +330,9 @@ ssize_t HdcUARTBase::WriteUartDev(uint8_t *data, const size_t length, HdcUART &u
 
 int HdcUARTBase::UartToHdcProtocol(uv_stream_t *stream, uint8_t *data, int dataSize)
 {
+    if (stream == nullptr || stream->data == nullptr) {
+        return ERR_IO_FAIL;
+    }
     HSession hSession = (HSession)stream->data;
     unsigned int fd = hSession->dataFd[STREAM_MAIN];
     fd_set fdSet;
@@ -461,6 +464,9 @@ size_t HdcUARTBase::PackageProcess(vector<uint8_t> &data, HSession hSession)
 bool HdcUARTBase::SendUARTRaw(HSession hSession, uint8_t *data, const size_t length)
 {
     struct UartHead *uartHeader = (struct UartHead *)data;
+    if (uartHeader == nullptr) {
+        return false;
+    }
 #ifndef HDC_HOST
     // review nobody can plug out the daemon uart , if we still need split write in daemon side?
     HdcUART deamonUart;
@@ -513,6 +519,9 @@ bool HdcUARTBase::UartSendToHdcStream(HSession hSession, uint8_t *data, size_t s
     }
 
     UartHead *head = reinterpret_cast<UartHead *>(data);
+    if (head == nullptr) {
+        return ERR_GENERIC;
+    }
     WRITE_LOG(LOG_DEBUG, "%s uartHeader:%s data: %x %x", __FUNCTION__,
               head->ToDebugString().c_str(), *(data + sizeof(UartHead)),
               *(data + sizeof(UartHead) + 1));
@@ -595,6 +604,9 @@ limit.
 void HdcUARTBase::RequestSendPackage(uint8_t *data, const size_t length, bool queue)
 {
     UartHead *head = reinterpret_cast<UartHead *>(data);
+    if (head == nullptr) {
+        return;
+    }
     bool response = head->IsResponsePackage();
 
     if (queue) {
@@ -827,6 +839,9 @@ void HdcUARTBase::ResponseUartTrans(uint32_t sessionId, uint32_t packageIndex,
 
 int HdcUARTBase::SendUARTData(HSession hSession, uint8_t *data, const size_t length)
 {
+    if (hSession == nullptr) {
+        return ERR_GENERIC;
+    }
     constexpr int maxIOSize = MAX_UART_SIZE_IOBUF;
     WRITE_LOG(LOG_DEBUG, "SendUARTData hSession:%u, total length:%d", hSession->sessionId, length);
     const int packageDataMaxSize = maxIOSize - sizeof(UartHead);
@@ -878,8 +893,14 @@ int HdcUARTBase::SendUARTData(HSession hSession, uint8_t *data, const size_t len
 
 void HdcUARTBase::ReadDataFromUARTStream(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 {
+    if (stream == nullptr || stream->data == nullptr) {
+        return;
+    }
     HSession hSession = (HSession)stream->data;
     HdcUARTBase *hUARTBase = (HdcUARTBase *)hSession->classModule;
+    if (hUARTBase == nullptr || hSession->hUART == nullptr) {
+        return;
+    }
     std::lock_guard<std::mutex> lock(hUARTBase->workThreadProcessingData);
 
     constexpr int bufSize = 1024;
@@ -891,6 +912,9 @@ void HdcUARTBase::ReadDataFromUARTStream(uv_stream_t *stream, ssize_t nread, con
               hSession->sessionId, nread, buffer,
               hSession->hUART->streamSize.load());
     HdcSessionBase *hSessionBase = (HdcSessionBase *)hSession->classInstance;
+    if (hSessionBase == nullptr) {
+        return;
+    }
     if (nread <= 0 or nread > signed(hSession->hUART->streamSize)) {
         WRITE_LOG(LOG_FATAL, "%s nothing need to do ! because no data here", __FUNCTION__);
         return;
@@ -911,6 +935,9 @@ void HdcUARTBase::ReadDataFromUARTStream(uv_stream_t *stream, ssize_t nread, con
 
 bool HdcUARTBase::ReadyForWorkThread(HSession hSession)
 {
+    if (hSession == nullptr) {
+        return false;
+    }
     if (externInterface.UvTcpInit(&hSession->childLoop, &hSession->dataPipe[STREAM_WORK],
                                   hSession->dataFd[STREAM_WORK])) {
         WRITE_LOG(LOG_FATAL, "%s init child TCP failed", __FUNCTION__);
@@ -918,6 +945,9 @@ bool HdcUARTBase::ReadyForWorkThread(HSession hSession)
     }
     hSession->dataPipe[STREAM_WORK].data = hSession;
     HdcSessionBase *pSession = (HdcSessionBase *)hSession->classInstance;
+    if (pSession == nullptr) {
+        return false;
+    }
     externInterface.SetTcpOptions(&hSession->dataPipe[STREAM_WORK]);
     if (externInterface.UvRead((uv_stream_t *)&hSession->dataPipe[STREAM_WORK],
                                pSession->AllocCallback, &HdcUARTBase::ReadDataFromUARTStream)) {

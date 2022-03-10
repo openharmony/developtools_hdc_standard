@@ -21,12 +21,18 @@ namespace Hdc {
 HdcTaskBase::HdcTaskBase(HTaskInfo hTaskInfo)
 {
     taskInfo = hTaskInfo;
-    loopTask = hTaskInfo->runLoop;
-    clsSession = hTaskInfo->ownerSessionClass;
+    if (hTaskInfo != nullptr) {
+        loopTask = hTaskInfo->runLoop;
+        clsSession = hTaskInfo->ownerSessionClass;
+    } else {
+        loopTask = nullptr;
+        clsSession = nullptr;
+    }
+
     childReady = false;
     singalStop = false;
     refCount = 0;
-    if (taskInfo->masterSlave)
+    if (taskInfo != nullptr && taskInfo->masterSlave)
         SendToAnother(CMD_KERNEL_WAKEUP_SLAVETASK, nullptr, 0);
 }
 
@@ -50,11 +56,14 @@ void HdcTaskBase::TaskFinish()
 
 bool HdcTaskBase::SendToAnother(const uint16_t command, uint8_t *bufPtr, const int size)
 {
-    if (singalStop) {
+    if (singalStop || taskInfo == nullptr) {
         return false;
     }
     HdcSessionBase *sessionBase = reinterpret_cast<HdcSessionBase *>(taskInfo->ownerSessionClass);
-    return sessionBase->Send(taskInfo->sessionId, taskInfo->channelId, command, bufPtr, size) > 0;
+    if (sessionBase != nullptr) {
+        return sessionBase->Send(taskInfo->sessionId, taskInfo->channelId, command, bufPtr, size) > 0;
+    }
+    return false;
 }
 
 void HdcTaskBase::LogMsg(MessageLevel level, const char *msg, ...)
@@ -64,11 +73,16 @@ void HdcTaskBase::LogMsg(MessageLevel level, const char *msg, ...)
     string log = Base::StringFormat(msg, vaArgs);
     va_end(vaArgs);
     HdcSessionBase *sessionBase = reinterpret_cast<HdcSessionBase *>(clsSession);
-    sessionBase->LogMsg(taskInfo->sessionId, taskInfo->channelId, level, log.c_str());
+    if (sessionBase != nullptr) {
+        sessionBase->LogMsg(taskInfo->sessionId, taskInfo->channelId, level, log.c_str());
+    }
 }
 
 bool HdcTaskBase::ServerCommand(const uint16_t command, uint8_t *bufPtr, const int size)
 {
+    if (taskInfo == nullptr || taskInfo->ownerSessionClass == nullptr) {
+        return false;
+    }
     HdcSessionBase *hSession = (HdcSessionBase *)taskInfo->ownerSessionClass;
     return hSession->ServerCommand(taskInfo->sessionId, taskInfo->channelId, command, bufPtr, size);
 }
@@ -76,6 +90,9 @@ bool HdcTaskBase::ServerCommand(const uint16_t command, uint8_t *bufPtr, const i
 // cross thread
 int HdcTaskBase::ThreadCtrlCommunicate(const uint8_t *bufPtr, const int size)
 {
+    if (taskInfo == nullptr || taskInfo->ownerSessionClass == nullptr) {
+        return false;
+    }
     HdcSessionBase *sessionBase = (HdcSessionBase *)taskInfo->ownerSessionClass;
     HSession hSession = sessionBase->AdminSession(OP_QUERY, taskInfo->sessionId, nullptr);
     if (!hSession) {
