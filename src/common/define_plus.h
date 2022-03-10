@@ -249,6 +249,7 @@ struct HostUSBEndpoint {
         transfer = libusb_alloc_transfer(0);
         isShutdown = true;
         isComplete = true;
+        bulkInOut = false;
         (void)memset_s(buf, sizeEpBuf, 0, sizeEpBuf);
     }
     ~HostUSBEndpoint()
