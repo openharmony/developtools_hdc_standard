@@ -191,7 +191,7 @@ int HdcUSBBase::CheckPacketOption(HSession hSession, uint8_t *appendData, int da
 int HdcUSBBase::SendToHdcStream(HSession hSession, uv_stream_t *stream, uint8_t *appendData, int dataSize)
 {
     if (hSession == nullptr || hSession->hUSB == nullptr) {
-        return ;
+        return -1;
     }
     int childRet = 0;
     HUSB hUSB = hSession->hUSB;
