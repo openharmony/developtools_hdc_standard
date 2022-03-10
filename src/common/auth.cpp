@@ -223,10 +223,6 @@ bool GenerateKey(const char *file)
 
 bool ReadKey(const char *file, list<void *> *listPrivateKey)
 {
-    if (file == nullptr || listPrivateKey == nullptr) {
-        return false;
-    }
-
     FILE *f = nullptr;
     bool ret = false;
 
