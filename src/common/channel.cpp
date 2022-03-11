@@ -97,18 +97,12 @@ void HdcChannelBase::WorkerPendding()
 
 void HdcChannelBase::ReadStream(uv_stream_t *tcp, ssize_t nread, const uv_buf_t *buf)
 {
-    if (tcp == nullptr || tcp->data == nullptr) {
-        return;
-    }
     int size = 0;
     int indexBuf = 0;
     int childRet = 0;
     bool needExit = false;
     HChannel hChannel = (HChannel)tcp->data;
     HdcChannelBase *thisClass = (HdcChannelBase *)hChannel->clsChannel;
-    if (thisClass == nullptr) {
-        return;
-    }
 
     if (nread == UV_ENOBUFS) {
         WRITE_LOG(LOG_DEBUG, "HdcChannelBase::ReadStream Pipe IOBuf max");
@@ -164,15 +158,9 @@ Finish:
 
 void HdcChannelBase::WriteCallback(uv_write_t *req, int status)
 {
-    if (req == nullptr || req->handle == nullptr || req->handle->data == nullptr) {
-        return;
-    }
     HChannel hChannel = (HChannel)req->handle->data;
     --hChannel->ref;
     HdcChannelBase *thisClass = (HdcChannelBase *)hChannel->clsChannel;
-    if (thisClass == nullptr) {
-        return;
-    }
     if (status < 0) {
         Base::TryCloseHandle((uv_handle_t *)req->handle);
         if (!hChannel->isDead && !hChannel->ref) {
@@ -180,22 +168,14 @@ void HdcChannelBase::WriteCallback(uv_write_t *req, int status)
             WRITE_LOG(LOG_DEBUG, "WriteCallback TryCloseHandle");
         }
     }
-    if (req->data != nullptr) {
-        delete[]((uint8_t *)req->data);
-    }
+    delete[]((uint8_t *)req->data);
     delete req;
 }
 
 void HdcChannelBase::AsyncMainLoopTask(uv_idle_t *handle)
 {
-    if (handle == nullptr || handle->data == nullptr) {
-        return;
-    }
     AsyncParam *param = (AsyncParam *)handle->data;
     HdcChannelBase *thisClass = (HdcChannelBase *)param->thisClass;
-    if (thisClass == nullptr) {
-        return;
-    }
 
     switch (param->method) {
         case ASYNC_FREE_CHANNEL: {
@@ -218,9 +198,6 @@ void HdcChannelBase::AsyncMainLoopTask(uv_idle_t *handle)
 // if uv_async_send() is called again after callback calling, it will be called again.
 void HdcChannelBase::MainAsyncCallback(uv_async_t *handle)
 {
-    if (handle == nullptr || handle->data == nullptr) {
-        return;
-    }
     HdcChannelBase *thisClass = (HdcChannelBase *)handle->data;
     if (uv_is_closing((uv_handle_t *)thisClass->loopMain)) {
         return;
@@ -242,7 +219,7 @@ void HdcChannelBase::PushAsyncMessage(const uint32_t channelId, const uint8_t me
     if (uv_is_closing((uv_handle_t *)&asyncMainLoop)) {
         return;
     }
-    auto param = new(std::nothrow) AsyncParam();
+    auto param = new AsyncParam();
     if (!param) {
         return;
     }
@@ -251,12 +228,12 @@ void HdcChannelBase::PushAsyncMessage(const uint32_t channelId, const uint8_t me
     param->method = method;
     if (dataSize > 0) {
         param->dataSize = dataSize;
-        param->data = new(std::nothrow) uint8_t[param->dataSize]();
+        param->data = new uint8_t[param->dataSize]();
         if (!param->data) {
             delete param;
             return;
         }
-        if (memcpy_s((uint8_t *)param->data, param->dataSize, data, dataSize) != EOK) {
+        if (memcpy_s((uint8_t *)param->data, param->dataSize, data, dataSize)) {
             delete[]((uint8_t *)param->data);
             delete param;
             return;
@@ -273,12 +250,12 @@ void HdcChannelBase::SendChannel(HChannel hChannel, uint8_t *bufPtr, const int s
 {
     uv_stream_t *sendStream = nullptr;
     int sizeNewBuf = size + DWORD_SERIALIZE_SIZE;
-    auto data = new(std::nothrow) uint8_t[sizeNewBuf]();
+    auto data = new uint8_t[sizeNewBuf]();
     if (!data) {
         return;
     }
     *(uint32_t *)data = htonl(size);  // big endian
-    if (memcpy_s(data + DWORD_SERIALIZE_SIZE, sizeNewBuf - DWORD_SERIALIZE_SIZE, bufPtr, size) != EOK) {
+    if (memcpy_s(data + DWORD_SERIALIZE_SIZE, sizeNewBuf - DWORD_SERIALIZE_SIZE, bufPtr, size)) {
         delete[] data;
         return;
     }
@@ -313,9 +290,6 @@ void HdcChannelBase::Send(const uint32_t channelId, uint8_t *bufPtr, const int s
 
 void HdcChannelBase::AllocCallback(uv_handle_t *handle, size_t sizeWanted, uv_buf_t *buf)
 {
-    if (handle == nullptr || handle->data == nullptr || buf == nullptr) {
-        return;
-    }
     HChannel context = (HChannel)handle->data;
     Base::ReallocBuf(&context->ioBuf, &context->bufSize, Base::GetMaxBufSize() * 4);
     buf->base = (char *)context->ioBuf + context->availTailIndex;
@@ -334,10 +308,7 @@ uint32_t HdcChannelBase::GetChannelPseudoUid()
 
 uint32_t HdcChannelBase::MallocChannel(HChannel *hOutChannel)
 {
-    if (hOutChannel == nullptr) {
-        return 0;
-    }
-    auto hChannel = new(std::nothrow) HdcChannel();
+    auto hChannel = new HdcChannel();
     if (!hChannel) {
         return 0;
     }
@@ -361,12 +332,9 @@ uint32_t HdcChannelBase::MallocChannel(HChannel *hOutChannel)
 // work when libuv-handle at struct of HdcSession has all callback finished
 void HdcChannelBase::FreeChannelFinally(uv_idle_t *handle)
 {
-    if (handle == nullptr || handle->data == nullptr) {
-        return;
-    }
     HChannel hChannel = (HChannel)handle->data;
     HdcChannelBase *thisClass = (HdcChannelBase *)hChannel->clsChannel;
-    if (hChannel->uvHandleRef > 0 || thisClass == nullptr) {
+    if (hChannel->uvHandleRef > 0) {
         return;
     }
     thisClass->NotifyInstanceChannelFree(hChannel);
@@ -381,9 +349,6 @@ void HdcChannelBase::FreeChannelFinally(uv_idle_t *handle)
 
 void HdcChannelBase::FreeChannelContinue(HChannel hChannel)
 {
-    if (hChannel == nullptr) {
-        return;
-    }
     auto closeChannelHandle = [](uv_handle_t *handle) -> void {
         HChannel hChannel = (HChannel)handle->data;
         --hChannel->uvHandleRef;
@@ -408,12 +373,9 @@ void HdcChannelBase::FreeChannelContinue(HChannel hChannel)
 
 void HdcChannelBase::FreeChannelOpeate(uv_timer_t *handle)
 {
-    if (handle == nullptr || handle->data == nullptr) {
-        return;
-    }
     HChannel hChannel = (HChannel)handle->data;
     HdcChannelBase *thisClass = (HdcChannelBase *)hChannel->clsChannel;
-    if (hChannel->ref > 0 || thisClass == nullptr) {
+    if (hChannel->ref > 0) {
         return;
     }
     if (hChannel->hChildWorkTCP.loop) {
@@ -485,9 +447,7 @@ HChannel HdcChannelBase::AdminChannel(const uint8_t op, const uint32_t channelId
             uv_rwlock_wrlock(&lockMapChannel);
             // remove old
             mapChannel.erase(channelId);
-            if (hInput != nullptr) {
-                mapChannel[hInput->channelId] = hInput;
-            }
+            mapChannel[hInput->channelId] = hInput;
             uv_rwlock_wrunlock(&lockMapChannel);
             break;
         default:
@@ -498,18 +458,14 @@ HChannel HdcChannelBase::AdminChannel(const uint8_t op, const uint32_t channelId
 
 void HdcChannelBase::EchoToClient(HChannel hChannel, uint8_t *bufPtr, const int size)
 {
-    if (hChannel == nullptr) {
-        return;
-    }
-
     uv_stream_t *sendStream = nullptr;
     int sizeNewBuf = size + DWORD_SERIALIZE_SIZE;
-    auto data = new(std::nothrow) uint8_t[sizeNewBuf]();
+    auto data = new uint8_t[sizeNewBuf]();
     if (!data) {
         return;
     }
     *(uint32_t *)data = htonl(size);
-    if (memcpy_s(data + DWORD_SERIALIZE_SIZE, sizeNewBuf - DWORD_SERIALIZE_SIZE, bufPtr, size) != EOK) {
+    if (memcpy_s(data + DWORD_SERIALIZE_SIZE, sizeNewBuf - DWORD_SERIALIZE_SIZE, bufPtr, size)) {
         delete[] data;
         return;
     }
@@ -527,7 +483,7 @@ void HdcChannelBase::EchoToAllChannelsViaSessionId(uint32_t targetSessionId, con
 {
     for (auto v : mapChannel) {
         HChannel hChannel = (HChannel)v.second;
-        if (hChannel != nullptr && !hChannel->isDead && hChannel->targetSessionId == targetSessionId) {
+        if (!hChannel->isDead && hChannel->targetSessionId == targetSessionId) {
             WRITE_LOG(LOG_INFO, "%s:%u %s", __FUNCTION__, targetSessionId, echo.c_str());
             EchoToClient(hChannel, (uint8_t *)echo.c_str(), echo.size());
         }
