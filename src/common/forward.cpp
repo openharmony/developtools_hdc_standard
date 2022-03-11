@@ -38,9 +38,8 @@ void HdcForwardBase::StopTask()
 {
     map<uint32_t, HCtxForward>::iterator iter;
     for (iter = mapCtxPoint.begin(); iter != mapCtxPoint.end(); ++iter) {
-        if (iter->second != nullptr) {
-            FreeContext(iter->second, 0, false);
-        }
+        HCtxForward ctx = iter->second;
+        FreeContext(ctx, 0, false);
     }
     // FREECONTEXT in the STOP is triggered by the other party sector, no longer notifying each other.
     mapCtxPoint.clear();
@@ -48,9 +47,6 @@ void HdcForwardBase::StopTask()
 
 void HdcForwardBase::OnAccept(uv_stream_t *server, HCtxForward ctxClient, uv_stream_t *client)
 {
-    if (server == nullptr || client == nullptr) {
-        return;
-    }
     HCtxForward ctxListen = (HCtxForward)server->data;
     char buf[BUF_SIZE_DEFAULT] = { 0 };
     bool ret = false;
@@ -80,14 +76,8 @@ void HdcForwardBase::OnAccept(uv_stream_t *server, HCtxForward ctxClient, uv_str
 
 void HdcForwardBase::ListenCallback(uv_stream_t *server, const int status)
 {
-    if (server == nullptr || server->data == nullptr) {
-        return;
-    }
     HCtxForward ctxListen = (HCtxForward)server->data;
     HdcForwardBase *thisClass = ctxListen->thisClass;
-    if (ctxListen == nullptr) {
-        return;
-    }
     uv_stream_t *client = nullptr;
 
     if (status == -1 || !ctxListen->ready) {
@@ -113,7 +103,7 @@ void HdcForwardBase::ListenCallback(uv_stream_t *server, const int status)
 void *HdcForwardBase::MallocContext(bool masterSlave)
 {
     HCtxForward ctx = nullptr;
-    if ((ctx = new(std::nothrow) ContextForward()) == nullptr) {
+    if ((ctx = new ContextForward()) == nullptr) {
         return nullptr;
     }
     ctx->id = Base::GetRuntimeMSec();
@@ -129,9 +119,6 @@ void *HdcForwardBase::MallocContext(bool masterSlave)
 
 void HdcForwardBase::FreeContextCallBack(HCtxForward ctx)
 {
-    if (ctx == nullptr) {
-        return;
-    }
     Base::DoNextLoop(loopTask, ctx, [this](const uint8_t flag, string &msg, const void *data) {
         HCtxForward ctx = (HCtxForward)data;
         AdminContext(OP_REMOVE, ctx->id, nullptr);
@@ -142,9 +129,6 @@ void HdcForwardBase::FreeContextCallBack(HCtxForward ctx)
 
 void HdcForwardBase::FreeJDWP(HCtxForward ctx)
 {
-    if (ctx == nullptr) {
-        return;
-    }
     if (ctx->fd > 0) {
         close(ctx->fd);
     }
@@ -152,9 +136,6 @@ void HdcForwardBase::FreeJDWP(HCtxForward ctx)
         ctx->fdClass->StopWork(false, nullptr);
 
         auto funcReqClose = [](uv_idle_t *handle) -> void {
-            if (handle == nullptr) {
-                return;
-            }
             uv_close_cb funcIdleHandleClose = [](uv_handle_t *handle) -> void {
                 HCtxForward ctx = (HCtxForward)handle->data;
                 ctx->thisClass->FreeContextCallBack(ctx);
@@ -220,7 +201,7 @@ bool HdcForwardBase::SendToTask(const uint32_t cid, const uint16_t command, uint
     if (bufSize > Base::GetMaxBufSize() * 2) {
         return false;
     }
-    auto newBuf = new(std::nothrow) uint8_t[bufSize + 4];
+    auto newBuf = new uint8_t[bufSize + 4];
     if (!newBuf) {
         return false;
     }
@@ -238,7 +219,7 @@ bool HdcForwardBase::SendToTask(const uint32_t cid, const uint16_t command, uint
 void HdcForwardBase::AllocForwardBuf(uv_handle_t *handle, size_t sizeSuggested, uv_buf_t *buf)
 {
     const uint16_t size = 1492 - 256;  // For layer 3, the default MTU is 1492 bytes. reserve hdc header 256 bytes
-    buf->base = (char *)new(std::nothrow) char[size];
+    buf->base = (char *)new char[size];
     if (buf->base) {
         buf->len = size - 1;
     } else {
@@ -248,9 +229,6 @@ void HdcForwardBase::AllocForwardBuf(uv_handle_t *handle, size_t sizeSuggested, 
 
 void HdcForwardBase::ReadForwardBuf(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 {
-    if (stream == nullptr || stream->data == nullptr) {
-        return;
-    }
     HCtxForward ctx = (HCtxForward)stream->data;
     if (nread < 0) {
         ctx->thisClass->FreeContext(ctx, 0, true);
@@ -263,14 +241,8 @@ void HdcForwardBase::ReadForwardBuf(uv_stream_t *stream, ssize_t nread, const uv
 
 void HdcForwardBase::ConnectTarget(uv_connect_t *connection, int status)
 {
-    if (connection == nullptr || connection->data == nullptr) {
-        return;
-    }
     HCtxForward ctx = (HCtxForward)connection->data;
     HdcForwardBase *thisClass = ctx->thisClass;
-    if (thisClass == nullptr) {
-        return;
-    }
     delete connection;
     if (status < 0) {
         constexpr int bufSize = 1024;
@@ -283,9 +255,6 @@ void HdcForwardBase::ConnectTarget(uv_connect_t *connection, int status)
 
 bool HdcForwardBase::CheckNodeInfo(const char *nodeInfo, string as[2])
 {
-    if (nodeInfo == nullptr) {
-        return false;
-    }
     char bufString[BUF_SIZE_MEDIUM];
     if (!strchr(nodeInfo, ':')) {
         return false;
@@ -314,9 +283,6 @@ bool HdcForwardBase::CheckNodeInfo(const char *nodeInfo, string as[2])
 
 bool HdcForwardBase::SetupPointContinue(HCtxForward ctx, int status)
 {
-    if (ctx == nullptr) {
-        return false;
-    }
     if (ctx->checkPoint) {
         // send to active
         uint8_t flag = status > 0;
@@ -338,9 +304,6 @@ bool HdcForwardBase::SetupPointContinue(HCtxForward ctx, int status)
 
 bool HdcForwardBase::DetechForwardType(HCtxForward ctxPoint)
 {
-    if (ctxPoint == nullptr) {
-        return false;
-    }
     string &sFType = ctxPoint->localArgs[0];
     string &sNodeCfg = ctxPoint->localArgs[1];
     // string to enum
@@ -369,9 +332,6 @@ bool HdcForwardBase::DetechForwardType(HCtxForward ctxPoint)
 
 bool HdcForwardBase::SetupTCPPoint(HCtxForward ctxPoint)
 {
-    if (ctxPoint == nullptr) {
-        return false;
-    }
     string &sNodeCfg = ctxPoint->localArgs[1];
     int port = atoi(sNodeCfg.c_str());
     ctxPoint->tcp.data = ctxPoint;
@@ -399,9 +359,6 @@ bool HdcForwardBase::SetupTCPPoint(HCtxForward ctxPoint)
 
 bool HdcForwardBase::SetupDevicePoint(HCtxForward ctxPoint)
 {
-    if (ctxPoint == nullptr) {
-        return false;
-    }
     uint8_t flag = 1;
     string &sNodeCfg = ctxPoint->localArgs[1];
     string resolvedPath = Base::CanonicalizeSpecPath(sNodeCfg);
@@ -430,9 +387,6 @@ bool HdcForwardBase::SetupDevicePoint(HCtxForward ctxPoint)
 
 bool HdcForwardBase::LocalAbstractConnect(uv_pipe_t *pipe, string &sNodeCfg)
 {
-    if (pipe == nullptr) {
-        return false;
-    }
     bool abstractRet = false;
 #ifndef _WIN32
     int s = 0;
@@ -468,9 +422,6 @@ bool HdcForwardBase::LocalAbstractConnect(uv_pipe_t *pipe, string &sNodeCfg)
 
 bool HdcForwardBase::SetupFilePoint(HCtxForward ctxPoint)
 {
-    if (ctxPoint == nullptr) {
-        return false;
-    }
     string &sNodeCfg = ctxPoint->localArgs[1];
     ctxPoint->pipe.data = ctxPoint;
     uv_pipe_init(loopTask, &ctxPoint->pipe, 0);
@@ -509,9 +460,6 @@ bool HdcForwardBase::SetupFilePoint(HCtxForward ctxPoint)
 
 bool HdcForwardBase::SetupPoint(HCtxForward ctxPoint)
 {
-    if (ctxPoint == nullptr) {
-        return false;
-    }
     bool ret = true;
     if (!DetechForwardType(ctxPoint)) {
         return false;
@@ -610,9 +558,6 @@ bool HdcForwardBase::BeginForward(const string &command, string &sError)
 
 inline bool HdcForwardBase::FilterCommand(uint8_t *bufCmdIn, uint32_t *idOut, uint8_t **pContentBuf)
 {
-    if (bufCmdIn == nullptr || idOut == nullptr || pContentBuf == nullptr) {
-        return false;
-    }
     *pContentBuf = bufCmdIn + DWORD_SERIALIZE_SIZE;
     *idOut = ntohl(*(uint32_t *)bufCmdIn);
     return true;
@@ -620,9 +565,6 @@ inline bool HdcForwardBase::FilterCommand(uint8_t *bufCmdIn, uint32_t *idOut, ui
 
 bool HdcForwardBase::SlaveConnect(uint8_t *bufCmd, bool bCheckPoint, string &sError)
 {
-    if (bufCmd == nullptr) {
-        return false;
-    }
     bool ret = false;
     char *content = nullptr;
     uint32_t idSlaveOld = 0;
@@ -659,9 +601,6 @@ Finish:
 
 bool HdcForwardBase::DoForwardBegin(HCtxForward ctx)
 {
-    if (ctx == nullptr) {
-        return false;
-    }
     switch (ctx->type) {
         case FORWARD_TCP:
         case FORWARD_JDWP:  // jdwp use tcp ->socketpair->jvm
@@ -702,9 +641,7 @@ void *HdcForwardBase::AdminContext(const uint8_t op, const uint32_t id, HCtxForw
             break;
         case OP_UPDATE:
             mapCtx.erase(id);
-            if (hInput != nullptr) {
-                mapCtx[hInput->id] = hInput;
-            }
+            mapCtx[hInput->id] = hInput;
             break;
         default:
             break;
@@ -714,26 +651,13 @@ void *HdcForwardBase::AdminContext(const uint8_t op, const uint32_t id, HCtxForw
 
 void HdcForwardBase::SendCallbackForwardBuf(uv_write_t *req, int status)
 {
-    if (req == nullptr || req->data == nullptr) {
-        return;
-    }
     ContextForwardIO *ctxIO = (ContextForwardIO *)req->data;
     HCtxForward ctx = (HCtxForward)ctxIO->ctxForward;
-    if (ctx == nullptr) {
-        if (ctxIO->bufIO != nullptr) {
-            delete[] ctxIO->bufIO;
-        }
-        delete ctxIO;
-        delete req;
-        return;
-    }
     if (status < 0 && !ctx->finish) {
         WRITE_LOG(LOG_DEBUG, "SendCallbackForwardBuf ctx->type:%d, status:%d finish", ctx->type, status);
         ctx->thisClass->FreeContext(ctx, 0, true);
     }
-    if (ctxIO->bufIO != nullptr) {
-        delete[] ctxIO->bufIO;
-    }
+    delete[] ctxIO->bufIO;
     delete ctxIO;
     delete req;
 }
@@ -741,14 +665,14 @@ void HdcForwardBase::SendCallbackForwardBuf(uv_write_t *req, int status)
 int HdcForwardBase::SendForwardBuf(HCtxForward ctx, uint8_t *bufPtr, const int size)
 {
     int nRet = 0;
-    if (size > static_cast<int>(HDC_BUF_MAX_BYTES - 1) || bufPtr == nullptr || ctx == nullptr) {
+    if (size > static_cast<int>(HDC_BUF_MAX_BYTES - 1)) {
         return -1;
     }
     if (size <= 0) {
         WRITE_LOG(LOG_WARN, "SendForwardBuf failed size:%d", size);
         return -1;
     }
-    auto pDynBuf = new(std::nothrow) uint8_t[size];
+    auto pDynBuf = new uint8_t[size];
     if (!pDynBuf) {
         return -1;
     }
@@ -756,7 +680,7 @@ int HdcForwardBase::SendForwardBuf(HCtxForward ctx, uint8_t *bufPtr, const int s
     if (FORWARD_DEVICE == ctx->type) {
         nRet = ctx->fdClass->WriteWithMem(pDynBuf, size);
     } else {
-        auto ctxIO = new(std::nothrow) ContextForwardIO();
+        auto ctxIO = new ContextForwardIO();
         if (!ctxIO) {
             delete[] pDynBuf;
             return -1;
@@ -844,9 +768,6 @@ bool HdcForwardBase::ForwardCommandDispatch(const uint16_t command, uint8_t *pay
 
 bool HdcForwardBase::CommandDispatch(const uint16_t command, uint8_t *payload, const int payloadSize)
 {
-    if (payload == nullptr) {
-        return false;
-    }
     bool ret = true;
     string sError;
     // prepare
