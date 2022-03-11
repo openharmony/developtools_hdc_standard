@@ -28,8 +28,14 @@ HdcUSBBase::~HdcUSBBase()
 
 void HdcUSBBase::ReadUSB(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 {
+    if (stream == nullptr || stream->data == nullptr) {
+        return;
+    }
     HSession hSession = (HSession)stream->data;
     HdcSessionBase *hSessionBase = (HdcSessionBase *)hSession->classInstance;
+    if (hSessionBase == nullptr) {
+        return;
+    }
     if (hSessionBase->FetchIOBuf(hSession, hSession->ioBuf, nread) < 0) {
         hSessionBase->FreeSession(hSession->sessionId);
     }
@@ -39,6 +45,9 @@ bool HdcUSBBase::ReadyForWorkThread(HSession hSession)
 {
     // Server-end USB IO is handed over to each sub-thread, only the daemon is still read by the main IO to distribute
     // to each sub-thread by DataPipe.
+    if (hSession == nullptr || hSession->classInstance == nullptr) {
+        return false;
+    }
     if (uv_tcp_init(&hSession->childLoop, &hSession->dataPipe[STREAM_WORK])
         || uv_tcp_open(&hSession->dataPipe[STREAM_WORK], hSession->dataFd[STREAM_WORK])) {
         WRITE_LOG(LOG_FATAL, "USBBase ReadyForWorkThread init child TCP failed");
@@ -73,6 +82,9 @@ vector<uint8_t> HdcUSBBase::BuildPacketHeader(uint32_t sessionId, uint8_t option
 // inserting the send queue causes the program to crash
 int HdcUSBBase::SendUSBBlock(HSession hSession, uint8_t *data, const int length)
 {
+    if (hSession == nullptr) {
+        return ERR_IO_FAIL;
+    }
     int childRet = 0;
     int ret = ERR_IO_FAIL;
     auto header = BuildPacketHeader(hSession->sessionId, USB_OPTION_HEADER, length);
@@ -103,6 +115,9 @@ int HdcUSBBase::SendUSBBlock(HSession hSession, uint8_t *data, const int length)
 
 bool HdcUSBBase::IsUsbPacketHeader(uint8_t *ioBuf, int ioBytes)
 {
+    if (ioBuf == nullptr) {
+        return false;
+    }
     USBHead *usbPayloadHeader = (struct USBHead *)ioBuf;
     uint32_t maybeSize = ntohl(usbPayloadHeader->dataSize);
     bool isHeader = false;
@@ -128,6 +143,9 @@ bool HdcUSBBase::IsUsbPacketHeader(uint8_t *ioBuf, int ioBytes)
 
 void HdcUSBBase::PreSendUsbSoftReset(HSession hSession, uint32_t sessionIdOld)
 {
+    if (hSession == nullptr || hSession->hUSB == nullptr) {
+        return;
+    }
     HUSB hUSB = hSession->hUSB;
     int childRet = 0;
     if (hSession->serverOrDaemon && !hUSB->resetIO) {
@@ -144,6 +162,9 @@ void HdcUSBBase::PreSendUsbSoftReset(HSession hSession, uint32_t sessionIdOld)
 
 int HdcUSBBase::CheckPacketOption(HSession hSession, uint8_t *appendData, int dataSize)
 {
+    if (hSession == nullptr || hSession->hUSB == nullptr || appendData == nullptr) {
+        return ERR_GENERIC;
+    }
     HUSB hUSB = hSession->hUSB;
     // special short packet
     USBHead *header = (USBHead *)appendData;
@@ -169,6 +190,9 @@ int HdcUSBBase::CheckPacketOption(HSession hSession, uint8_t *appendData, int da
 // return value: <0 error; = 0 all finish; >0 need size
 int HdcUSBBase::SendToHdcStream(HSession hSession, uv_stream_t *stream, uint8_t *appendData, int dataSize)
 {
+    if (hSession == nullptr || hSession->hUSB == nullptr) {
+        return -1;
+    }
     int childRet = 0;
     HUSB hUSB = hSession->hUSB;
     if (IsUsbPacketHeader(appendData, dataSize)) {

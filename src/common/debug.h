@@ -18,6 +18,7 @@
 
 namespace Hdc {
 namespace Debug {
+    FILE* OpenValidDebugFilePath(const char *fileName, const std::string& mode, std::string& filePath);
     int WriteHexToDebugFile(const char *fileName, const uint8_t *buf, const int bufLen);
     int ReadHexFromDebugFile(const char *fileName, uint8_t *buf, const int bufLen);
     void DetermineThread(HSession hSession);
