@@ -122,9 +122,6 @@ namespace Base {
 
     void LogToPath(const char *path, const char *str)
     {
-        if (path == nullptr || str == nullptr) {
-            return;
-        }
         // logfile, not thread-safe
 #ifdef HDC_DEBUG_UART
         // make a log path print.
@@ -277,16 +274,13 @@ namespace Base {
 
     void ReallocBuf(uint8_t **origBuf, int *nOrigSize, int sizeWanted)
     {
-        if (origBuf == nullptr || nOrigSize == nullptr) {
-            return;
-        }
         if (*nOrigSize > 0)
             return;
         if (sizeWanted <= 0 || sizeWanted >= HDC_BUF_MAX_BYTES) {
             WRITE_LOG(LOG_WARN, "ReallocBuf failed, sizeWanted:%d", sizeWanted);
             return;
         }
-        *origBuf = new(std::nothrow) uint8_t[sizeWanted];
+        *origBuf = new uint8_t[sizeWanted];
         if (!*origBuf)
             return;
         *nOrigSize = sizeWanted;
@@ -295,11 +289,8 @@ namespace Base {
     // As an uv_alloc_cb it must keep the same as prototype
     void AllocBufferCallback(uv_handle_t *handle, size_t sizeSuggested, uv_buf_t *buf)
     {
-        if (buf == nullptr) {
-            return;
-        }
         const int size = GetMaxBufSize();
-        buf->base = (char *)new(std::nothrow) uint8_t[size]();
+        buf->base = (char *)new uint8_t[size]();
         if (buf->base) {
             buf->len = size - 1;
         }
@@ -314,12 +305,8 @@ namespace Base {
             uv_strerror_r(status, buf, bufSize);
             WRITE_LOG(LOG_WARN, "SendCallback failed,status:%d %s", status, buf);
         }
-        if (req != nullptr) {
-            if (req->data != nullptr) {
-                delete[]((uint8_t *)req->data);
-            }
-            delete req;
-        }
+        delete[]((uint8_t *)req->data);
+        delete req;
     }
 
     // xxx must keep sync with uv_loop_close/uv_walk etc.
@@ -330,15 +317,12 @@ namespace Base {
         //                 Returns zero when done (no active handles or requests left), or non-zero if more events are
         //                 expected meaning you should run the event loop again sometime in the future).
         // UV_RUN_NOWAIT:  Poll for new events once but don't block if there are no pending events.
-        if (ptrLoop == nullptr) {
-            return false;
-        }
         uint8_t closeRetry = 0;
         bool ret = false;
         constexpr int maxRetry = 3;
         for (closeRetry = 0; closeRetry < maxRetry; ++closeRetry) {
             if (uv_loop_close(ptrLoop) == UV_EBUSY) {
-                if (closeRetry > 2 && callerName != nullptr) {
+                if (closeRetry > 2) {
                     WRITE_LOG(LOG_WARN, "%s close busy,try:%d", callerName, closeRetry);
                 }
 
@@ -377,10 +361,6 @@ namespace Base {
 
     void TryCloseHandle(const uv_handle_t *handle, bool alwaysCallback, uv_close_cb closeCallBack)
     {
-        if (handle == nullptr) {
-            return;
-        }
-
         bool hasCallClose = false;
         if (handle->loop && !uv_is_closing(handle)) {
             uv_close((uv_handle_t *)handle, closeCallBack);
@@ -393,18 +373,15 @@ namespace Base {
 
     int SendToStream(uv_stream_t *handleStream, const uint8_t *buf, const int bufLen)
     {
-        if (handleStream == nullptr) {
-            return ERR_GENERIC;
-        }
         if (bufLen > static_cast<int>(HDC_BUF_MAX_BYTES)) {
             return ERR_BUF_ALLOC;
         }
-        uint8_t *pDynBuf = new(std::nothrow) uint8_t[bufLen];
+        uint8_t *pDynBuf = new uint8_t[bufLen];
         if (!pDynBuf) {
             WRITE_LOG(LOG_WARN, "SendToStream, alloc failed, size:%d", bufLen);
             return ERR_BUF_ALLOC;
         }
-        if (memcpy_s(pDynBuf, bufLen, buf, bufLen) != EOK) {
+        if (memcpy_s(pDynBuf, bufLen, buf, bufLen)) {
             WRITE_LOG(LOG_WARN, "SendToStream, memory copy failed, size:%d", bufLen);
             delete[] pDynBuf;
             return ERR_BUF_COPY;
@@ -417,12 +394,8 @@ namespace Base {
     int SendToStreamEx(uv_stream_t *handleStream, const uint8_t *buf, const int bufLen, uv_stream_t *handleSend,
                        const void *finishCallback, const void *pWriteReqData)
     {
-        if (handleStream == nullptr || buf == nullptr || finishCallback == nullptr || pWriteReqData == nullptr) {
-            return ERR_GENERIC;
-        }
-
         int ret = ERR_GENERIC;
-        uv_write_t *reqWrite = new(std::nothrow) uv_write_t();
+        uv_write_t *reqWrite = new uv_write_t();
         if (!reqWrite) {
             WRITE_LOG(LOG_WARN, "SendToStreamEx, new write_t failed, size:%d", bufLen);
             return ERR_BUF_ALLOC;
@@ -450,7 +423,6 @@ namespace Base {
             }
             if (ret < 0) {
                 WRITE_LOG(LOG_WARN, "SendToStreamEx, uv_write false, size:%d", bufLen);
-                delete[]((uint8_t *)reqWrite->data);
                 delete reqWrite;
                 ret = ERR_IO_FAIL;
                 break;
@@ -505,7 +477,7 @@ namespace Base {
     int ConnectKey2IPPort(const char *connectKey, char *outIP, uint16_t *outPort)
     {
         char bufString[BUF_SIZE_TINY] = "";
-        if (memcpy_s(bufString, sizeof(bufString), connectKey, sizeof(bufString)) != EOK) {
+        if (memcpy_s(bufString, sizeof(bufString), connectKey, sizeof(bufString))) {
             return ERR_BUF_COPY;
         }
         char *p = strchr(bufString, ':');
@@ -528,9 +500,7 @@ namespace Base {
     void FinishWorkThread(uv_work_t *req, int status)
     {
         // This is operated in the main thread
-        if (req != nullptr) {
-            delete req;
-        }
+        delete req;
     }
 
     // at the finsh of pFuncAfterThread must free uv_work_t*
@@ -538,25 +508,18 @@ namespace Base {
     int StartWorkThread(uv_loop_t *loop, uv_work_cb pFuncWorkThread,
                         uv_after_work_cb pFuncAfterThread, void *pThreadData)
     {
-        if (loop == nullptr || pThreadData == nullptr) {
-            return ERR_GENERIC;
-        }
-
-        uv_work_t *workThread = new(std::nothrow) uv_work_t();
+        uv_work_t *workThread = new uv_work_t();
         if (!workThread) {
-            return ERR_GENERIC;
+            return -1;
         }
         workThread->data = pThreadData;
         uv_queue_work(loop, workThread, pFuncWorkThread, pFuncAfterThread);
-        return RET_SUCCESS;
+        return 0;
     }
     // clang-format on
 
     char **SplitCommandToArgs(const char *cmdStringLine, int *slotIndex)
     {
-        if (cmdStringLine == nullptr || slotIndex == nullptr) {
-            return nullptr;
-        }
         constexpr int extraBufSize = 2;
         char **argv;
         char *temp = nullptr;
@@ -641,10 +604,6 @@ namespace Base {
 
     bool RunPipeComand(const char *cmdString, char *outBuf, uint16_t sizeOutBuf, bool ignoreTailLf)
     {
-        if (cmdString == nullptr || outBuf == nullptr) {
-            return false;
-        }
-
         FILE *pipeHandle = popen(cmdString, "r");
         if (pipeHandle == nullptr) {
             return false;
@@ -672,13 +631,9 @@ namespace Base {
     // ret value: <0 or bytes read
     int ReadBinFile(const char *pathName, void **buf, const int bufLen)
     {
-        if (pathName == nullptr || buf == nullptr) {
-            return -1;
-        }
-
         uint8_t *pDst = nullptr;
         int byteIO = 0;
-        struct stat statbuf{};
+        struct stat statbuf;
         int ret = stat(pathName, &statbuf);
         if (ret < 0) {
             return -1;
@@ -689,7 +644,7 @@ namespace Base {
         ret = -3;
         if (bufLen == 0) {
             dynamicBuf = 1;
-            pDst = new(std::nothrow) uint8_t[nFileSize + 1]();  // tail \0
+            pDst = new uint8_t[nFileSize + 1]();  // tail \0
             if (!pDst) {
                 return -1;
             }
@@ -730,9 +685,6 @@ namespace Base {
 
     int WriteBinFile(const char *pathName, const uint8_t *buf, const int bufLen, bool newFile)
     {
-        if (pathName == nullptr || buf == nullptr) {
-            return ERR_GENERIC;
-        }
         string mode;
         string resolvedPath;
         string srcPath(pathName);
@@ -763,24 +715,17 @@ namespace Base {
 
     void CloseIdleCallback(uv_handle_t *handle)
     {
-        if (handle != nullptr) {
-            delete (uv_idle_t *)handle;
-        }
+        delete (uv_idle_t *)handle;
     };
 
     void CloseTimerCallback(uv_handle_t *handle)
     {
-        if (handle != nullptr) {
-            delete (uv_timer_t *)handle;
-        }
+        delete (uv_timer_t *)handle;
     };
 
     // return value: <0 error; 0 can start new server instance; >0 server already exists
     int ProgramMutex(const char *procname, bool checkOrNew)
     {
-        if (procname == nullptr) {
-            return ERR_GENERIC;
-        }
         char bufPath[BUF_SIZE_DEFAULT] = "";
         char buf[BUF_SIZE_DEFAULT] = "";
         char pidBuf[BUF_SIZE_TINY] = "";
@@ -1025,21 +970,16 @@ namespace Base {
     void BuildErrorString(const char *localPath, const char *op, const char *err, string &str)
     {
         // avoid to use stringstream
-        if (localPath != nullptr) {
-            str = op;
-            str += " ";
-            str += localPath;
-            str += " failed, ";
-            str += err;
-        }
+        str = op;
+        str += " ";
+        str += localPath;
+        str += " failed, ";
+        str += err;
     }
 
     // Both absolute and relative paths support
     bool CheckDirectoryOrPath(const char *localPath, bool pathOrDir, bool readWrite, string &errStr)
     {
-        if (localPath == nullptr) {
-            return false;
-        }
         if (pathOrDir) {  // filepath
             uv_fs_t req;
             mode_t mode;
@@ -1096,9 +1036,6 @@ namespace Base {
 
     vector<uint8_t> Base64Encode(const uint8_t *input, const int length)
     {
-        if (input == nullptr) {
-            return {};
-        }
         vector<uint8_t> retVec;
         uint8_t *pBuf = nullptr;
         while (true) {
@@ -1106,7 +1043,7 @@ namespace Base {
                 break;
             }
             int base64Size = length * 1.4 + 256;
-            if (!(pBuf = new(std::nothrow) uint8_t[base64Size]())) {
+            if (!(pBuf = new uint8_t[base64Size]())) {
                 break;
             }
             int childRet = Base64EncodeBuf(input, length, pBuf);
@@ -1125,9 +1062,6 @@ namespace Base {
 
     inline int CalcDecodeLength(const uint8_t *b64input)
     {
-        if (b64input == nullptr) {
-            return 0;
-        }
         int len = strlen(reinterpret_cast<char *>(const_cast<uint8_t *>(b64input)));
         if (!len) {
             return 0;
@@ -1146,9 +1080,6 @@ namespace Base {
     // return -1 error; >0 decode size
     int Base64DecodeBuf(const uint8_t *input, const int length, uint8_t *bufOut)
     {
-        if (input == nullptr) {
-            return 0;
-        }
         int nRetLen = CalcDecodeLength(input);
         if (!nRetLen) {
             return 0;
@@ -1162,9 +1093,6 @@ namespace Base {
 
     string Base64Decode(const uint8_t *input, const int length)
     {
-        if (input == nullptr) {
-            return 0;
-        }
         string retString;
         uint8_t *pBuf = nullptr;
         while (true) {
@@ -1172,7 +1100,7 @@ namespace Base {
                 break;
             }
             // must less than length
-            if (!(pBuf = new(std::nothrow) uint8_t[length]())) {
+            if (!(pBuf = new uint8_t[length]())) {
                 break;
             }
             int childRet = Base64DecodeBuf(input, length, pBuf);
@@ -1190,9 +1118,6 @@ namespace Base {
 
     void ReverseBytes(void *start, int size)
     {
-        if (start == nullptr) {
-            return;
-        }
         uint8_t *istart = (uint8_t *)start;
         uint8_t *iend = istart + size;
         std::reverse(istart, iend);
@@ -1233,7 +1158,7 @@ namespace Base {
 
     bool IdleUvTask(uv_loop_t *loop, void *data, uv_idle_cb cb)
     {
-        uv_idle_t *idle = new(std::nothrow) uv_idle_t();
+        uv_idle_t *idle = new uv_idle_t();
         if (idle == nullptr) {
             return false;
         }
@@ -1246,7 +1171,7 @@ namespace Base {
 
     bool TimerUvTask(uv_loop_t *loop, void *data, uv_timer_cb cb, int repeatTimeout)
     {
-        uv_timer_t *timer = new(std::nothrow) uv_timer_t();
+        uv_timer_t *timer = new uv_timer_t();
         if (timer == nullptr) {
             return false;
         }
@@ -1320,9 +1245,6 @@ namespace Base {
 
     uint8_t CalcCheckSum(const uint8_t *data, int len)
     {
-        if (data == nullptr) {
-            return 0;
-        }
         uint8_t ret = 0;
         for (int i = 0; i < len; ++i) {
             ret += data[i];
@@ -1333,9 +1255,6 @@ namespace Base {
     uv_os_sock_t DuplicateUvSocket(uv_tcp_t *tcp)
     {
         uv_os_sock_t dupFd = -1;
-        if (tcp == nullptr) {
-            return dupFd;
-        }
 #ifdef _WIN32
         WSAPROTOCOL_INFO info;
         ZeroStruct(info);
