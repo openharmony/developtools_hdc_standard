@@ -149,6 +149,10 @@ int GetUserInfo(char *buf, size_t len)
 
 int WritePublicKeyfile(RSA *private_key, const char *private_key_path)
 {
+    if (private_key == nullptr || private_key_path == nullptr) {
+        return 0;
+    }
+
     RSAPublicKey publicKey;
     char info[BUF_SIZE_DEFAULT];
     int ret = 0;
@@ -160,7 +164,7 @@ int WritePublicKeyfile(RSA *private_key, const char *private_key_path)
         return 0;
     }
     vector<uint8_t> vec = Base::Base64Encode((const uint8_t *)&publicKey, sizeof(RSAPublicKey));
-    if (!vec.size()) {
+    if (vec.empty()) {
         return 0;
     }
     GetUserInfo(info, sizeof(info));
@@ -272,6 +276,10 @@ int GetUserKeyPath(string &path)
 
 bool LoadHostUserKey(list<void *> *listPrivateKey)
 {
+    if (listPrivateKey == nullptr) {
+        return false;
+    }
+
     struct stat status;
     string path;
     if (!GetUserKeyPath(path)) {
@@ -300,6 +308,9 @@ int AuthSign(void *rsa, const unsigned char *token, size_t tokenSize, void *sig)
 
 int GetPublicKeyFileBuf(unsigned char *data, size_t len)
 {
+    if (data == nullptr) {
+        return 0;
+    }
     string path;
     int ret;
 
@@ -319,6 +330,9 @@ int GetPublicKeyFileBuf(unsigned char *data, size_t len)
 
 bool RSAPublicKey2RSA(const uint8_t *keyBuf, RSA **key)
 {
+    if (keyBuf == nullptr || key == nullptr) {
+        return false;
+    }
     const int pubKeyModulusSize = 256;
     const int pubKeyModulusSizeWords = pubKeyModulusSize / 4;
 
@@ -369,6 +383,9 @@ cleanup:
 
 void ReadDaemonKeys(const char *file, list<void *> *listPublicKey)
 {
+    if (file == nullptr || listPublicKey == nullptr) {
+        return;
+    }
     char buf[BUF_SIZE_DEFAULT2] = { 0 };
     char *sep = nullptr;
     int ret;
@@ -378,7 +395,7 @@ void ReadDaemonKeys(const char *file, list<void *> *listPublicKey)
         return;
     }
     while (fgets(buf, sizeof(buf), f)) {
-        RSAPublicKey *key = new RSAPublicKey();
+        RSAPublicKey *key = new(std::nothrow) RSAPublicKey();
         if (!key) {
             break;
         }
@@ -429,6 +446,9 @@ bool AuthVerify(uint8_t *token, uint8_t *sig, int siglen)
 
 void LoadDaemonKey(list<void *> *listPublicKey)
 {
+    if (listPublicKey == nullptr) {
+        return;
+    }
 #ifdef HDC_PCDEBUG
     char keyPaths[][BUF_SIZE_SMALL] = { "/root/.harmony/hdckey.pub" };
 #else
@@ -457,7 +477,10 @@ bool PostUIConfirm(string publicKey)
 // --------------------------------------common code------------------------------------------
 bool KeylistIncrement(list<void *> *listKey, uint8_t &authKeyIndex, void **out)
 {
-    if (!listKey->size()) {
+    if (listKey == nullptr || out == nullptr) {
+        return false;
+    }
+    if (listKey->empty()) {
 #ifdef HDC_HOST
         LoadHostUserKey(listKey);
 #else
@@ -479,7 +502,16 @@ bool KeylistIncrement(list<void *> *listKey, uint8_t &authKeyIndex, void **out)
 
 void FreeKey(bool publicOrPrivate, list<void *> *listKey)
 {
+    if (listKey == nullptr) {
+        return;
+    }
+
+
     for (auto &&v : *listKey) {
+        if (v == nullptr) {
+            continue;
+        }
+
         if (publicOrPrivate) {
             delete (RSAPublicKey *)v;
             v = nullptr;

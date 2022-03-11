@@ -35,9 +35,12 @@ void HdcTCPBase::InitialChildClass(const bool serverOrDaemonIn, void *ptrMainBas
 void HdcTCPBase::RecvUDP(uv_udp_t *handle, ssize_t nread, const uv_buf_t *rcvbuf, const struct sockaddr *addr,
                          unsigned flags)
 {
+    if (handle == nullptr || rcvbuf == nullptr) {
+        return;
+    }
     while (true) {
         HdcTCPBase *thisClass = (HdcTCPBase *)handle->data;
-        if (nread <= 0) {
+        if (nread <= 0 || thisClass == nullptr) {
             // ==0 finish;<0 error
             break;
         }
@@ -48,14 +51,16 @@ void HdcTCPBase::RecvUDP(uv_udp_t *handle, ssize_t nread, const uv_buf_t *rcvbuf
         thisClass->RecvUDPEntry(addr, handle, rcvbuf);
         break;
     }
-    delete[] rcvbuf->base;
+    if (rcvbuf->base != nullptr) {
+        delete[] rcvbuf->base;
+    }
 }
 
 void HdcTCPBase::AllocStreamUDP(uv_handle_t *handle, size_t sizeWanted, uv_buf_t *buf)
 {
     int bufLen = BUF_SIZE_DEFAULT;
-    char *pRecvBuf = (char *)new uint8_t[bufLen]();
-    if (!pRecvBuf) {
+    char *pRecvBuf = (char *)new(std::nothrow) uint8_t[bufLen]();
+    if (!pRecvBuf || buf == nullptr) {
         return;
     }
     buf->base = pRecvBuf;
@@ -64,13 +69,21 @@ void HdcTCPBase::AllocStreamUDP(uv_handle_t *handle, size_t sizeWanted, uv_buf_t
 
 void HdcTCPBase::SendUDPFinish(uv_udp_send_t *req, int status)
 {
-    delete req;
+    if (req != nullptr) {
+        delete req;
+    }
 }
 
 void HdcTCPBase::ReadStream(uv_stream_t *tcp, ssize_t nread, const uv_buf_t *buf)
 {
+    if (tcp == nullptr || tcp->data == nullptr) {
+        return;
+    }
     HSession hSession = (HSession)tcp->data;
     HdcTCPBase *thisClass = (HdcTCPBase *)hSession->classModule;
+    if (thisClass == nullptr || thisClass->clsMainBase) {
+        return;
+    }
     HdcSessionBase *hSessionBase = (HdcSessionBase *)thisClass->clsMainBase;
     bool ret = false;
     while (true) {
