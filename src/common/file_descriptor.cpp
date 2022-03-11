@@ -48,9 +48,6 @@ void HdcFileDescriptor::StopWork(bool tryCloseFdIo, std::function<void()> closeF
         ++refIO;
         reqClose.data = this;
         uv_fs_close(loop, &reqClose, fdIO, [](uv_fs_t *req) {
-            if (req == nullptr || req->data == nullptr) {
-                return;
-            }
             auto thisClass = (HdcFileDescriptor *)req->data;
             uv_fs_req_cleanup(req);
             if (thisClass->callbackCloseFd != nullptr) {
@@ -63,15 +60,9 @@ void HdcFileDescriptor::StopWork(bool tryCloseFdIo, std::function<void()> closeF
 
 void HdcFileDescriptor::OnFileIO(uv_fs_t *req)
 {
-    if (req == nullptr || req->data == nullptr) {
-        return;
-    }
     CtxFileIO *ctxIO = static_cast<CtxFileIO *>(req->data);
     HdcFileDescriptor *thisClass = ctxIO->thisClass;
     uint8_t *buf = ctxIO->bufIO;
-    if (thisClass == nullptr || buf == nullptr) {
-        return;
-    }
     bool bFinish = false;
     bool fetalFinish = false;
 
@@ -99,13 +90,8 @@ void HdcFileDescriptor::OnFileIO(uv_fs_t *req)
         }
     } while (false);
     uv_fs_req_cleanup(req);
-    if (buf != nullptr) {
-        delete[] buf;
-    }
-
-    if (ctxIO == nullptr) {
-        delete ctxIO;
-    }
+    delete[] buf;
+    delete ctxIO;
 
     --thisClass->refIO;
     if (bFinish) {
@@ -118,8 +104,8 @@ int HdcFileDescriptor::LoopRead()
 {
     uv_buf_t iov;
     int readMax = Base::GetMaxBufSize() * 1.2;
-    auto contextIO = new(std::nothrow) CtxFileIO();
-    auto buf = new(std::nothrow) uint8_t[readMax]();
+    auto contextIO = new CtxFileIO();
+    auto buf = new uint8_t[readMax]();
     if (!contextIO || !buf) {
         if (contextIO) {
             delete contextIO;
@@ -169,7 +155,7 @@ int HdcFileDescriptor::Write(uint8_t *data, int size)
 // Data's memory must be Malloc, and the callback FREE after this function is completed
 int HdcFileDescriptor::WriteWithMem(uint8_t *data, int size)
 {
-    auto contextIO = new(std::nothrow) CtxFileIO();
+    auto contextIO = new CtxFileIO();
     if (!contextIO) {
         delete[] data;
         WRITE_LOG(LOG_FATAL, "Memory alloc failed");

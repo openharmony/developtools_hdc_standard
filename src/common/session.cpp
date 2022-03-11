@@ -79,7 +79,6 @@ bool HdcSessionBase::TryRemoveTask(HTaskInfo hTask)
         // This is used to check that the memory cannot be cleaned up. If the memory cannot be released, break point
         // here to see which task has not been released
         // print task clear
-        WRITE_LOG(LOG_DEBUG, "task taskType:%d channelId:%u has not been released.", hTask->taskType, hTask->channelId);
     }
     return ret;
 }
@@ -125,14 +124,12 @@ void HdcSessionBase::ClearOwnTasks(HSession hSession, const uint32_t channelIDIn
     // Second: The task is cleaned up, the session ends
     // Third: The task is cleaned up, and the session is directly over the session.
     map<uint32_t, HTaskInfo>::iterator iter;
-    for (iter = hSession->mapTask->begin(); iter != hSession->mapTask->end();++iter) {
+    for (iter = hSession->mapTask->begin(); iter != hSession->mapTask->end();) {
         uint32_t channelId = iter->first;
         HTaskInfo hTask = iter->second;
-        if (hTask == nullptr) {
-            continue;
-        }
         if (channelIDInput != 0) {  // single
             if (channelIDInput != channelId) {
+                ++iter;
                 continue;
             }
             BeginRemoveTask(hTask);
@@ -142,6 +139,7 @@ void HdcSessionBase::ClearOwnTasks(HSession hSession, const uint32_t channelIDIn
         }
         // multi
         BeginRemoveTask(hTask);
+        ++iter;
     }
 }
 
@@ -151,7 +149,7 @@ void HdcSessionBase::ClearSessions()
     // broadcast free singal
     for (auto v : mapSession) {
         HSession hSession = (HSession)v.second;
-        if (hSession != nullptr && !hSession->isDead) {
+        if (!hSession->isDead) {
             FreeSession(hSession->sessionId);
         }
     }
@@ -160,9 +158,6 @@ void HdcSessionBase::ClearSessions()
 void HdcSessionBase::ReMainLoopForInstanceClear()
 {  // reloop
     auto clearSessionsForFinish = [](uv_idle_t *handle) -> void {
-        if (handle == nullptr || handle == nullptr) {
-            return;
-        }
         HdcSessionBase *thisClass = (HdcSessionBase *)handle->data;
         if (thisClass->sessionRef > 0) {
             return;
@@ -182,7 +177,7 @@ void HdcSessionBase::EnumUARTDeviceRegister(UartKickoutZombie kickOut)
     map<uint32_t, HSession>::iterator i;
     for (i = mapSession.begin(); i != mapSession.end(); ++i) {
         HSession hs = i->second;
-        if ((hs == nullptr) or (hs->connType != CONN_SERIAL) or (hs->hUART == nullptr)) {
+        if ((hs->connType != CONN_SERIAL) or (hs->hUART == nullptr)) {
             continue;
         }
         kickOut(hs);
@@ -222,7 +217,7 @@ HSession HdcSessionBase::QueryUSBDeviceRegister(void *pDev, uint8_t busIDIn, uin
 #ifdef HDC_HOST
     libusb_device *dev = (libusb_device *)pDev;
     HSession hResult = nullptr;
-    if (mapSession.empty()) {
+    if (!mapSession.size()) {
         return nullptr;
     }
     uint8_t busId = 0;
@@ -238,8 +233,13 @@ HSession HdcSessionBase::QueryUSBDeviceRegister(void *pDev, uint8_t busIDIn, uin
     map<uint32_t, HSession>::iterator i;
     for (i = mapSession.begin(); i != mapSession.end(); ++i) {
         HSession hs = i->second;
-        if (hs == nullptr || hs->connType == CONN_USB || hs->hUSB == nullptr ||
-            hs->hUSB->devId != devId || hs->hUSB->busId != busId) {
+        if (hs->connType == CONN_USB) {
+            continue;
+        }
+        if (hs->hUSB == nullptr) {
+            continue;
+        }
+        if (hs->hUSB->devId != devId || hs->hUSB->busId != busId) {
             continue;
         }
         hResult = hs;
@@ -277,9 +277,6 @@ void HdcSessionBase::AsyncMainLoopTask(uv_idle_t *handle)
 
 void HdcSessionBase::MainAsyncCallback(uv_async_t *handle)
 {
-    if (handle == nullptr || handle->data == nullptr) {
-        return;
-    }
     HdcSessionBase *thisClass = (HdcSessionBase *)handle->data;
     list<void *>::iterator i;
     list<void *> &lst = thisClass->lstMainThreadOP;
@@ -295,10 +292,7 @@ void HdcSessionBase::MainAsyncCallback(uv_async_t *handle)
 void HdcSessionBase::PushAsyncMessage(const uint32_t sessionId, const uint8_t method, const void *data,
                                       const int dataSize)
 {
-    if (data == nullptr) {
-        return;
-    }
-    AsyncParam *param = new(std::nothrow) AsyncParam();
+    AsyncParam *param = new AsyncParam();
     if (!param) {
         return;
     }
@@ -312,7 +306,7 @@ void HdcSessionBase::PushAsyncMessage(const uint32_t sessionId, const uint8_t me
             delete param;
             return;
         }
-        if (memcpy_s((uint8_t *)param->data, param->dataSize, data, dataSize) != EOK) {
+        if (memcpy_s((uint8_t *)param->data, param->dataSize, data, dataSize)) {
             delete[]((uint8_t *)param->data);
             delete param;
             return;
@@ -411,7 +405,6 @@ HSession HdcSessionBase::MallocSession(bool serverOrDaemon, const ConnType connT
     hSession->listKey = new(std::nothrow) list<void *>;
     if (hSession->listKey == nullptr) {
         WRITE_LOG(LOG_FATAL, "MallocSession new hSession->listKey failed");
-        delete hSession->mapTask;
         delete hSession;
         hSession = nullptr;
         return nullptr;
@@ -437,8 +430,6 @@ HSession HdcSessionBase::MallocSession(bool serverOrDaemon, const ConnType connT
     Base::SetTcpOptions(&hSession->dataPipe[STREAM_MAIN]);
     ret = MallocSessionByConnectType(hSession);
     if (ret) {
-        delete hSession->mapTask;
-        delete hSession->listKey;
         delete hSession;
         hSession = nullptr;
     } else {
@@ -450,9 +441,6 @@ HSession HdcSessionBase::MallocSession(bool serverOrDaemon, const ConnType connT
 void HdcSessionBase::FreeSessionByConnectType(HSession hSession)
 {
     WRITE_LOG(LOG_DEBUG, "FreeSessionByConnectType %s", hSession->ToDebugString().c_str());
-    if (hSession == nullptr) {
-        return;
-    }
 
     if (CONN_USB == hSession->connType) {
         // ibusb All context is applied for sub-threaded, so it needs to be destroyed in the subline
@@ -518,7 +506,7 @@ void HdcSessionBase::FreeSessionFinally(uv_idle_t *handle)
 {
     HSession hSession = (HSession)handle->data;
     HdcSessionBase *thisClass = (HdcSessionBase *)hSession->classInstance;
-    if (hSession->uvHandleRef > 0 || thisClass == nullptr) {
+    if (hSession->uvHandleRef > 0) {
         return;
     }
     // Notify Server or Daemon, just UI or display commandline
@@ -622,9 +610,6 @@ HSession HdcSessionBase::AdminSession(const uint8_t op, const uint32_t sessionId
     HSession hRet = nullptr;
     switch (op) {
         case OP_ADD:
-            if (hInput == nullptr) {
-                return nullptr;
-            }
             uv_rwlock_wrlock(&lockMapSession);
             mapSession[sessionId] = hInput;
             uv_rwlock_wrunlock(&lockMapSession);
@@ -650,9 +635,6 @@ HSession HdcSessionBase::AdminSession(const uint8_t op, const uint32_t sessionId
             uv_rwlock_wrunlock(&lockMapSession);
             break;
         case OP_UPDATE:
-            if (hInput == nullptr) {
-                return nullptr;
-            }
             uv_rwlock_wrlock(&lockMapSession);
             // remove old
             mapSession.erase(sessionId);
@@ -704,9 +686,6 @@ HTaskInfo HdcSessionBase::AdminTask(const uint8_t op, HSession hSession, const u
                 break;
             }
 #endif
-            if (hInput == nullptr) {
-                return nullptr;
-            }
             hRet = mapTask[channelId];
             if (hRet != nullptr) {
                 delete hRet;
@@ -757,9 +736,6 @@ int HdcSessionBase::SendByProtocol(HSession hSession, uint8_t *bufPtr, const int
         }
         case CONN_USB: {
             HdcUSBBase *pUSB = ((HdcUSBBase *)hSession->classModule);
-            if (pUSB == nullptr) {
-                return 0;
-            }
             ret = pUSB->SendUSBBlock(hSession, bufPtr, bufLen);
             delete[] bufPtr;
             break;
@@ -802,23 +778,23 @@ int HdcSessionBase::Send(const uint32_t sessionId, const uint32_t channelId, con
     payloadHead.headSize = htons(s.size());
     payloadHead.dataSize = htonl(dataSize);
     int finalBufSize = sizeof(PayloadHead) + s.size() + dataSize;
-    uint8_t *finayBuf = new(std::nothrow) uint8_t[finalBufSize]();
+    uint8_t *finayBuf = new uint8_t[finalBufSize]();
     if (finayBuf == nullptr) {
         WRITE_LOG(LOG_WARN, "send allocmem err");
         return ERR_BUF_ALLOC;
     }
     bool bufRet = false;
     do {
-        if (memcpy_s(finayBuf, sizeof(PayloadHead), reinterpret_cast<uint8_t *>(&payloadHead), sizeof(PayloadHead)) != EOK) {
+        if (memcpy_s(finayBuf, sizeof(PayloadHead), reinterpret_cast<uint8_t *>(&payloadHead), sizeof(PayloadHead))) {
             WRITE_LOG(LOG_WARN, "send copyhead err for dataSize:%d", dataSize);
             break;
         }
         if (memcpy_s(finayBuf + sizeof(PayloadHead), s.size(),
-                     reinterpret_cast<uint8_t *>(const_cast<char *>(s.c_str())), s.size()) != EOK) {
+                     reinterpret_cast<uint8_t *>(const_cast<char *>(s.c_str())), s.size())) {
             WRITE_LOG(LOG_WARN, "send copyProtbuf err for dataSize:%d", dataSize);
             break;
         }
-        if (dataSize > 0 && memcpy_s(finayBuf + sizeof(PayloadHead) + s.size(), dataSize, data, dataSize) != EOK) {
+        if (dataSize > 0 && memcpy_s(finayBuf + sizeof(PayloadHead) + s.size(), dataSize, data, dataSize)) {
             WRITE_LOG(LOG_WARN, "send copyDatabuf err for dataSize:%d", dataSize);
             break;
         }
@@ -859,7 +835,7 @@ int HdcSessionBase::DecryptPayload(HSession hSession, PayloadHead *payloadHeadBe
 int HdcSessionBase::OnRead(HSession hSession, uint8_t *bufPtr, const int bufLen)
 {
     int ret = ERR_GENERIC;
-    if (memcmp(bufPtr, PACKET_FLAG.c_str(), PACKET_FLAG.size()) != EOK) {
+    if (memcmp(bufPtr, PACKET_FLAG.c_str(), PACKET_FLAG.size())) {
         WRITE_LOG(LOG_FATAL, "PACKET_FLAG incorrect %x %x", bufPtr[0], bufPtr[1]);
         return ERR_BUF_CHECK;
     }
@@ -884,9 +860,6 @@ int HdcSessionBase::OnRead(HSession hSession, uint8_t *bufPtr, const int bufLen)
 // Returns <0 error;> 0 receives the number of bytes; 0 untreated
 int HdcSessionBase::FetchIOBuf(HSession hSession, uint8_t *ioBuf, int read)
 {
-    if (hSession == nullptr || hSession->classInstance == nullptr || ioBuf == nullptr) {
-        return ERR_GENERIC;
-    }
     HdcSessionBase *ptrConnect = (HdcSessionBase *)hSession->classInstance;
     int indexBuf = 0;
     int childRet = 0;
@@ -926,9 +899,6 @@ int HdcSessionBase::FetchIOBuf(HSession hSession, uint8_t *ioBuf, int read)
 
 void HdcSessionBase::AllocCallback(uv_handle_t *handle, size_t sizeWanted, uv_buf_t *buf)
 {
-    if (handle == nullptr || handle->data == nullptr || buf == nullptr) {
-        return;
-    }
     HSession context = (HSession)handle->data;
     Base::ReallocBuf(&context->ioBuf, &context->bufSize, HDC_SOCKETPAIR_SIZE);
     buf->base = (char *)context->ioBuf + context->availTailIndex;
@@ -938,31 +908,23 @@ void HdcSessionBase::AllocCallback(uv_handle_t *handle, size_t sizeWanted, uv_bu
 
 void HdcSessionBase::FinishWriteSessionTCP(uv_write_t *req, int status)
 {
-    if (req == nullptr || req->handle == nullptr || req->handle->data == nullptr) {
-        return;
-    }
     HSession hSession = (HSession)req->handle->data;
     --hSession->ref;
     HdcSessionBase *thisClass = (HdcSessionBase *)hSession->classInstance;
     if (status < 0) {
         Base::TryCloseHandle((uv_handle_t *)req->handle);
-        if (thisClass != nullptr && !hSession->isDead && !hSession->ref) {
+        if (!hSession->isDead && !hSession->ref) {
             WRITE_LOG(LOG_DEBUG, "FinishWriteSessionTCP freesession :%p", hSession);
             thisClass->FreeSession(hSession->sessionId);
         }
     }
-    if (req->data == nullptr) {
-        delete[]((uint8_t *)req->data);
-    }
+    delete[]((uint8_t *)req->data);
     delete req;
 }
 
 bool HdcSessionBase::DispatchSessionThreadCommand(uv_stream_t *uvpipe, HSession hSession, const uint8_t *baseBuf,
                                                   const int bytesIO)
 {
-    if (baseBuf == nullptr) {
-        return false;
-    }
     bool ret = true;
     uint8_t flag = *(uint8_t *)baseBuf;
 
@@ -980,14 +942,8 @@ bool HdcSessionBase::DispatchSessionThreadCommand(uv_stream_t *uvpipe, HSession 
 
 void HdcSessionBase::ReadCtrlFromSession(uv_stream_t *uvpipe, ssize_t nread, const uv_buf_t *buf)
 {
-    if (uvpipe == nullptr || uvpipe->data == nullptr) {
-        return;
-    }
     HSession hSession = (HSession)uvpipe->data;
     HdcSessionBase *hSessionBase = (HdcSessionBase *)hSession->classInstance;
-    if (hSessionBase == nullptr) {
-        return;
-    }
     while (true) {
         if (nread < 0) {
             constexpr int bufSize = 1024;
@@ -1006,9 +962,7 @@ void HdcSessionBase::ReadCtrlFromSession(uv_stream_t *uvpipe, ssize_t nread, con
         hSessionBase->DispatchSessionThreadCommand(uvpipe, hSession, (uint8_t *)buf->base, nread);
         break;
     }
-    if (buf->base != nullptr) {
-        delete[] buf->base;
-    }
+    delete[] buf->base;
 }
 
 bool HdcSessionBase::WorkThreadStartSession(HSession hSession)
@@ -1139,14 +1093,8 @@ bool HdcSessionBase::DispatchMainThreadCommand(HSession hSession, const CtrlStru
 // Several bytes of control instructions, generally do not stick
 void HdcSessionBase::ReadCtrlFromMain(uv_stream_t *uvpipe, ssize_t nread, const uv_buf_t *buf)
 {
-    if (uvpipe == nullptr || uvpipe->data == nullptr || buf == nullptr || buf->base == nullptr) {
-        return;
-    }
     HSession hSession = (HSession)uvpipe->data;
     HdcSessionBase *hSessionBase = (HdcSessionBase *)hSession->classInstance;
-    if (hSessionBase == nullptr) {
-        return;
-    }
     int formatCommandSize = sizeof(CtrlStruct);
     int index = 0;
     bool ret = true;
@@ -1186,9 +1134,6 @@ void HdcSessionBase::ReChildLoopForSessionClear(HSession hSession)
         HSession hSession = (HSession)handle->data;
         for (auto v : *hSession->mapTask) {
             HTaskInfo hTask = (HTaskInfo)v.second;
-            if (hTask == nullptr) {
-                continue;
-            }
             uint8_t level;
             if (hTask->closeRetryCount < GLOBAL_TIMEOUT / 2) {
                 level = LOG_DEBUG;
@@ -1199,9 +1144,6 @@ void HdcSessionBase::ReChildLoopForSessionClear(HSession hSession)
                       hTask->closeRetryCount, GLOBAL_TIMEOUT, hTask->channelId, hTask->sessionId);
             if (hTask->closeRetryCount++ >= GLOBAL_TIMEOUT) {
                 HdcSessionBase *thisClass = (HdcSessionBase *)hTask->ownerSessionClass;
-                if (thisClass == nullptr) {
-                    continue;
-                }
                 hSession = thisClass->AdminSession(OP_QUERY, hTask->sessionId, nullptr);
                 thisClass->AdminTask(OP_VOTE_RESET, hSession, hTask->channelId, nullptr);
             }
@@ -1222,9 +1164,6 @@ void HdcSessionBase::SessionWorkThread(uv_work_t *arg)
 {
     int childRet = 0;
     HSession hSession = (HSession)arg->data;
-    if (hSession == nullptr) {
-        return;
-    }
     HdcSessionBase *thisClass = (HdcSessionBase *)hSession->classInstance;
     uv_loop_init(&hSession->childLoop);
     hSession->hWorkChildThread = uv_thread_self();
@@ -1311,7 +1250,7 @@ bool HdcSessionBase::DispatchTaskData(HSession hSession, const uint32_t channelI
         if (NeedNewTaskInfo(command, masterTask)) {
             WRITE_LOG(LOG_DEBUG, "New HTaskInfo channelId:%u command:%u", channelId, command);
             hTaskInfo = new(std::nothrow) TaskInformation();
-            if (hTaskInfo == nullptr || hSession == nullptr) {
+            if (hTaskInfo == nullptr) {
                 WRITE_LOG(LOG_FATAL, "DispatchTaskData new hTaskInfo failed");
                 break;
             }
