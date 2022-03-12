@@ -91,7 +91,7 @@ bool HdcSessionBase::BeginRemoveTask(HTaskInfo hTask)
         return true;
     }
 
-    WRITE_LOG(LOG_DEBUG, "BeginRemoveTask taskType:%d", hTask->taskType);
+    WRITE_LOG(LOG_DEBUG, "BeginRemoveTask taskType:%d channelId:%u", hTask->taskType, hTask->channelId);
     ret = RemoveInstanceTask(OP_CLEAR, hTask);
     auto taskClassDeleteRetry = [](uv_timer_t *handle) -> void {
         HTaskInfo hTask = (HTaskInfo)handle->data;
@@ -380,13 +380,14 @@ uint32_t HdcSessionBase::GetSessionPseudoUid()
 HSession HdcSessionBase::MallocSession(bool serverOrDaemon, const ConnType connType, void *classModule,
                                        uint32_t sessionId)
 {
-    HSession hSession = new HdcSession();
+    HSession hSession = new(std::nothrow) HdcSession();
     if (!hSession) {
+        WRITE_LOG(LOG_FATAL, "MallocSession new hSession failed");
         return nullptr;
     }
     int ret = 0;
     ++sessionRef;
-    memset_s(hSession->ctrlFd, sizeof(hSession->ctrlFd), 0, sizeof(hSession->ctrlFd));
+    (void)memset_s(hSession->ctrlFd, sizeof(hSession->ctrlFd), 0, sizeof(hSession->ctrlFd));
     hSession->classInstance = this;
     hSession->connType = connType;
     hSession->classModule = classModule;
@@ -539,8 +540,10 @@ void HdcSessionBase::FreeSessionContinue(HSession hSession)
     Base::TryCloseHandle((uv_handle_t *)&hSession->ctrlPipe[STREAM_MAIN], true, closeSessionTCPHandle);
     Base::TryCloseHandle((uv_handle_t *)&hSession->dataPipe[STREAM_MAIN], true, closeSessionTCPHandle);
     delete hSession->mapTask;
+    hSession->mapTask = nullptr;
     HdcAuth::FreeKey(!hSession->serverOrDaemon, hSession->listKey);
     delete hSession->listKey;  // to clear
+    hSession->listKey = nullptr;
     FreeSessionByConnectType(hSession);
     // finish
     Base::IdleUvTask(&loopMain, hSession, FreeSessionFinally);
@@ -639,13 +642,14 @@ HSession HdcSessionBase::AdminSession(const uint8_t op, const uint32_t sessionId
             uv_rwlock_wrunlock(&lockMapSession);
             break;
         case OP_VOTE_RESET:
+            if (mapSession.count(sessionId) == 0) {
+                break;
+            }
             bool needReset;
             uv_rwlock_wrlock(&lockMapSession);
-            if (mapSession.count(sessionId)) {
-                hRet = mapSession[sessionId];
-                hRet->voteReset = true;
-                needReset = true;
-            }
+            hRet = mapSession[sessionId];
+            hRet->voteReset = true;
+            needReset = true;
             for (auto &kv : mapSession) {
                 if (sessionId == kv.first) {
                     continue;
@@ -658,7 +662,7 @@ HSession HdcSessionBase::AdminSession(const uint8_t op, const uint32_t sessionId
             }
             uv_rwlock_wrunlock(&lockMapSession);
             if (needReset) {
-                WRITE_LOG(LOG_FATAL, "!! session:%u vote reset, passed unanimously !!");
+                WRITE_LOG(LOG_FATAL, "!! session:%u vote reset, passed unanimously !!", sessionId);
                 abort();
             }
             break;
@@ -682,6 +686,10 @@ HTaskInfo HdcSessionBase::AdminTask(const uint8_t op, HSession hSession, const u
                 break;
             }
 #endif
+            hRet = mapTask[channelId];
+            if (hRet != nullptr) {
+                delete hRet;
+            }
             mapTask[channelId] = hInput;
             hRet = hInput;
             break;
@@ -694,9 +702,7 @@ HTaskInfo HdcSessionBase::AdminTask(const uint8_t op, HSession hSession, const u
             }
             break;
         case OP_VOTE_RESET:
-            if (mapTask.size() == 1) {
-                AdminSession(op, hSession->sessionId, nullptr);
-            }
+            AdminSession(op, hSession->sessionId, nullptr);
             break;
         default:
             break;
@@ -1242,7 +1248,7 @@ bool HdcSessionBase::DispatchTaskData(HSession hSession, const uint32_t channelI
     while (true) {
         // Some basic commands do not have a local task constructor. example: Interactive shell, some uinty commands
         if (NeedNewTaskInfo(command, masterTask)) {
-            WRITE_LOG(LOG_DEBUG, "New HTaskInfo");
+            WRITE_LOG(LOG_DEBUG, "New HTaskInfo channelId:%u command:%u", channelId, command);
             hTaskInfo = new(std::nothrow) TaskInformation();
             if (hTaskInfo == nullptr) {
                 WRITE_LOG(LOG_FATAL, "DispatchTaskData new hTaskInfo failed");

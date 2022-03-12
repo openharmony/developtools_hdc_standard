@@ -13,20 +13,21 @@
 # limitations under the License.
 
 # gcc-9 needed
+set -e
 
 ohos_root=$1
 ohos_hdc_build="ohos_hdc_build"
-cwddir=`pwd`
+cwddir=$(pwd)
 
 build_in_source=true
 [ "X$ohos_root" == "X" ] && build_in_source=false
 
-if [ $build_in_source == "true" ] ; then
+if [ "$build_in_source" == "true" ] ; then
 	ohos_root_real=$(realpath $ohos_root)
 fi
 
-[ "X$KEEP" == "X" ] && [ -d $ohos_hdc_build ] && rm -fr $ohos_hdc_build
-[ -d $ohos_hdc_build ] || mkdir $ohos_hdc_build
+[ "X$KEEP" == "X" ] && [ -d "$ohos_hdc_build" ] && rm -fr $ohos_hdc_build
+[ -d "$ohos_hdc_build" ] || mkdir $ohos_hdc_build
 
 STATICLIB=""
 INCLUDES=""
@@ -59,7 +60,7 @@ function build_libuv ()
 function build_securec ()
 {
 	pushd third_party_bounds_checking_function
-	[ "X$KEEP" == "X" ] && gcc src/*.c -I`pwd`/include -c && ar rcs libsecurec.a *.o
+	[ "X$KEEP" == "X" ] && gcc src/*.c -I$(pwd)/include -c && ar rcs libsecurec.a *.o
 	STATICLIB+="$(realpath libsecurec.a) "
 	INCLUDES+="-I$(realpath include) "
 	popd
@@ -100,7 +101,7 @@ pushd $ohos_hdc_build
 if [ "X$KEEP" == "X" ]; then
 	for name in "developtools/hdc_standard" "third_party/libuv" "third_party/openssl" "third_party/bounds_checking_function" "third_party/lz4"; do
 		reponame=$(echo $name | sed "s/\//_/g")
-		if [ $build_in_source == "true" ] ; then
+		if [ "$build_in_source" == "true" ] ; then
 			cp -ra ${ohos_root_real}/${name} ${reponame} || exit 1
 		else
 			git clone https://gitee.com/openharmony/${reponame}

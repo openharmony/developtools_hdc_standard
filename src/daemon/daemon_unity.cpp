@@ -246,7 +246,7 @@ bool HdcDaemonUnity::CommandDispatch(const uint16_t command, uint8_t *payload, c
     string strPayload = string((char *)payload, payloadSize);
 #ifdef HDC_DEBUG
     WRITE_LOG(LOG_DEBUG, "CommandDispatch command:%d", command);
-#endif // HDC_LOCAL_DEBUG
+#endif // HDC_DEBUG
     switch (command) {
         case CMD_UNITY_EXECUTE: {
             ExecuteShell((char *)strPayload.c_str());
@@ -273,11 +273,13 @@ bool HdcDaemonUnity::CommandDispatch(const uint16_t command, uint8_t *payload, c
         }
         case CMD_UNITY_ROOTRUN: {
             ret = false;
+#ifdef HDC_DEBUG
             if (payloadSize != 0 && !strcmp((char *)strPayload.c_str(), "r")) {
                 SystemDepend::SetDevItem("persist.hdc.root", "0");
             } else {
                 SystemDepend::SetDevItem("persist.hdc.root", "1");
             }
+#endif // HDC_DEBUG
             daemon->PostStopInstanceMessage(true);
             break;
         }

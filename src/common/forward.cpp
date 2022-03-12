@@ -676,7 +676,7 @@ int HdcForwardBase::SendForwardBuf(HCtxForward ctx, uint8_t *bufPtr, const int s
     if (!pDynBuf) {
         return -1;
     }
-    memcpy_s(pDynBuf, size, bufPtr, size);
+    (void)memcpy_s(pDynBuf, size, bufPtr, size);
     if (FORWARD_DEVICE == ctx->type) {
         nRet = ctx->fdClass->WriteWithMem(pDynBuf, size);
     } else {
