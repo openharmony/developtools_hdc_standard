@@ -222,6 +222,10 @@ bool ReadKey(const char *file, list<void *> *listPrivateKey)
     FILE *f = nullptr;
     bool ret = false;
 
+    if (file == nullptr || listPrivateKey == nullptr) {
+        WRITE_LOG(LOG_FATAL, "file or listPrivateKey is null");
+        return ret;
+    }
     while (true) {
         if (!(f = fopen(file, "r"))) {
             break;
