@@ -134,8 +134,8 @@ HSession HdcHostTCP::ConnectDaemon(const string &connectKey)
         return nullptr;
     }
     hSession->connectKey = connectKey;
-    struct sockaddr_in6 dest;
-    uv_ip6_addr(ip, port, &dest);
+    struct sockaddr_in dest;
+    uv_ip4_addr(ip, port, &dest);
     uv_connect_t *conn = new(std::nothrow) uv_connect_t();
     if (conn == nullptr) {
         WRITE_LOG(LOG_FATAL, "ConnectDaemon new conn failed");
