@@ -1054,7 +1054,7 @@ bool HdcSessionBase::DispatchMainThreadCommand(HSession hSession, const CtrlStru
                 };
             };
             hSession->uvChildRef += 2;
-            if (hSession->hChildWorkTCP.loop) {  // maybe not use it
+            if (hSession->hChildWorkTCP.loop && hSession->connType == CONN_TCP) {  // maybe not use it
                 ++hSession->uvChildRef;
                 Base::TryCloseHandle((uv_handle_t *)&hSession->hChildWorkTCP, true, closeSessionChildThreadTCPHandle);
             }
