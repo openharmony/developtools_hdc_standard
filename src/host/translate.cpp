@@ -118,6 +118,11 @@ namespace TranslateCommand {
             // tcp mode
             string ip = outCmd->parameters.substr(0, outCmd->parameters.find(":"));
             string sport = outCmd->parameters.substr(outCmd->parameters.find(":") + 1);
+            if (sport.empty()) {
+                stringError = "Port incorrect";
+                outCmd->bJumpDo = true;
+                return stringError;
+            }
             int port = std::stoi(sport);
             sockaddr_in addr;
             if ((port <= 0 || port > MAX_IP_PORT) || uv_ip4_addr(ip.c_str(), port, &addr) < 0) {
