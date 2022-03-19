@@ -480,7 +480,7 @@ namespace Base {
         if (memcpy_s(bufString, sizeof(bufString), connectKey, sizeof(bufString))) {
             return ERR_BUF_COPY;
         }
-        char *p = strchr(bufString, ':');
+        char *p = strrchr(bufString, ':');
         if (!p) {
             return ERR_PARM_FORMAT;
         }
