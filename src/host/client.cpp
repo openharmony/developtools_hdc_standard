@@ -155,7 +155,10 @@ int HdcClient::ExecuteCommand(const string &commandIn)
 {
     char ip[BUF_SIZE_TINY] = "";
     uint16_t port = 0;
-    if (Base::ConnectKey2IPPort(channelHostPort.c_str(), ip, &port) < 0) {
+    int ret = Base::ConnectKey2IPPort(channelHostPort.c_str(), ip, &port);
+    if (ret < 0) {
+        WRITE_LOG(LOG_FATAL, "ConnectKey2IPPort %s failed with %d",
+                  channelHostPort.c_str(), ret);
         return -1;
     }
     command = commandIn;
@@ -184,8 +187,8 @@ int HdcClient::ConnectServerForClient(const char *ip, uint16_t port)
         return ERR_SOCKET_FAIL;
     }
     WRITE_LOG(LOG_DEBUG, "Try to connect %s:%d", ip, port);
-    struct sockaddr_in dest;
-    uv_ip4_addr(ip, port, &dest);
+    struct sockaddr_in6 dest;
+    uv_ip6_addr(ip, port, &dest);
     uv_connect_t *conn = new(std::nothrow) uv_connect_t();
     if (conn == nullptr) {
         WRITE_LOG(LOG_FATAL, "ConnectServerForClient new conn failed");
