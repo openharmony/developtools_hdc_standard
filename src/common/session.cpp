@@ -1003,7 +1003,7 @@ bool HdcSessionBase::WorkThreadStartSession(HSession hSession)
         handshake.authType = AUTH_NONE;
         string hs = SerialStruct::SerializeToString(handshake);
 #ifdef HDC_SUPPORT_UART
-        WRITE_LOG(LOG_DEBUG, "WorkThreadStartSession session %u auth %u send handshake hs:",
+        WRITE_LOG(LOG_DEBUG, "WorkThreadStartSession session %u auth %u send handshake hs: %s",
                   hSession->sessionId, handshake.authType, hs.c_str());
 #endif
         Send(hSession->sessionId, 0, CMD_KERNEL_HANDSHAKE, (uint8_t *)hs.c_str(), hs.size());
