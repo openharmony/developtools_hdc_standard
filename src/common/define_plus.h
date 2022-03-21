@@ -381,6 +381,33 @@ struct HdcSession {
         return oss.str();
     }
 
+    HdcSession()
+    {
+        serverOrDaemon = false;
+        handshakeOK = false;
+        isDead = false;
+        voteReset = false;
+        connectKey = "";
+        connType = CONN_USB;
+        sessionId = 0;
+        ref = 0;
+        uvHandleRef = 0;
+        uvChildRef = 0;
+        childCleared = false;
+        mapTask = nullptr;
+        classInstance = nullptr;
+        classModule = nullptr;
+        bufSize = 0;
+        availTailIndex = 0;
+        listKey = nullptr;
+        authKeyIndex = 0;
+        tokenRSA = "";
+        hUSB = nullptr;
+#ifdef HDC_SUPPORT_UART
+        hUART = nullptr;
+#endif
+    }
+
     ~HdcSession()
     {
         if (mapTask) {
