@@ -258,8 +258,6 @@ namespace TranslateCommand {
             stringError = TargetReboot(input.c_str(), outCmd);
         } else if (!strncmp(input.c_str(), CMDSTR_TARGET_MODE.c_str(), CMDSTR_TARGET_MODE.size())) {
             stringError = RunMode(input.c_str(), outCmd);
-        } else if (!strcmp(input.c_str(), CMDSTR_CONNECT_ANY.c_str())) {
-            outCmd->cmdFlag = CMD_KERNEL_TARGET_ANY;
         } else if (!strncmp(input.c_str(), CMDSTR_HILOG.c_str(), CMDSTR_HILOG.size())) {
             outCmd->cmdFlag = CMD_UNITY_HILOG;
             if (strstr(input.c_str(), " -v")) {
