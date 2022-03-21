@@ -145,6 +145,8 @@ void HdcDaemonApp::WhenTransferFinish(CtxFile *context)
 {
     if (context->lastErrno > 0) {
         WRITE_LOG(LOG_DEBUG, "HdcDaemonApp WhenTransferFinish with errno:%d", context->lastErrno);
+        LogMsg(MSG_FAIL, "Transfer App at:%lld/%lld(Bytes), Reason: %s",
+               context->indexIO, context->fileSize, uv_strerror((int)(-context->lastErrno)));
         return;
     }
     if (ctxNow.transferConfig.functionName == CMDSTR_APP_SIDELOAD) {

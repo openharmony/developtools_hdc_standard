@@ -59,7 +59,7 @@ bool HdcHostApp::BeginInstall(CtxFile *context, const char *command)
     }
     if (!context->taskQueue.size()) {
         LogMsg(MSG_FAIL, "Not any installation package was found");
-        return false;
+        goto Finish;
     }
     // remove repeate
     sort(context->taskQueue.begin(), context->taskQueue.end());
