@@ -59,11 +59,11 @@ hdc_host_sources = [
 ]
 
 common_deps = [
+  "//third_party/bounds_checking_function:libsec_static",
   "//third_party/libusb:libusb",
   "//third_party/libuv:uv_static",
   "//third_party/lz4:liblz4_static",
   "//third_party/openssl:libcrypto_static",
-  "//utils/native/base:utilsecurec",
 ]
 
 config("hdc_ut_code_flag") {
@@ -136,6 +136,7 @@ ohos_source_set("hdc_daemon") {
   sources = hdc_common_sources
   sources += hdc_daemon_sources
   if (hdc_support_uart) {
+    include_dirs = [ "//utils/native/base/include" ]
     sources += [ "${hdc_path}/src/common/uart.cpp" ]
     sources += [ "${hdc_path}/src/daemon/daemon_uart.cpp" ]
   }
@@ -185,9 +186,9 @@ ohos_source_set("hdc_daemon_platform") {
   ]
 
   public_deps = [
+    "//third_party/bounds_checking_function:libsec_static",
     "//third_party/libuv:uv_static",
     "//third_party/openssl:libcrypto_static",
-    "//utils/native/base:utilsecurec",
   ]
 
   external_deps = [
@@ -197,7 +198,7 @@ ohos_source_set("hdc_daemon_platform") {
 
   include_dirs = [
     "${hdc_path}/daemon",
-    "//utils/native/base/include",
+    "//third_party/bounds_checking_function/include",
     "//third_party/openssl/include",
     "//third_party/libuv",
   ]
@@ -237,8 +238,8 @@ ohos_unittest("hdc_jdwp_unittest") {
     "${hdc_path}/test/unittest/common/include",
     "${hdc_path}/src/daemon",
     "${hdc_path}/src/common",
+    "//third_party/bounds_checking_function/include",
     "//third_party/libuv",
-    "//utils/native/base/include",
   ]
 
   if (is_linux) {

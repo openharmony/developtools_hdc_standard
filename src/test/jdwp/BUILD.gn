@@ -26,7 +26,7 @@ ohos_executable("jdwp_test") {
   ]
   external_deps = [ "hiviewdfx_hilog_native:libhilog" ]
   include_dirs = [
-    "//utils/native/base/include",
+    "//third_party/bounds_checking_function/include",
     "//third_party/libuv",
   ]
   install_enable = true
