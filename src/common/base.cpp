@@ -480,7 +480,7 @@ namespace Base {
         if (memcpy_s(bufString, sizeof(bufString), connectKey, sizeof(bufString))) {
             return ERR_BUF_COPY;
         }
-        char *p = strchr(bufString, ':');
+        char *p = strrchr(bufString, ':');
         if (!p) {
             return ERR_PARM_FORMAT;
         }
@@ -751,11 +751,13 @@ namespace Base {
         }
 #ifdef _WIN32
         if (snprintf_s(buf, sizeof(buf), sizeof(buf) - 1, "Global\\%s", procname) < 0) {
+            close(fd);
             return ERR_BUF_OVERFLOW;
         }
         HANDLE hMutex = CreateMutex(nullptr, FALSE, buf);
         DWORD dwError = GetLastError();
         if (ERROR_ALREADY_EXISTS == dwError || ERROR_ACCESS_DENIED == dwError) {
+            close(fd);
             WRITE_LOG(LOG_DEBUG, "File \"%s\" locked. proc already exit!!!\n", procname);
             return 1;
         }

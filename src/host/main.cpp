@@ -196,7 +196,7 @@ bool ParseServerListenString(string &serverListenString, char *optarg)
         Base::PrintMessage("strcpy_s error %d", errno);
         return false;
     }
-    char *p = strchr(buf, ':');
+    char *p = strrchr(buf, ':');
     if (!p) {  // Only port
         if (strlen(buf) > 5) {
             Base::PrintMessage("The port-string's length must < 5");
@@ -207,17 +207,28 @@ bool ParseServerListenString(string &serverListenString, char *optarg)
             Base::PrintMessage("Port range incorrect");
             return false;
         }
-        (void)snprintf_s(buf, sizeof(buf), sizeof(buf) - 1, "127.0.0.1:%d", port);
+        (void)snprintf_s(buf, sizeof(buf), sizeof(buf) - 1, "::ffff:127.0.0.1:%d", port);
         serverListenString = buf;
     } else {
         *p = '\0';
         int port = atoi(p + 1);
-        sockaddr_in addr;
-        if ((port <= 0 || port > MAX_IP_PORT) || uv_ip4_addr(buf, port, &addr) < 0) {
-            Base::PrintMessage("-s content incorrect.");
+        sockaddr_in addrv4;
+        sockaddr_in6 addrv6;
+
+        if ((port <= 0 || port > MAX_IP_PORT)) {
+            Base::PrintMessage("-s content port incorrect.");
             return false;
         }
-        serverListenString = optarg;
+
+        if (uv_ip4_addr(buf, port, &addrv4) == 0) {
+            serverListenString = IPV4_MAPPING_PREFIX;
+            serverListenString += optarg;
+        } else if (uv_ip6_addr(buf, port, &addrv6) == 0) {
+            serverListenString = optarg;
+        } else {
+            Base::PrintMessage("-s content IP incorrect.");
+            return false;
+        }
     }
     return true;
 }

@@ -118,6 +118,11 @@ namespace TranslateCommand {
             // tcp mode
             string ip = outCmd->parameters.substr(0, outCmd->parameters.find(":"));
             string sport = outCmd->parameters.substr(outCmd->parameters.find(":") + 1);
+            if (sport.empty()) {
+                stringError = "Port incorrect";
+                outCmd->bJumpDo = true;
+                return stringError;
+            }
             int port = std::stoi(sport);
             sockaddr_in addr;
             if ((port <= 0 || port > MAX_IP_PORT) || uv_ip4_addr(ip.c_str(), port, &addr) < 0) {
@@ -253,8 +258,6 @@ namespace TranslateCommand {
             stringError = TargetReboot(input.c_str(), outCmd);
         } else if (!strncmp(input.c_str(), CMDSTR_TARGET_MODE.c_str(), CMDSTR_TARGET_MODE.size())) {
             stringError = RunMode(input.c_str(), outCmd);
-        } else if (!strcmp(input.c_str(), CMDSTR_CONNECT_ANY.c_str())) {
-            outCmd->cmdFlag = CMD_KERNEL_TARGET_ANY;
         } else if (!strncmp(input.c_str(), CMDSTR_HILOG.c_str(), CMDSTR_HILOG.size())) {
             outCmd->cmdFlag = CMD_UNITY_HILOG;
             if (strstr(input.c_str(), " -v")) {
