@@ -185,6 +185,7 @@ private:
     std::atomic<uint32_t> sessionRef = 0;
     const uint8_t payloadProtectStaticVcode = 0x09;
     uv_thread_t threadSessionMain;
+    size_t threadPoolCount;
 };
 }  // namespace Hdc
 #endif

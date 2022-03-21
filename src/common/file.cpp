@@ -125,7 +125,12 @@ void HdcFile::TransferSummary(CtxFile *context)
 {
     uint64_t nMSec = Base::GetRuntimeMSec() - context->transferBegin;
     double fRate = static_cast<double>(context->indexIO) / nMSec;  // / /1000 * 1000 = 0
-    LogMsg(MSG_OK, "FileTransfer finish, Size:%lld time:%lldms rate:%.2lfkB/s", context->indexIO, nMSec, fRate);
+    if (context->indexIO >= context->fileSize) {
+        LogMsg(MSG_OK, "FileTransfer finish, Size:%lld time:%lldms rate:%.2lfkB/s", context->indexIO, nMSec, fRate);
+    } else {
+        LogMsg(MSG_FAIL, "Transfer Stop at:%lld/%lld(Bytes), Reason: %s",
+               context->indexIO, context->fileSize, uv_strerror((int)(-context->lastErrno)));
+    }
 }
 
 bool HdcFile::SlaveCheck(uint8_t *payload, const int payloadSize)
@@ -178,6 +183,7 @@ bool HdcFile::CommandDispatch(const uint16_t command, uint8_t *payload, const in
         }
         case CMD_FILE_FINISH: {
             if (*payload) {  // close-step3
+                ctxNow.ioFinish = true;
                 --(*payload);
                 SendToAnother(CMD_FILE_FINISH, payload, 1);
             } else {  // close-step3

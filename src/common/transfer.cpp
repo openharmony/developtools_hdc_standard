@@ -79,6 +79,7 @@ int HdcTransferBase::SimpleFileIO(CtxFile *context, uint64_t index, uint8_t *sen
             // The US_FS_WRITE here must be brought into the actual file offset, which cannot be incorporated with local
             // accumulated index because UV_FS_WRITE will be executed multiple times and then trigger a callback.
             if (bytes > 0 && memcpy_s(ioContext->bufIO, bytes, sendBuf, bytes) != EOK) {
+                WRITE_LOG(LOG_WARN, "SimpleFileIO memcpy error");
                 break;
             }
             uv_buf_t iov = uv_buf_init(reinterpret_cast<char *>(ioContext->bufIO), bytes);
@@ -88,7 +89,6 @@ int HdcTransferBase::SimpleFileIO(CtxFile *context, uint64_t index, uint8_t *sen
         break;
     }
     if (!ret) {
-        WRITE_LOG(LOG_WARN, "SimpleFileIO error");
         if (buf != nullptr) {
             delete[] buf;
             buf = nullptr;
@@ -188,6 +188,9 @@ void HdcTransferBase::OnFileIO(uv_fs_t *req)
     uint8_t *bufIO = contextIO->bufIO;
     uv_fs_req_cleanup(req);
     while (true) {
+        if (context->ioFinish) {
+            break;
+        }
         if (req->result < 0) {
             WRITE_LOG(LOG_DEBUG, "OnFileIO error: %s", uv_strerror((int)req->result));
             context->closeNotify = true;
@@ -394,7 +397,11 @@ bool HdcTransferBase::CommandDispatch(const uint16_t command, uint8_t *payload, 
     while (true) {
         if (command == commandBegin) {
             CtxFile *context = &ctxNow;
-            SimpleFileIO(context, context->indexIO, nullptr, Base::GetMaxBufSize() * maxTransferBufFactor);
+            int ioRet = SimpleFileIO(context, context->indexIO, nullptr, Base::GetMaxBufSize() * maxTransferBufFactor);
+            if (ioRet < 0) {
+                ret = false;
+                break;
+            }
             context->transferBegin = Base::GetRuntimeMSec();
         } else if (command == commandData) {
             if ((uint32_t)payloadSize > HDC_BUF_MAX_BYTES || payloadSize < 0) {

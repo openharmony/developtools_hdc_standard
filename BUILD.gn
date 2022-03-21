@@ -89,11 +89,6 @@ ohos_executable("hdc_std") {
   if (is_mac) {
     defines += [ "HOST_MAC" ]
   }
-  cflags_cc = [
-    "-Wno-error",
-    "-Wno-error=unused-variable",
-    "-Wno-unused-variable",
-  ]
   sources = [
     "src/host/client.cpp",
     "src/host/host_app.cpp",
