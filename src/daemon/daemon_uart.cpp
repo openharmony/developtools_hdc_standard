@@ -270,7 +270,7 @@ void HdcDaemonUART::DeamonReadThread()
     }
     if (isAlive) {
         WRITE_LOG(LOG_WARN, "totalReadSize is full %zu/%zu, DeamonReadThread exit..",
-                  dataReadBuf.size());
+                  dataReadBuf.size(), expectedSize);
     } else {
         WRITE_LOG(LOG_WARN, "dev is not alive, DeamonReadThread exit..");
     }

@@ -415,7 +415,7 @@ size_t HdcUARTBase::PackageProcess(vector<uint8_t> &data, HSession hSession)
 #endif
                 }
                 if (hSession == nullptr) {
-                    WRITE_LOG(LOG_WARN, "%s have not found seesion (%u). skip it", sessionId);
+                    WRITE_LOG(LOG_WARN, "%s have not found seesion (%u). skip it", __FUNCTION__, sessionId);
                 } else {
                     if (hSession->hUART->dispatchedPackageIndex == packageIndex) {
                         // we need check if the duplication pacakge we have already send
