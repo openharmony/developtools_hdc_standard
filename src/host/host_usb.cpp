@@ -60,7 +60,6 @@ int HdcHostUSB::Initial()
 
 bool HdcHostUSB::DetectMyNeed(libusb_device *device, string &sn)
 {
-    bool ret = false;
     HUSB hUSB = new HdcUSB();
     hUSB->device = device;
     // just get usb SN, close handle immediately
