@@ -945,7 +945,7 @@ void HdcSessionBase::ReadCtrlFromSession(uv_stream_t *uvpipe, ssize_t nread, con
             constexpr int bufSize = 1024;
             char buffer[bufSize] = { 0 };
             uv_strerror_r((int)nread, buffer, bufSize);
-            WRITE_LOG(LOG_DEBUG, "SessionCtrl failed,%s", buf);
+            WRITE_LOG(LOG_DEBUG, "SessionCtrl failed,%s", buffer);
             uv_read_stop(uvpipe);
             break;
         }
