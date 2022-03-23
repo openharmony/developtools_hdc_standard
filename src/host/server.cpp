@@ -91,7 +91,9 @@ bool HdcServer::Initial(const char *listenString)
         return false;
     }
     (static_cast<HdcServerForClient *>(clsServerForClient))->Initial();
-    clsUSBClt->Initial();
+    if (clsUSBClt->Initial() != RET_SUCCESS) {
+        return false;
+    }
 
 #ifdef HDC_SUPPORT_UART
     clsUARTClt = new HdcHostUART(*this);

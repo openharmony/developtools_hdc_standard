@@ -58,11 +58,23 @@ bool HdcChannelBase::SetChannelTCPString(const string &addrString)
         if (addrString.find(":") == string::npos) {
             break;
         }
-        string host = addrString.substr(0, addrString.find(":"));
-        string port = addrString.substr(addrString.find(":") + 1);
+        std::size_t found = addrString.find_last_of(":");
+        if (found == string::npos) {
+            break;
+        }
+
+        string host = addrString.substr(0, found);
+        string port = addrString.substr(found + 1);
+
         channelPort = std::atoi(port.c_str());
-        sockaddr_in addr;
-        if (!channelPort || uv_ip4_addr(host.c_str(), channelPort, &addr) != 0) {
+        sockaddr_in addrv4;
+        sockaddr_in6 addrv6;
+        if (!channelPort) {
+            break;
+        }
+
+        if (uv_ip6_addr(host.c_str(), channelPort, &addrv6) != 0 &&
+            uv_ip4_addr(host.c_str(), channelPort, &addrv4) != 0) {
             break;
         }
         channelHost = host;

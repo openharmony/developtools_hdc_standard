@@ -378,7 +378,7 @@ int HdcHostUART::OpenSerialPort(const std::string &connectKey)
         // if the dev is idle
         if (!WaitUartIdle(uart)) {
             ret = ERR_GENERIC;
-            WRITE_LOG(LOG_INFO, "This is not a Idle UART port", uart.serialPort.c_str());
+            WRITE_LOG(LOG_INFO, "This is not a Idle UART port: %s", uart.serialPort.c_str());
             break;
         }
         if (!ConnectMyNeed(&uart, connectKey)) {
@@ -616,7 +616,7 @@ HSession HdcHostUART::GetSession(const uint32_t sessionId, bool)
 }
 void HdcHostUART::CloseSerialPort(const HUART hUART)
 {
-    WRITE_LOG(LOG_DEBUG, "try to close dev handle %d", __FUNCTION__, hUART->devUartHandle);
+    WRITE_LOG(LOG_DEBUG, "%s try to close dev handle %d", __FUNCTION__, hUART->devUartHandle);
 
 #ifdef _WIN32
     if (hUART->devUartHandle != INVALID_HANDLE_VALUE) {
