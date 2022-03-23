@@ -514,6 +514,7 @@ void HdcSessionBase::FreeSessionFinally(uv_idle_t *handle)
     // all hsession uv handle has been clear
     thisClass->AdminSession(OP_REMOVE, hSession->sessionId, nullptr);
     WRITE_LOG(LOG_DEBUG, "!!!FreeSessionFinally sessionId:%u finish", hSession->sessionId);
+    HdcAuth::FreeKey(!hSession->serverOrDaemon, hSession->listKey);
     delete hSession;
     hSession = nullptr;  // fix CodeMars SetNullAfterFree issue
     Base::TryCloseHandle((const uv_handle_t *)handle, Base::CloseIdleCallback);
@@ -539,11 +540,6 @@ void HdcSessionBase::FreeSessionContinue(HSession hSession)
     }
     Base::TryCloseHandle((uv_handle_t *)&hSession->ctrlPipe[STREAM_MAIN], true, closeSessionTCPHandle);
     Base::TryCloseHandle((uv_handle_t *)&hSession->dataPipe[STREAM_MAIN], true, closeSessionTCPHandle);
-    delete hSession->mapTask;
-    hSession->mapTask = nullptr;
-    HdcAuth::FreeKey(!hSession->serverOrDaemon, hSession->listKey);
-    delete hSession->listKey;  // to clear
-    hSession->listKey = nullptr;
     FreeSessionByConnectType(hSession);
     // finish
     Base::IdleUvTask(&loopMain, hSession, FreeSessionFinally);
@@ -1007,7 +1003,7 @@ bool HdcSessionBase::WorkThreadStartSession(HSession hSession)
         handshake.authType = AUTH_NONE;
         string hs = SerialStruct::SerializeToString(handshake);
 #ifdef HDC_SUPPORT_UART
-        WRITE_LOG(LOG_DEBUG, "WorkThreadStartSession session %u auth %u send handshake hs:",
+        WRITE_LOG(LOG_DEBUG, "WorkThreadStartSession session %u auth %u send handshake hs: %s",
                   hSession->sessionId, handshake.authType, hs.c_str());
 #endif
         Send(hSession->sessionId, 0, CMD_KERNEL_HANDSHAKE, (uint8_t *)hs.c_str(), hs.size());
@@ -1058,7 +1054,7 @@ bool HdcSessionBase::DispatchMainThreadCommand(HSession hSession, const CtrlStru
                 };
             };
             hSession->uvChildRef += 2;
-            if (hSession->hChildWorkTCP.loop) {  // maybe not use it
+            if (hSession->hChildWorkTCP.loop && hSession->connType == CONN_TCP) {  // maybe not use it
                 ++hSession->uvChildRef;
                 Base::TryCloseHandle((uv_handle_t *)&hSession->hChildWorkTCP, true, closeSessionChildThreadTCPHandle);
             }

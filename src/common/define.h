@@ -22,7 +22,8 @@ constexpr uint8_t SIZE_THREAD_POOL = 16;
 constexpr uint8_t GLOBAL_TIMEOUT = 30;
 constexpr uint16_t DEFAULT_PORT = 8710;
 constexpr bool ENABLE_IO_CHECKSUM = false;
-const string DEFAULT_SERVER_ADDR = "127.0.0.1:8710";
+const string IPV4_MAPPING_PREFIX = "::ffff:";
+const string DEFAULT_SERVER_ADDR = "::ffff:127.0.0.1:8710";
 
 // ################################ macro define ###################################
 constexpr uint8_t MINOR_TIMEOUT = 5;
