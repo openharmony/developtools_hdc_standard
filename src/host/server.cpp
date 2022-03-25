@@ -78,7 +78,9 @@ bool HdcServer::Initial(const char *listenString)
         return false;
     }
     (static_cast<HdcServerForClient *>(clsServerForClient))->Initial();
-    clsUSBClt->Initial();
+    if (clsUSBClt->Initial() != RET_SUCCESS) {
+        return false;
+    }
     return true;
 }
 
@@ -703,6 +705,8 @@ void HdcServer::DeatchChannel(HSession hSession, const uint32_t channelId)
         WRITE_LOG(LOG_DEBUG, "Childchannel has already freed, cid:%u", channelId);
         return;
     }
+    // The own task for this channel must be clear before free channel
+    ClearOwnTasks(hSession, channelId);
     uint8_t count = 0;
     Send(hSession->sessionId, hChannel->channelId, CMD_KERNEL_CHANNEL_CLOSE, &count, 1);
     if (uv_is_closing((const uv_handle_t *)&hChannel->hChildWorkTCP)) {

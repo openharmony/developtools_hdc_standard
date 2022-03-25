@@ -21,8 +21,16 @@ HdcSessionBase::HdcSessionBase(bool serverOrDaemonIn)
     // print version pid
     WRITE_LOG(LOG_INFO, "Program running. %s Pid:%u", Base::GetVersion().c_str(), getpid());
     // server/daemon common initialization code
-    string threadNum = std::to_string(SIZE_THREAD_POOL);
-    uv_os_setenv("UV_THREADPOOL_SIZE", threadNum.c_str());
+    threadPoolCount = SIZE_THREAD_POOL;
+    string uvThreadEnv("UV_THREADPOOL_SIZE");
+    string uvThreadVal = std::to_string(threadPoolCount);
+#ifdef _WIN32
+    uvThreadEnv += "=";
+    uvThreadEnv += uvThreadVal;
+    _putenv(uvThreadEnv.c_str());
+#else
+    setenv(uvThreadEnv.c_str(), uvThreadVal.c_str(), 1);
+#endif
     uv_loop_init(&loopMain);
     WRITE_LOG(LOG_DEBUG, "loopMain init");
     uv_rwlock_init(&mainAsync);
@@ -81,11 +89,13 @@ bool HdcSessionBase::BeginRemoveTask(HTaskInfo hTask)
         return true;
     }
 
-    WRITE_LOG(LOG_DEBUG, "BeginRemoveTask taskType:%d", hTask->taskType);
+    WRITE_LOG(LOG_DEBUG, "BeginRemoveTask taskType:%d channelId:%u", hTask->taskType, hTask->channelId);
     ret = RemoveInstanceTask(OP_CLEAR, hTask);
-    auto taskClassDeleteRetry = [](uv_idle_t *handle) -> void {
+    auto taskClassDeleteRetry = [](uv_timer_t *handle) -> void {
         HTaskInfo hTask = (HTaskInfo)handle->data;
         HdcSessionBase *thisClass = (HdcSessionBase *)hTask->ownerSessionClass;
+        WRITE_LOG(LOG_DEBUG, "TaskDelay task remove current try count %d/%d, channelId:%u, sessionId:%u",
+                  hTask->closeRetryCount, GLOBAL_TIMEOUT, hTask->channelId, hTask->sessionId);
         if (!thisClass->TryRemoveTask(hTask)) {
             return;
         }
@@ -93,9 +103,9 @@ bool HdcSessionBase::BeginRemoveTask(HTaskInfo hTask)
         thisClass->AdminTask(OP_REMOVE, hSession, hTask->channelId, nullptr);
         WRITE_LOG(LOG_DEBUG, "TaskDelay task remove finish, channelId:%u", hTask->channelId);
         delete hTask;
-        Base::TryCloseHandle((uv_handle_t *)handle, Base::CloseIdleCallback);
+        Base::TryCloseHandle((uv_handle_t *)handle, Base::CloseTimerCallback);
     };
-    Base::IdleUvTask(hTask->runLoop, hTask, taskClassDeleteRetry);
+    Base::TimerUvTask(hTask->runLoop, hTask, taskClassDeleteRetry, (GLOBAL_TIMEOUT * TIME_BASE) / UV_DEFAULT_INTERVAL);
 
     hTask->taskStop = true;
     ret = true;
@@ -483,7 +493,7 @@ void HdcSessionBase::FreeSessionOpeate(uv_timer_t *handle)
     if (hSession->ctrlPipe[STREAM_WORK].loop) {
         auto ctrl = BuildCtrlString(SP_STOP_SESSION, 0, nullptr, 0);
         Base::SendToStream((uv_stream_t *)&hSession->ctrlPipe[STREAM_MAIN], ctrl.data(), ctrl.size());
-        WRITE_LOG(LOG_DEBUG, "FreeSession, send workthread fo free. sessionId:%u", hSession->sessionId);
+        WRITE_LOG(LOG_DEBUG, "FreeSessionOpeate, send workthread fo free. sessionId:%u", hSession->sessionId);
         auto callbackCheckFreeSessionContinue = [](uv_timer_t *handle) -> void {
             HSession hSession = (HSession)handle->data;
             HdcSessionBase *thisClass = (HdcSessionBase *)hSession->classInstance;
@@ -555,6 +565,31 @@ HSession HdcSessionBase::AdminSession(const uint8_t op, const uint32_t sessionId
             mapSession[hInput->sessionId] = hInput;
             uv_rwlock_wrunlock(&lockMapSession);
             break;
+        case OP_VOTE_RESET:
+            if (mapSession.count(sessionId) == 0) {
+                break;
+            }
+            bool needReset;
+            uv_rwlock_wrlock(&lockMapSession);
+            hRet = mapSession[sessionId];
+            hRet->voteReset = true;
+            needReset = true;
+            for (auto &kv : mapSession) {
+                if (sessionId == kv.first) {
+                    continue;
+                }
+                WRITE_LOG(LOG_DEBUG, "session:%u vote reset, session %u is %s",
+                          sessionId, kv.first, kv.second->voteReset ? "YES" : "NO");
+                if (!kv.second->voteReset) {
+                    needReset = false;
+                }
+            }
+            uv_rwlock_wrunlock(&lockMapSession);
+            if (needReset) {
+                WRITE_LOG(LOG_FATAL, "!! session:%u vote reset, passed unanimously !!", sessionId);
+                abort();
+            }
+            break;
         default:
             break;
     }
@@ -568,7 +603,19 @@ HTaskInfo HdcSessionBase::AdminTask(const uint8_t op, HSession hSession, const u
     map<uint32_t, HTaskInfo> &mapTask = *hSession->mapTask;
     switch (op) {
         case OP_ADD:
+#ifndef HDC_HOST
+            // uv sub-thread confiured by threadPoolCount, reserve 2 for main & communicate
+            if (mapTask.size() >= (threadPoolCount - 2)) {
+                WRITE_LOG(LOG_WARN, "mapTask.size:%d, hdc is busy", mapTask.size());
+                break;
+            }
+#endif
+            hRet = mapTask[channelId];
+            if (hRet != nullptr) {
+                delete hRet;
+            }
             mapTask[channelId] = hInput;
+            hRet = hInput;
             break;
         case OP_REMOVE:
             mapTask.erase(channelId);
@@ -577,6 +624,9 @@ HTaskInfo HdcSessionBase::AdminTask(const uint8_t op, HSession hSession, const u
             if (mapTask.count(channelId)) {
                 hRet = mapTask[channelId];
             }
+            break;
+        case OP_VOTE_RESET:
+            AdminSession(op, hSession->sessionId, nullptr);
             break;
         default:
             break;
@@ -907,7 +957,7 @@ bool HdcSessionBase::DispatchMainThreadCommand(HSession hSession, const CtrlStru
                 };
             };
             hSession->uvChildRef += 2;
-            if (hSession->hChildWorkTCP.loop) {  // maybe not use it
+            if (hSession->hChildWorkTCP.loop && hSession->connType == CONN_TCP) {  // maybe not use it
                 ++hSession->uvChildRef;
                 Base::TryCloseHandle((uv_handle_t *)&hSession->hChildWorkTCP, true, closeSessionChildThreadTCPHandle);
             }
@@ -975,18 +1025,32 @@ void HdcSessionBase::ReChildLoopForSessionClear(HSession hSession)
 {
     // Restart loop close task
     ClearOwnTasks(hSession, 0);
-    auto clearTaskForSessionFinish = [](uv_idle_t *handle) -> void {
+    WRITE_LOG(LOG_INFO, "ReChildLoopForSessionClear sessionId:%u", hSession->sessionId);
+    auto clearTaskForSessionFinish = [](uv_timer_t *handle) -> void {
         HSession hSession = (HSession)handle->data;
         for (auto v : *hSession->mapTask) {
             HTaskInfo hTask = (HTaskInfo)v.second;
+            uint8_t level;
+            if (hTask->closeRetryCount < GLOBAL_TIMEOUT / 2) {
+                level = LOG_DEBUG;
+            } else {
+                level = LOG_WARN;
+            }
+            WRITE_LOG(level, "wait task free retry %d/%d, channelId:%u, sessionId:%u",
+                      hTask->closeRetryCount, GLOBAL_TIMEOUT, hTask->channelId, hTask->sessionId);
+            if (hTask->closeRetryCount++ >= GLOBAL_TIMEOUT) {
+                HdcSessionBase *thisClass = (HdcSessionBase *)hTask->ownerSessionClass;
+                hSession = thisClass->AdminSession(OP_QUERY, hTask->sessionId, nullptr);
+                thisClass->AdminTask(OP_VOTE_RESET, hSession, hTask->channelId, nullptr);
+            }
             if (!hTask->taskFree)
                 return;
         }
         // all task has been free
-        uv_close((uv_handle_t *)handle, Base::CloseIdleCallback);
+        uv_close((uv_handle_t *)handle, Base::CloseTimerCallback);
         uv_stop(&hSession->childLoop);  // stop ReChildLoopForSessionClear pendding
     };
-    Base::IdleUvTask(&hSession->childLoop, hSession, clearTaskForSessionFinish);
+    Base::TimerUvTask(&hSession->childLoop, hSession, clearTaskForSessionFinish, (GLOBAL_TIMEOUT * TIME_BASE) / UV_DEFAULT_INTERVAL);
     uv_run(&hSession->childLoop, UV_RUN_DEFAULT);
     // clear
     Base::TryCloseLoop(&hSession->childLoop, "Session childUV");
@@ -1074,14 +1138,33 @@ bool HdcSessionBase::DispatchTaskData(HSession hSession, const uint32_t channelI
     while (true) {
         // Some basic commands do not have a local task constructor. example: Interactive shell, some uinty commands
         if (NeedNewTaskInfo(command, masterTask)) {
-            WRITE_LOG(LOG_DEBUG, "New HTaskInfo");
+            WRITE_LOG(LOG_DEBUG, "New HTaskInfo channelId:%u command:%u", channelId, command);
             hTaskInfo = new TaskInformation();
             hTaskInfo->channelId = channelId;
             hTaskInfo->sessionId = hSession->sessionId;
             hTaskInfo->runLoop = &hSession->childLoop;
             hTaskInfo->serverOrDaemon = serverOrDaemon;
             hTaskInfo->masterSlave = masterTask;
-            AdminTask(OP_ADD, hSession, channelId, hTaskInfo);
+            hTaskInfo->closeRetryCount = 0;
+
+            int addTaskRetry = 3; // try 3 time
+            while (addTaskRetry > 0) {
+                if (AdminTask(OP_ADD, hSession, channelId, hTaskInfo)) {
+                    break;
+                }
+                sleep(1);
+                --addTaskRetry;
+            }
+
+            if (addTaskRetry == 0) {
+#ifndef HDC_HOST
+                LogMsg(hTaskInfo->sessionId, hTaskInfo->channelId, MSG_FAIL, "hdc thread pool busy, may cause reset later");
+#endif
+                delete hTaskInfo;
+                hTaskInfo = nullptr;
+                ret = false;
+                break;
+            }
         } else {
             hTaskInfo = AdminTask(OP_QUERY, hSession, channelId, nullptr);
         }

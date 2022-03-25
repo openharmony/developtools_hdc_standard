@@ -105,12 +105,14 @@ namespace Base {
         }
         string msTimeSurplus;
         if (g_logLevel >= LOG_DEBUG) {
-            const auto sSinceUnix0Rest = duration_cast<microseconds>(sinceUnix0).count() % (TIME_BASE * TIME_BASE);
+            const auto sSinceUnix0Rest = duration_cast<microseconds>(sinceUnix0).count() % TIME_BASE;
             msTimeSurplus = StringFormat(".%06llu", sSinceUnix0Rest);
         }
         timeString = msTimeSurplus;
         if (tim != nullptr) {
-            timeString = StringFormat("%d:%d:%d%s", tim->tm_hour, tim->tm_min, tim->tm_sec, msTimeSurplus.c_str());
+            char buffer[TIME_BUF_SIZE];
+            (void)strftime(buffer, TIME_BUF_SIZE, "%Y-%m-%d %H:%M:%S", tim);
+            timeString = StringFormat("%s%s", buffer, msTimeSurplus.c_str());
         }
     }
 
@@ -688,11 +690,13 @@ namespace Base {
         }
 #ifdef _WIN32
         if (snprintf_s(buf, sizeof(buf), sizeof(buf) - 1, "Global\\%s", procname) < 0) {
+            close(fd);
             return ERR_BUF_OVERFLOW;
         }
         HANDLE hMutex = CreateMutex(nullptr, FALSE, buf);
         DWORD dwError = GetLastError();
         if (ERROR_ALREADY_EXISTS == dwError || ERROR_ACCESS_DENIED == dwError) {
+            close(fd);
             WRITE_LOG(LOG_DEBUG, "File \"%s\" locked. proc already exit!!!\n", procname);
             return 1;
         }
