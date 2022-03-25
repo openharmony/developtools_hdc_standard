@@ -87,7 +87,8 @@ bool HdcSessionBase::TryRemoveTask(HTaskInfo hTask)
 bool HdcSessionBase::BeginRemoveTask(HTaskInfo hTask)
 {
     bool ret = true;
-    if (hTask->taskStop || hTask->taskFree || !hTask->taskClass) {
+
+    if (hTask->taskStop || hTask->taskFree) {
         return true;
     }
 
@@ -128,6 +129,7 @@ void HdcSessionBase::ClearOwnTasks(HSession hSession, const uint32_t channelIDIn
         uint32_t channelId = iter->first;
         HTaskInfo hTask = iter->second;
         if (channelIDInput != 0) {  // single
+            WRITE_LOG(LOG_DEBUG, "channelIDInput = %u, cur = %u", channelIDInput, channelId);
             if (channelIDInput != channelId) {
                 ++iter;
                 continue;
@@ -642,21 +644,25 @@ HSession HdcSessionBase::AdminSession(const uint8_t op, const uint32_t sessionId
                 break;
             }
             bool needReset;
-            uv_rwlock_wrlock(&lockMapSession);
-            hRet = mapSession[sessionId];
-            hRet->voteReset = true;
-            needReset = true;
-            for (auto &kv : mapSession) {
-                if (sessionId == kv.first) {
-                    continue;
+            if (serverOrDaemon) {
+                uv_rwlock_wrlock(&lockMapSession);
+                hRet = mapSession[sessionId];
+                hRet->voteReset = true;
+                needReset = true;
+                for (auto &kv : mapSession) {
+                    if (sessionId == kv.first) {
+                        continue;
+                    }
+                    WRITE_LOG(LOG_DEBUG, "session:%u vote reset, session %u is %s",
+                              sessionId, kv.first, kv.second->voteReset ? "YES" : "NO");
+                    if (!kv.second->voteReset) {
+                        needReset = false;
+                    }
                 }
-                WRITE_LOG(LOG_DEBUG, "session:%u vote reset, session %u is %s",
-                          sessionId, kv.first, kv.second->voteReset ? "YES" : "NO");
-                if (!kv.second->voteReset) {
-                    needReset = false;
-                }
+                uv_rwlock_wrunlock(&lockMapSession);
+            } else {
+                needReset = true;
             }
-            uv_rwlock_wrunlock(&lockMapSession);
             if (needReset) {
                 WRITE_LOG(LOG_FATAL, "!! session:%u vote reset, passed unanimously !!", sessionId);
                 abort();
@@ -673,6 +679,7 @@ HTaskInfo HdcSessionBase::AdminTask(const uint8_t op, HSession hSession, const u
 {
     HTaskInfo hRet = nullptr;
     map<uint32_t, HTaskInfo> &mapTask = *hSession->mapTask;
+
     switch (op) {
         case OP_ADD:
 #ifndef HDC_HOST
@@ -688,9 +695,15 @@ HTaskInfo HdcSessionBase::AdminTask(const uint8_t op, HSession hSession, const u
             }
             mapTask[channelId] = hInput;
             hRet = hInput;
+
+            WRITE_LOG(LOG_DEBUG, "AdminTask add session %u, channelId %u, mapTask size: %zu",
+                      hSession->sessionId, channelId, mapTask.size());
+
             break;
         case OP_REMOVE:
             mapTask.erase(channelId);
+            WRITE_LOG(LOG_DEBUG, "AdminTask rm session %u, channelId %u, mapTask size: %zu",
+                      hSession->sessionId, channelId, mapTask.size());
             break;
         case OP_QUERY:
             if (mapTask.count(channelId)) {
