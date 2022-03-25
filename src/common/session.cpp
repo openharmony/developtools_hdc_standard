@@ -411,11 +411,14 @@ HSession HdcSessionBase::MallocSession(bool serverOrDaemon, const ConnType connT
         hSession = nullptr;
         return nullptr;
     }
+    uv_loop_init(&hSession->childLoop);
     hSession->uvHandleRef = 0;
     // pullup child
     WRITE_LOG(LOG_DEBUG, "HdcSessionBase NewSession, sessionId:%u, connType:%d.",
               hSession->sessionId, hSession->connType);
     uv_tcp_init(&loopMain, &hSession->ctrlPipe[STREAM_MAIN]);
+    (void)memset_s(&hSession->ctrlPipe[STREAM_WORK], sizeof(hSession->ctrlPipe[STREAM_WORK]),
+                   0, sizeof(uv_tcp_t));
     ++hSession->uvHandleRef;
     Base::CreateSocketPair(hSession->ctrlFd);
     uv_tcp_open(&hSession->ctrlPipe[STREAM_MAIN], hSession->ctrlFd[STREAM_MAIN]);
@@ -1067,7 +1070,7 @@ bool HdcSessionBase::DispatchMainThreadCommand(HSession hSession, const CtrlStru
                 };
             };
             hSession->uvChildRef += 2;
-            if (hSession->hChildWorkTCP.loop && hSession->connType == CONN_TCP) {  // maybe not use it
+            if (hSession->connType == CONN_TCP && hSession->hChildWorkTCP.loop) {  // maybe not use it
                 ++hSession->uvChildRef;
                 Base::TryCloseHandle((uv_handle_t *)&hSession->hChildWorkTCP, true, closeSessionChildThreadTCPHandle);
             }
@@ -1174,7 +1177,6 @@ void HdcSessionBase::SessionWorkThread(uv_work_t *arg)
     int childRet = 0;
     HSession hSession = (HSession)arg->data;
     HdcSessionBase *thisClass = (HdcSessionBase *)hSession->classInstance;
-    uv_loop_init(&hSession->childLoop);
     hSession->hWorkChildThread = uv_thread_self();
     if ((childRet = uv_tcp_init(&hSession->childLoop, &hSession->ctrlPipe[STREAM_WORK])) < 0) {
         constexpr int bufSize = 1024;
