@@ -93,7 +93,7 @@ HWTEST_F(HdcJdwpTest, TestReadStream, TestSize.Level1)
     uint32_t pkgSize = pkgName.size() + sizeof(HdcJdwp::JsMsgHeader); // JsMsgHeader pkgName;
     uint8_t *info = reinterpret_cast<uint8_t *>(ctxJdwp->buf);
     ASSERT_NE(info, nullptr) << "TestReadStream info null.";
-    std::memset(info, 0, sizeof(ctxJdwp->buf));
+    memset_s(info, sizeof(ctxJdwp->buf), 0, sizeof(ctxJdwp->buf));
     HdcJdwp::JsMsgHeader *jsMsg = (HdcJdwp::JsMsgHeader *)info;
     jsMsg->pid = 1212;
     jsMsg->msgLen = pkgSize;
