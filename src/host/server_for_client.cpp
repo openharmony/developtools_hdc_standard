@@ -266,7 +266,8 @@ bool HdcServerForClient::CommandRemoveForward(const string &forwardKey)
     }
     HSession hSession = ptrServer->AdminSession(OP_QUERY, hfi->sessionId, nullptr);
     if (!hSession) {
-        return false;
+        ptrServer->AdminForwardMap(OP_REMOVE, forwardKey, hfi);
+        return true;
     }
     ptrServer->ClearOwnTasks(hSession, hfi->channelId);
     FreeChannel(hfi->channelId);

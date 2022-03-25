@@ -324,6 +324,11 @@ bool HdcDaemon::FetchCommand(HSession hSession, const uint32_t channelId, const 
 bool HdcDaemon::RemoveInstanceTask(const uint8_t op, HTaskInfo hTask)
 {
     bool ret = true;
+
+    if (!hTask->taskClass) {
+        return ret;
+    }
+
     switch (hTask->taskType) {
         case TYPE_UNITY:
             ret = DoTaskRemove<HdcDaemonUnity>(hTask, op);
