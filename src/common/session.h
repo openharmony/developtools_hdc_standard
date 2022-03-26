@@ -89,7 +89,7 @@ public:
     int OnRead(HSession hSession, uint8_t *bufPtr, const int bufLen);
     int Send(const uint32_t sessionId, const uint32_t channelId, const uint16_t commandFlag, const uint8_t *data,
              const int dataSize);
-    int SendByProtocol(HSession hSession, uint8_t *bufPtr, const int bufLen);
+    int SendByProtocol(HSession hSession, uint8_t *bufPtr, const int bufLen, bool echo = false);
     virtual HSession AdminSession(const uint8_t op, const uint32_t sessionId, HSession hInput);
     virtual int FetchIOBuf(HSession hSession, uint8_t *ioBuf, int read);
     virtual void PushAsyncMessage(const uint32_t sessionId, const uint8_t method, const void *data, const int dataSize);
