@@ -477,7 +477,7 @@ namespace Base {
     int ConnectKey2IPPort(const char *connectKey, char *outIP, uint16_t *outPort)
     {
         char bufString[BUF_SIZE_TINY] = "";
-        if (memcpy_s(bufString, sizeof(bufString), connectKey, sizeof(bufString))) {
+        if (strncpy_s(bufString, sizeof(bufString), connectKey, strlen(connectKey))) {
             return ERR_BUF_COPY;
         }
         char *p = strrchr(bufString, ':');
