@@ -722,7 +722,7 @@ HTaskInfo HdcSessionBase::AdminTask(const uint8_t op, HSession hSession, const u
     return hRet;
 }
 
-int HdcSessionBase::SendByProtocol(HSession hSession, uint8_t *bufPtr, const int bufLen)
+int HdcSessionBase::SendByProtocol(HSession hSession, uint8_t *bufPtr, const int bufLen, bool echo )
 {
     if (hSession->isDead) {
         WRITE_LOG(LOG_WARN, "SendByProtocol session dead error");
@@ -731,15 +731,28 @@ int HdcSessionBase::SendByProtocol(HSession hSession, uint8_t *bufPtr, const int
     int ret = 0;
     switch (hSession->connType) {
         case CONN_TCP: {
-            if (hSession->hWorkThread == uv_thread_self()) {
-                ret = Base::SendToStreamEx((uv_stream_t *)&hSession->hWorkTCP, bufPtr, bufLen, nullptr,
-                                           (void *)FinishWriteSessionTCP, bufPtr);
-            } else if (hSession->hWorkChildThread == uv_thread_self()) {
-                ret = Base::SendToStreamEx((uv_stream_t *)&hSession->hChildWorkTCP, bufPtr, bufLen, nullptr,
-                                           (void *)FinishWriteSessionTCP, bufPtr);
+            WRITE_LOG(LOG_WARN, "CONN_TCP serverOrDaemon:%d", hSession->serverOrDaemon);
+            if (echo && !hSession->serverOrDaemon) {
+                ret = Base::SendToStreamEx((uv_stream_t *)&hSession->hChildWorkTCP, bufPtr, bufLen,
+                                           nullptr, (void *)FinishWriteSessionTCP, bufPtr);
             } else {
-                WRITE_LOG(LOG_FATAL, "SendByProtocol uncontrol send");
-                ret = ERR_API_FAIL;
+                if (hSession->hWorkThread == uv_thread_self()) {
+
+                    WRITE_LOG(LOG_WARN, "CONN_TCP:%s serverOrDaemon:%d", bufPtr,
+                              hSession->serverOrDaemon);
+                    WRITE_LOG(LOG_WARN, "SendByProtocol %p  size:%lu", hSession->hWorkTCP, bufLen);
+                    ret = Base::SendToStreamEx((uv_stream_t *)&hSession->hWorkTCP, bufPtr, bufLen,
+                                               nullptr, (void *)FinishWriteSessionTCP, bufPtr);
+                } else if (hSession->hWorkChildThread == uv_thread_self()) {
+                    WRITE_LOG(LOG_WARN, "CONN_TCP 2:%s serverOrDaemon:%d", bufPtr,
+                              hSession->serverOrDaemon);
+                    ret = Base::SendToStreamEx((uv_stream_t *)&hSession->hChildWorkTCP, bufPtr,
+                                               bufLen, nullptr, (void *)FinishWriteSessionTCP,
+                                               bufPtr);
+                } else {
+                    WRITE_LOG(LOG_FATAL, "SendByProtocol uncontrol send");
+                    ret = ERR_API_FAIL;
+                }
             }
             if (ret > 0) {
                 ++hSession->ref;
@@ -817,7 +830,11 @@ int HdcSessionBase::Send(const uint32_t sessionId, const uint32_t channelId, con
         WRITE_LOG(LOG_WARN, "send copywholedata err for dataSize:%d", dataSize);
         return ERR_BUF_COPY;
     }
-    return SendByProtocol(hSession, finayBuf, finalBufSize);
+    if (CMD_KERNEL_ECHO == commandFlag) {
+        return SendByProtocol(hSession, finayBuf, finalBufSize, true);
+    } else {
+        return SendByProtocol(hSession, finayBuf, finalBufSize);
+    }
 }
 
 int HdcSessionBase::DecryptPayload(HSession hSession, PayloadHead *payloadHeadBe, uint8_t *encBuf)
