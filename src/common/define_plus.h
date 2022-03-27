@@ -398,6 +398,7 @@ struct HdcSession {
         classInstance = nullptr;
         classModule = nullptr;
         bufSize = 0;
+        ioBuf = nullptr;
         availTailIndex = 0;
         listKey = nullptr;
         authKeyIndex = 0;

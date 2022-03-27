@@ -154,7 +154,7 @@ void HdcForwardBase::FreeJDWP(HCtxForward ctx)
 
 void HdcForwardBase::FreeContext(HCtxForward ctxIn, const uint32_t id, bool bNotifyRemote)
 {
-    WRITE_LOG(LOG_DEBUG, "FreeContext bNotifyRemote:%d %p", bNotifyRemote, ctxIn);
+    WRITE_LOG(LOG_DEBUG, "FreeContext bNotifyRemote:%d", bNotifyRemote);
     HCtxForward ctx = nullptr;
     if (!ctxIn) {
         if (!(ctx = (HCtxForward)AdminContext(OP_QUERY, id, nullptr))) {

@@ -26,13 +26,15 @@ HdcTaskBase::HdcTaskBase(HTaskInfo hTaskInfo)
     childReady = false;
     singalStop = false;
     refCount = 0;
-    if (taskInfo->masterSlave)
+    if (taskInfo->masterSlave) {
         SendToAnother(CMD_KERNEL_WAKEUP_SLAVETASK, nullptr, 0);
+    }
+    WRITE_LOG(LOG_DEBUG, "HdcTaskBase channelId:%u", taskInfo->channelId);
 }
 
 HdcTaskBase::~HdcTaskBase()
 {
-    WRITE_LOG(LOG_DEBUG, "~HdcTaskBase");
+    WRITE_LOG(LOG_DEBUG, "~HdcTaskBase channelId:%u", taskInfo->channelId);
 }
 
 bool HdcTaskBase::ReadyForRelease()

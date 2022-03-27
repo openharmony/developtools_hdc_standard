@@ -384,6 +384,7 @@ void HdcServer::NotifyInstanceSessionFree(HSession hSession, bool freeOrClear)
         diNew.connStatus = STATUS_OFFLINE;
         HDaemonInfo hdiNew = &diNew;
         AdminDaemonMap(OP_UPDATE, hSession->connectKey, hdiNew);
+        CleanForwardMap(hSession->sessionId);
     } else {  // step2
         string usbMountPoint = hdiOld->usbMountPoint;
         // The waiting time must be longer than DEVICE_CHECK_INTERVAL. Wait the method WatchUsbNodeChange
@@ -633,6 +634,24 @@ string HdcServer::AdminForwardMap(uint8_t opType, const string &taskString, HFor
             break;
     }
     return sRet;
+}
+
+void HdcServer::CleanForwardMap(uint32_t sessionId)
+{
+    uv_rwlock_rdlock(&forwardAdmin);
+    map<string, HForwardInfo>::iterator iter;
+    for (iter = mapForward.begin(); iter != mapForward.end();) {
+        HForwardInfo di = iter->second;
+        if (!di) {
+            continue;
+        }
+        if (sessionId == 0 || sessionId == di->sessionId) {
+            iter = mapForward.erase(iter);
+        } else {
+            iter++;
+        }
+    }
+    uv_rwlock_rdunlock(&forwardAdmin);
 }
 
 void HdcServer::UsbPreConnect(uv_timer_t *handle)
