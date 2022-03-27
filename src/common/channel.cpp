@@ -335,6 +335,7 @@ uint32_t HdcChannelBase::MallocChannel(HChannel *hOutChannel)
     hChannel->hWorkTCP.data = hChannel;
     hChannel->clsChannel = this;
     hChannel->channelId = channelId;
+    (void)memset_s(&hChannel->hChildWorkTCP, sizeof(hChannel->hChildWorkTCP), 0, sizeof(uv_tcp_t));
     AdminChannel(OP_ADD, channelId, hChannel);
     *hOutChannel = hChannel;
     WRITE_LOG(LOG_DEBUG, "Mallocchannel:%u", channelId);
