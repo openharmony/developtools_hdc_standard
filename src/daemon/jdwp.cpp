@@ -54,11 +54,13 @@ void HdcJdwp::Stop()
         --thisClass->refCount;
     };
     Base::TryCloseHandle((const uv_handle_t *)&listenPipe, funcListenPipeClose);
+    freeContextMutex.lock();
     for (auto &&obj : mapCtxJdwp) {
         HCtxJdwp v = obj.second;
         FreeContext(v);
     }
     AdminContext(OP_CLEAR, 0, nullptr);
+    freeContextMutex.unlock();
 }
 
 void *HdcJdwp::MallocContext()
@@ -162,7 +164,9 @@ void HdcJdwp::ReadStream(uv_stream_t *pipe, ssize_t nread, const uv_buf_t *buf)
     Base::ZeroArray(ctxJdwp->buf);
     if (!ret) {
         WRITE_LOG(LOG_INFO, "ReadStream proc:%d err, free it.", ctxJdwp->pid);
+        thisClass->freeContextMutex.lock();
         thisClass->FreeContext(ctxJdwp);
+        thisClass->freeContextMutex.unlock();
     }
 }
 
@@ -191,7 +195,9 @@ void HdcJdwp::AcceptClient(uv_stream_t *server, int status)
     uv_pipe_init(thisClass->loop, &ctxJdwp->pipe, 1);
     if (uv_accept(server, (uv_stream_t *)&ctxJdwp->pipe) < 0) {
         WRITE_LOG(LOG_DEBUG, "uv_accept failed");
+        thisClass->freeContextMutex.lock();
         thisClass->FreeContext(ctxJdwp);
+        thisClass->freeContextMutex.unlock();
         return;
     }
     auto funAlloc = [](uv_handle_t *handle, size_t sizeSuggested, uv_buf_t *buf) -> void {
@@ -508,12 +514,14 @@ void *HdcJdwp::FdEventPollThread(void *args)
                 auto it = thisClass->pollNodeMap.find(pollfdsing.fd);
                 if (it != thisClass->pollNodeMap.end()) {
                     uint32_t targetPID = it->second.ppid;
+                    thisClass->freeContextMutex.lock();
                     HCtxJdwp ctx = static_cast<HCtxJdwp>(thisClass->AdminContext(OP_QUERY, targetPID, nullptr));
                     if (ctx != nullptr) {
                         WRITE_LOG(LOG_INFO, "FreeContext for targetPID :%d", targetPID);
                         uv_read_stop((uv_stream_t *)&ctx->pipe);
                         thisClass->FreeContext(ctx);
                     }
+                    thisClass->freeContextMutex.unlock();
                 }
                 thisClass->freeContextMutex.unlock();
             } else if (pollfdsing.revents & POLLIN) {
