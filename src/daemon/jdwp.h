@@ -99,6 +99,7 @@ private:
     std::unordered_map<int, PollNode> pollNodeMap;  // fd, PollNode
     std::vector<HTaskInfo> jdwpTrackers;
     bool stop;
+    std::mutex freeContextMutex;
 };
 } // namespace Hdc
 #endif
