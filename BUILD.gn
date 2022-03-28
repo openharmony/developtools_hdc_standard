@@ -91,7 +91,7 @@ ohos_executable("hdcd") {
 
   include_dirs = [
     "${HDC_PATH}/daemon",
-    "//utils/native/base/include",
+    "//third_party/bounds_checking_function/include",
     "//third_party/lz4/lib",
     "//third_party/openssl/include",
     "//third_party/libuv",
@@ -140,16 +140,16 @@ ohos_executable("hdc_std") {
   }
 
   deps = [
+    "//third_party/bounds_checking_function:libsec_static",
     "//third_party/libusb:libusb",
     "//third_party/libuv:uv_static",
     "//third_party/lz4:liblz4_static",
     "//third_party/openssl:libcrypto_static",
-    "//utils/native/base:utilsecurec",
   ]
 
   include_dirs = [
     "${HDC_PATH}/daemon",
-    "//utils/native/base/include",
+    "//third_party/bounds_checking_function/include",
     "//third_party/lz4/lib",
     "//third_party/openssl/include",
     "//third_party/libuv",
