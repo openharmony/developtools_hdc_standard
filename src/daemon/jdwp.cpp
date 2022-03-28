@@ -518,7 +518,6 @@ void *HdcJdwp::FdEventPollThread(void *args)
                     HCtxJdwp ctx = static_cast<HCtxJdwp>(thisClass->AdminContext(OP_QUERY, targetPID, nullptr));
                     if (ctx != nullptr) {
                         WRITE_LOG(LOG_INFO, "FreeContext for targetPID :%d", targetPID);
-                        uv_read_stop((uv_stream_t *)&ctx->pipe);
                         thisClass->FreeContext(ctx);
                     }
                     thisClass->freeContextMutex.unlock();
