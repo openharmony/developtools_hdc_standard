@@ -152,7 +152,9 @@ void HdcJdwp::ReadStream(uv_stream_t *pipe, ssize_t nread, const uv_buf_t *buf)
             if (uv_fileno(reinterpret_cast<uv_handle_t *>(&(ctxJdwp->pipe)), &fd) < 0) {
                 WRITE_LOG(LOG_DEBUG, "HdcJdwp::ReadStream uv_fileno fail.");
             } else {
+                thisClass->freeContextMutex.lock();
                 thisClass->pollNodeMap.emplace(fd, PollNode(fd, pid));
+                thisClass->freeContextMutex.unlock();
                 thisClass->WakePollThread();
             }
         }
@@ -482,6 +484,7 @@ void *HdcJdwp::FdEventPollThread(void *args)
     std::vector<struct pollfd> pollfds;
     size_t size = 0;
     while (!thisClass->stop) {
+        thisClass->freeContextMutex.lock();
         if (size != thisClass->pollNodeMap.size() || thisClass->pollNodeMap.size() == 0) {
             pollfds.clear();
             struct pollfd pollFd;
@@ -497,9 +500,11 @@ void *HdcJdwp::FdEventPollThread(void *args)
             pollfds.push_back(pollFd);
             size = pollfds.size();
         }
+        thisClass->freeContextMutex.unlock();
         poll(&pollfds[0], size, -1);
         for (const auto &pollfdsing : pollfds) {
             if (pollfdsing.revents & (POLLNVAL | POLLRDHUP | POLLHUP | POLLERR)) {  // POLLNVAL:fd not open
+                thisClass->freeContextMutex.lock();
                 auto it = thisClass->pollNodeMap.find(pollfdsing.fd);
                 if (it != thisClass->pollNodeMap.end()) {
                     uint32_t targetPID = it->second.ppid;
@@ -510,6 +515,7 @@ void *HdcJdwp::FdEventPollThread(void *args)
                         thisClass->FreeContext(ctx);
                     }
                 }
+                thisClass->freeContextMutex.unlock();
             } else if (pollfdsing.revents & POLLIN) {
                 if (pollfdsing.fd == thisClass->awakenPollFd) {
                     thisClass->DrainAwakenPollThread();
@@ -543,7 +549,9 @@ int HdcJdwp::CreateFdEventPoll()
 // jdb -connect com.sun.jdi.SocketAttach:hostname=localhost,port=8000
 int HdcJdwp::Initial()
 {
+    freeContextMutex.lock();
     pollNodeMap.clear();
+    freeContextMutex.unlock();
     if (!JdwpListen()) {
         return ERR_MODULE_JDWP_FAILED;
     }
