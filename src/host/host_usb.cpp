@@ -259,7 +259,7 @@ int HdcHostUSB::CheckActiveConfig(libusb_device *device, HUSB hUSB)
     unsigned int j = 0;
     int ret = -1;
     struct libusb_config_descriptor *descConfig = nullptr;
-    ret = libusb_get_active_config_descriptor(device, &descConfig);
+    ret = libusb_get_config_descriptor(device, &descConfig);
     if (ret != 0) {
         WRITE_LOG(LOG_WARN, "CheckActiveConfig failed descConfig ret:%d", ret);
         return -1;
