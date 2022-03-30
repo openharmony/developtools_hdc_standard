@@ -166,6 +166,9 @@ protected:
     template<class T> bool DoTaskRemove(HTaskInfo hTaskInfo, const uint8_t op)
     {
         T *ptrTask = (T *)hTaskInfo->taskClass;
+        if (ptrTask == nullptr) {
+            return true;
+        }
         if (OP_CLEAR == op) {
             ptrTask->StopTask();
         } else if (OP_REMOVE == op) {
