@@ -256,8 +256,16 @@ bool HdcHostUSB::IsDebuggableDev(const struct libusb_interface_descriptor *ifDes
 
 int HdcHostUSB::CheckActiveConfig(libusb_device *device, HUSB hUSB)
 {
+    int configuration = 0;
+    int ret = libusb_get_configuration(hUSB->devHandle, &configuration);
+    if (ret != 0) {
+        ret = libusb_set_configuration(hUSB->devHandle, 1);
+        if (ret != 0) {
+            WRITE_LOG(LOG_WARN, "set config failed ret:%d", ret);
+            return -1;
+        }
+    }
     unsigned int j = 0;
-    int ret = -1;
     struct libusb_config_descriptor *descConfig = nullptr;
     ret = libusb_get_active_config_descriptor(device, &descConfig);
     if (ret != 0) {
