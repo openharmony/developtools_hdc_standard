@@ -498,12 +498,16 @@ int HdcHostUSB::OpenDeviceMyNeed(HUSB hUSB)
             break;
         }
         // USB filter rules are set according to specific device pedding device
-        libusb_claim_interface(handle, hUSB->interfaceNumber);
-        ret = 0;
+        ret = libusb_claim_interface(handle, hUSB->interfaceNumber);
         break;
     }
     if (ret) {
-        // not my need device
+        // not my need device, release the device
+        int configuration = 0;
+        libusb_get_configuration(hUSB->devHandle, &configuration);
+        if (configuration == 1) {
+            libusb_set_configuration(hUSB->devHandle, 0);
+        }
         libusb_close(hUSB->devHandle);
         hUSB->devHandle = nullptr;
     }
