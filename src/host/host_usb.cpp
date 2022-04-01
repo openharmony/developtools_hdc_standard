@@ -272,6 +272,7 @@ int HdcHostUSB::CheckActiveConfig(libusb_device *device, HUSB hUSB)
         WRITE_LOG(LOG_WARN, "CheckActiveConfig failed descConfig ret:%d", ret);
         return -1;
     }
+    ret = -1;
     for (j = 0; j < descConfig->bNumInterfaces; ++j) {
         const struct libusb_interface *interface = &descConfig->interface[j];
         if (interface->num_altsetting >= 1) {
