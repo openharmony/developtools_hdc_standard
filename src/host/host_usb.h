@@ -22,6 +22,7 @@ public:
     HdcHostUSB(const bool serverOrDaemonIn, void *ptrMainBase, void *ctxUSBin);
     virtual ~HdcHostUSB();
     int Initial();
+    void InitLogging(void *ctxUSB);
     int SendUSBRaw(HSession hSession, uint8_t *data, const int length);
     HSession ConnectDetectDaemon(const HSession hSession, const HDaemonInfo pdi);
     void Stop();

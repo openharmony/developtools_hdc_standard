@@ -27,7 +27,8 @@ enum LogLevel {
     LOG_INFO,  // default
     LOG_DEBUG,
     LOG_ALL,
-    LOG_LAST = LOG_ALL,  // tail, not use
+    LOG_VERBOSE,
+    LOG_LAST = LOG_VERBOSE,  // tail, not use
 };
 #define WRITE_LOG(x, y...) Base::PrintLogEx(__FILE__, __LINE__, x, y)
 
