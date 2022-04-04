@@ -207,6 +207,7 @@ void HdcClient::CommandWorker(uv_timer_t *handle)
         uv_timer_stop(handle);
         uv_stop(thisClass->loopMain);
         WRITE_LOG(LOG_DEBUG, "Connect server failed");
+        fprintf(stderr, "Connect server failed\n");
         return;
     }
     if (!thisClass->channel->handshakeOK) {

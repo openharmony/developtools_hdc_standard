@@ -23,7 +23,9 @@ constexpr uint8_t GLOBAL_TIMEOUT = 30;
 constexpr uint16_t DEFAULT_PORT = 8710;
 constexpr bool ENABLE_IO_CHECKSUM = false;
 const string IPV4_MAPPING_PREFIX = "::ffff:";
+const string DEFAULT_SERVER_ADDR_IP = "::ffff:127.0.0.1";
 const string DEFAULT_SERVER_ADDR = "::ffff:127.0.0.1:8710";
+const string ENV_SERVER_PORT = "OHOS_HDC_SERVER_PORT";
 
 // ################################ macro define ###################################
 constexpr uint8_t MINOR_TIMEOUT = 5;
