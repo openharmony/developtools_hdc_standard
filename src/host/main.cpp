@@ -31,7 +31,7 @@ bool g_isTCPorUSB = false;
 bool g_isCustomLoglevel = false;
 int g_isTestMethod = 0;
 string g_connectKey = "";
-string g_serverListenString = DEFAULT_SERVER_ADDR;
+string g_serverListenString = "";
 
 namespace Hdc {
 // return value: 0 == not command, 1 == one command, 2 == double command
@@ -187,7 +187,7 @@ int RunClientMode(string &commands, string &serverListenString, string &connectK
 
 bool ParseServerListenString(string &serverListenString, char *optarg)
 {
-    if (strlen(optarg) > 24) {
+    if (strlen(optarg) > strlen("0000::0000:0000:0000:0000:65535")) {
         Base::PrintMessage("Unknown content of parament '-s'");
         return false;
     }
@@ -315,6 +315,28 @@ bool GetCommandlineOptions(int optArgc, const char *optArgv[])
     }
     return needExit;
 }
+
+void InitServerAddr(void)
+{
+    int port;
+    do {
+        char *env = getenv(ENV_SERVER_PORT.c_str());
+        if (!env) {
+            port = DEFAULT_PORT;
+            break;
+        }
+
+        port = atoi(env);
+        if (port <= 0) {
+            port = DEFAULT_PORT;
+        }
+    } while (0);
+
+    g_serverListenString = DEFAULT_SERVER_ADDR_IP;
+    g_serverListenString += ":";
+    g_serverListenString += std::to_string(port);
+}
+
 }
 
 #ifndef UNIT_TEST
@@ -327,7 +349,10 @@ int main(int argc, const char *argv[])
     Hdc::SplitOptionAndCommand(argc, argv, options, commands);
     int optArgc = 0;
     char **optArgv = Base::SplitCommandToArgs(options.c_str(), &optArgc);
-    bool cmdOptionResult = GetCommandlineOptions(optArgc, (const char **)optArgv);
+    bool cmdOptionResult;
+
+    InitServerAddr();
+    cmdOptionResult = GetCommandlineOptions(optArgc, (const char **)optArgv);
     delete[]((char *)optArgv);
     if (cmdOptionResult) {
         return 0;
