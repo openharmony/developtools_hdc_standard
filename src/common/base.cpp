@@ -110,7 +110,7 @@ namespace Base {
         string msTimeSurplus;
         if (g_logLevel >= LOG_DEBUG) {
             const auto sSinceUnix0Rest = duration_cast<milliseconds>(sinceUnix0).count() % TIME_BASE;
-            msTimeSurplus = StringFormat(".%06llu", sSinceUnix0Rest);
+            msTimeSurplus = StringFormat(".%03llu", sSinceUnix0Rest);
         }
         timeString = msTimeSurplus;
         if (tim != nullptr) {
