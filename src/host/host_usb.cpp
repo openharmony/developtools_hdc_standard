@@ -256,14 +256,23 @@ bool HdcHostUSB::IsDebuggableDev(const struct libusb_interface_descriptor *ifDes
 
 int HdcHostUSB::CheckActiveConfig(libusb_device *device, HUSB hUSB)
 {
+    int configuration = 0;
+    int ret = libusb_get_configuration(hUSB->devHandle, &configuration);
+    if (ret != 0) {
+        ret = libusb_set_configuration(hUSB->devHandle, 1);
+        if (ret != 0) {
+            WRITE_LOG(LOG_WARN, "set config failed ret:%d", ret);
+            return -1;
+        }
+    }
     unsigned int j = 0;
-    int ret = -1;
     struct libusb_config_descriptor *descConfig = nullptr;
     ret = libusb_get_active_config_descriptor(device, &descConfig);
     if (ret != 0) {
         WRITE_LOG(LOG_WARN, "CheckActiveConfig failed descConfig ret:%d", ret);
         return -1;
     }
+    ret = -1;
     for (j = 0; j < descConfig->bNumInterfaces; ++j) {
         const struct libusb_interface *interface = &descConfig->interface[j];
         if (interface->num_altsetting >= 1) {
@@ -490,12 +499,16 @@ int HdcHostUSB::OpenDeviceMyNeed(HUSB hUSB)
             break;
         }
         // USB filter rules are set according to specific device pedding device
-        libusb_claim_interface(handle, hUSB->interfaceNumber);
-        ret = 0;
+        ret = libusb_claim_interface(handle, hUSB->interfaceNumber);
         break;
     }
     if (ret) {
-        // not my need device
+        // not my need device, release the device
+        int configuration = 0;
+        libusb_get_configuration(hUSB->devHandle, &configuration);
+        if (configuration == 1) {
+            libusb_set_configuration(hUSB->devHandle, 0);
+        }
         libusb_close(hUSB->devHandle);
         hUSB->devHandle = nullptr;
     }
