@@ -688,7 +688,7 @@ namespace Base {
         if (byteIO != readMax) {
             char buffer[BUF_SIZE_DEFAULT] = { 0 };
             uv_strerror_r((int)req.result, buffer, BUF_SIZE_DEFAULT);
-            WRITE_LOG(LOG_FATAL,"ReadBinFile uv_fs_read %s error %s byteIO:%llu readMax:%llu",
+            WRITE_LOG(LOG_FATAL, "ReadBinFile uv_fs_read %s error %s byteIO:%llu readMax:%llu",
                 resolvedPath.c_str(), buffer, byteIO, readMax);
             goto ReadFileFromPath_Finish;
         }
