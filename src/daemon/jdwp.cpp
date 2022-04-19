@@ -81,8 +81,9 @@ void HdcJdwp::FreeContext(HCtxJdwp ctx)
     if (ctx->finish) {
         return;
     }
-    Base::TryCloseHandle((const uv_handle_t *)&ctx->pipe);
     ctx->finish = true;
+    WRITE_LOG(LOG_INFO, "FreeContext for targetPID :%d", ctx->pid);
+    Base::TryCloseHandle((const uv_handle_t *)&ctx->pipe);
     AdminContext(OP_REMOVE, ctx->pid, nullptr);
     auto funcReqClose = [](uv_idle_t *handle) -> void {
         HCtxJdwp ctx = (HCtxJdwp)handle->data;
@@ -516,8 +517,7 @@ void *HdcJdwp::FdEventPollThread(void *args)
                     uint32_t targetPID = it->second.ppid;
                     HCtxJdwp ctx = static_cast<HCtxJdwp>(thisClass->AdminContext(OP_QUERY, targetPID, nullptr));
                     if (ctx != nullptr) {
-                        WRITE_LOG(LOG_INFO, "FreeContext for targetPID :%d", targetPID);
-                        thisClass->FreeContext(ctx);
+                        thisClass->AdminContext(OP_REMOVE, targetPID, nullptr);
                     }
                 }
                 thisClass->freeContextMutex.unlock();
