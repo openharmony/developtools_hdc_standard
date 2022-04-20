@@ -26,7 +26,7 @@ namespace Base {
     // tcpHandle can't be const as it's passed into uv_tcp_keepalive
     void SetTcpOptions(uv_tcp_t *tcpHandle);
     // Realloc need to update origBuf&origSize which can't be const
-    void ReallocBuf(uint8_t **origBuf, int *nOrigSize, int sizeWanted);
+    void ReallocBuf(uint8_t **origBuf, int *nOrigSize, size_t sizeWanted);
     // handle&sendHandle must keep sync with uv_write
     int SendToStreamEx(uv_stream_t *handleStream, const uint8_t *buf, const int bufLen, uv_stream_t *handleSend,
                        const void *finishCallback, const void *pWriteReqData);
@@ -53,8 +53,8 @@ namespace Base {
     char **SplitCommandToArgs(const char *cmdStringLine, int *slotIndex);
     bool RunPipeComand(const char *cmdString, char *outBuf, uint16_t sizeOutBuf, bool ignoreTailLF);
     // results need to save in buf which can't be const
-    int ReadBinFile(const char *pathName, void **buf, const int bufLen);
-    int WriteBinFile(const char *pathName, const uint8_t *buf, const int bufLen, bool newFile = false);
+    int ReadBinFile(const char *pathName, void **buf, const size_t bufLen);
+    int WriteBinFile(const char *pathName, const uint8_t *buf, const size_t bufLen, bool newFile = false);
     void CloseIdleCallback(uv_handle_t *handle);
     void CloseTimerCallback(uv_handle_t *handle);
     int ProgramMutex(const char *procname, bool checkOrNew);
