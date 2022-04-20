@@ -127,22 +127,32 @@ namespace Base {
         // make a log path print.
         static std::once_flag firstLog;
         std::call_once(firstLog, [&]() { printf("log at %s\n", path); });
-#endif
-#ifdef HDC_DEBUG_UART
         // better than open log file every time.
         static std::unique_ptr<FILE, decltype(&fclose)> file(fopen(path, "w"), &fclose);
         FILE *fp = file.get();
-#else
-        FILE *fp = fopen(path, "a");
-#endif
         if (fp == nullptr) {
             return;
         }
         if (fprintf(fp, "%s", str) > 0 && fflush(fp)) {
             // make ci happy
         }
-#ifndef HDC_DEBUG_UART
         fclose(fp);
+#else
+        int flags = UV_FS_O_RDWR | UV_FS_O_APPEND | UV_FS_O_CREAT;
+        uv_fs_t req;
+        int fd = uv_fs_open(nullptr, &req, path, flags, S_IWUSR | S_IRUSR, nullptr);
+        if (fd < 0) {
+            char buffer[BUF_SIZE_DEFAULT] = { 0 };
+            uv_strerror_r((int)req.result, buffer, BUF_SIZE_DEFAULT);
+            uv_fs_req_cleanup(&req);
+            PrintMessage("LogToPath uv_fs_open %s error %s", path, buffer);
+            return;
+        }
+        string text(str);
+        uv_buf_t wbf = uv_buf_init((char *)str, text.size());
+        uv_fs_req_cleanup(&req);
+        uv_fs_write(nullptr, &req, fd, &wbf, 1, 0, nullptr);
+        uv_fs_close(nullptr, &req, fd, nullptr);
 #endif
     }
 
@@ -272,7 +282,7 @@ namespace Base {
         uv_send_buffer_size((uv_handle_t *)tcpHandle, &bufMaxSize);
     }
 
-    void ReallocBuf(uint8_t **origBuf, int *nOrigSize, int sizeWanted)
+    void ReallocBuf(uint8_t **origBuf, int *nOrigSize, size_t sizeWanted)
     {
         if (*nOrigSize > 0)
             return;
@@ -629,17 +639,21 @@ namespace Base {
     // bufLen == 0: alloc buffer in heap, need free it later
     // >0: read max nBuffLen bytes to *buff
     // ret value: <0 or bytes read
-    int ReadBinFile(const char *pathName, void **buf, const int bufLen)
+    int ReadBinFile(const char *pathName, void **buf, const size_t bufLen)
     {
         uint8_t *pDst = nullptr;
-        int byteIO = 0;
-        struct stat statbuf;
-        int ret = stat(pathName, &statbuf);
+        size_t byteIO = 0;
+        uv_fs_t req;
+        int ret = uv_fs_stat(nullptr, &req, pathName, nullptr);
         if (ret < 0) {
+            char buffer[BUF_SIZE_DEFAULT] = { 0 };
+            uv_strerror_r((int)req.result, buffer, BUF_SIZE_DEFAULT);
+            uv_fs_req_cleanup(&req);
+            WRITE_LOG(LOG_FATAL, "ReadBinFile uv_fs_stat %s error %s", pathName, buffer);
             return -1;
         }
-        int nFileSize = statbuf.st_size;
-        int readMax = 0;
+        size_t nFileSize = req.statbuf.st_size;
+        size_t readMax = 0;
         uint8_t dynamicBuf = 0;
         ret = -3;
         if (bufLen == 0) {
@@ -659,13 +673,23 @@ namespace Base {
 
         string srcPath(pathName);
         string resolvedPath = CanonicalizeSpecPath(srcPath);
-        FILE *fp = fopen(resolvedPath.c_str(), "r");
-        if (fp == nullptr) {
+        uv_buf_t rbf = uv_buf_init((char *)pDst, readMax);
+        uv_fs_req_cleanup(&req);
+        int fd = uv_fs_open(nullptr, &req, resolvedPath.c_str(), O_RDONLY, 0, nullptr);
+        if (fd < 0) {
+            char buffer[BUF_SIZE_DEFAULT] = { 0 };
+            uv_strerror_r((int)req.result, buffer, BUF_SIZE_DEFAULT);
+            WRITE_LOG(LOG_FATAL, "ReadBinFile uv_fs_open %s error %s", resolvedPath.c_str(), buffer);
             goto ReadFileFromPath_Finish;
         }
-        byteIO = fread(pDst, 1, readMax, fp);
-        fclose(fp);
+        uv_fs_req_cleanup(&req);
+        byteIO = uv_fs_read(nullptr, &req, fd, &rbf, 1, 0, nullptr);
+        uv_fs_close(nullptr, nullptr, fd, nullptr);
         if (byteIO != readMax) {
+            char buffer[BUF_SIZE_DEFAULT] = { 0 };
+            uv_strerror_r((int)req.result, buffer, BUF_SIZE_DEFAULT);
+            WRITE_LOG(LOG_FATAL, "ReadBinFile uv_fs_read %s error %s byteIO:%llu readMax:%llu",
+                resolvedPath.c_str(), buffer, byteIO, readMax);
             goto ReadFileFromPath_Finish;
         }
         ret = 0;
@@ -683,31 +707,41 @@ namespace Base {
         return ret;
     }
 
-    int WriteBinFile(const char *pathName, const uint8_t *buf, const int bufLen, bool newFile)
+    int WriteBinFile(const char *pathName, const uint8_t *buf, const size_t bufLen, bool newFile)
     {
-        string mode;
         string resolvedPath;
         string srcPath(pathName);
+        int flags = 0;
         if (newFile) {
-            mode = "wb+";
+            flags = UV_FS_O_RDWR | UV_FS_O_CREAT | UV_FS_O_TRUNC;
             // no std::fs supoort, else std::filesystem::canonical,-lstdc++fs
             if (srcPath.find("..") != string::npos) {
                 return ERR_FILE_PATH_CHECK;
             }
             resolvedPath = srcPath.c_str();
         } else {
-            mode = "a+";
+            flags = UV_FS_O_RDWR | UV_FS_O_CREAT | UV_FS_O_APPEND;
             resolvedPath = CanonicalizeSpecPath(srcPath);
         }
-        FILE *fp = fopen(resolvedPath.c_str(), mode.c_str());
-        if (fp == nullptr) {
-            WRITE_LOG(LOG_DEBUG, "Write to %s failed!", pathName);
+        uv_fs_t req;
+        int fd = uv_fs_open(nullptr, &req, resolvedPath.c_str(), flags, S_IWUSR | S_IRUSR, nullptr);
+        if (fd < 0) {
+            char buffer[BUF_SIZE_DEFAULT] = { 0 };
+            uv_strerror_r((int)req.result, buffer, BUF_SIZE_DEFAULT);
+            uv_fs_req_cleanup(&req);
+            WRITE_LOG(LOG_FATAL, "WriteBinFile uv_fs_open %s error %s", resolvedPath.c_str(), buffer);
             return ERR_FILE_OPEN;
         }
-        int bytesDone = fwrite(buf, 1, bufLen, fp);
-        fflush(fp);
-        fclose(fp);
+        uv_buf_t wbf = uv_buf_init((char *)buf, bufLen);
+        uv_fs_req_cleanup(&req);
+        size_t bytesDone = uv_fs_write(nullptr, &req, fd, &wbf, 1, 0, nullptr);
+        uv_fs_close(nullptr, &req, fd, nullptr);
         if (bytesDone != bufLen) {
+            char buffer[BUF_SIZE_DEFAULT] = { 0 };
+            uv_strerror_r((int)req.result, buffer, BUF_SIZE_DEFAULT);
+            uv_fs_req_cleanup(&req);
+            WRITE_LOG(LOG_FATAL, "WriteBinFile uv_fs_write %s error %s bytesDone:%llu bufLen:%llu",
+                resolvedPath.c_str(), buffer, bytesDone, bufLen);
             return ERR_BUF_SIZE;
         }
         return RET_SUCCESS;
@@ -744,9 +778,13 @@ namespace Base {
         }
         // no need to CanonicalizeSpecPath, else not work
         umask(0);
-        int fd = open(bufPath, O_RDWR | O_CREAT, 0666);  // 0666:permission
+        uv_fs_t req;
+        int fd = uv_fs_open(nullptr, &req, bufPath, O_RDWR | O_CREAT, 0666, nullptr);  // 0666:permission
         if (fd < 0) {
-            WRITE_LOG(LOG_FATAL, "Open mutex file \"%s\" failed!!!Errno:%d\n", buf, errno);
+            char buffer[BUF_SIZE_DEFAULT] = { 0 };
+            uv_strerror_r((int)req.result, buffer, BUF_SIZE_DEFAULT);
+            uv_fs_req_cleanup(&req);
+            WRITE_LOG(LOG_FATAL, "Open mutex file %s failed!!! %s", bufPath, buffer);
             return ERR_FILE_OPEN;
         }
 #ifdef _WIN32
