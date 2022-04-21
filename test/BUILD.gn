@@ -60,7 +60,7 @@ hdc_host_sources = [
 
 common_deps = [
   "//third_party/bounds_checking_function:libsec_static",
-  "//third_party/libusb:libusb",
+  "//third_party/libusb:libusb_source",
   "//third_party/libuv:uv_static",
   "//third_party/lz4:liblz4_static",
   "//third_party/openssl:libcrypto_static",
@@ -97,6 +97,7 @@ config("hdc_common_config") {
     "${hdc_path}/src/daemon",
     "${hdc_path}/src/host",
     "${hdc_path}/test/unittest/common/include",
+    "//third_party/libusb",
     "//third_party/libuv",  # used in common.h
     "//third_party/lz4/lib",  # used in transfer.cpp
     "//base/startup/syspara_lite/interfaces/innerkits/native/syspara/include",
