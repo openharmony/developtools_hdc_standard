@@ -101,6 +101,8 @@ ohos_executable("hdcd") {
     "updater",
   ]
 
+  ldflags = [ "-rdynamic" ]
+
   install_enable = true
   subsystem_name = "developtools"
   part_name = "hdc_standard"
