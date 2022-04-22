@@ -18,7 +18,11 @@
 
 namespace Hdc {
 // ############################## config #######################################
-constexpr uint8_t SIZE_THREAD_POOL = 16;
+#ifndef USE_CONFIG_UV_THREADS
+constexpr size_t SIZE_THREAD_POOL = 16;
+#endif
+constexpr size_t SIZE_THREAD_POOL_MIN = 16;
+constexpr size_t SIZE_THREAD_POOL_MAX = 256;
 constexpr uint8_t GLOBAL_TIMEOUT = 30;
 constexpr uint16_t DEFAULT_PORT = 8710;
 constexpr bool ENABLE_IO_CHECKSUM = false;

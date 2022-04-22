@@ -16,12 +16,18 @@
 #include "serial_struct.h"
 
 namespace Hdc {
-HdcSessionBase::HdcSessionBase(bool serverOrDaemonIn)
+HdcSessionBase::HdcSessionBase(bool serverOrDaemonIn, size_t uvThreadSize)
 {
     // print version pid
     WRITE_LOG(LOG_INFO, "Program running. %s Pid:%u", Base::GetVersion().c_str(), getpid());
     // server/daemon common initialization code
-    threadPoolCount = SIZE_THREAD_POOL;
+    if (uvThreadSize < SIZE_THREAD_POOL_MIN) {
+        uvThreadSize = SIZE_THREAD_POOL_MIN;
+    } else if (uvThreadSize > SIZE_THREAD_POOL_MAX) {
+        uvThreadSize = SIZE_THREAD_POOL_MAX;
+    }
+    threadPoolCount = uvThreadSize;
+    WRITE_LOG(LOG_INFO, "set UV_THREADPOOL_SIZE:%zu", threadPoolCount);
     string uvThreadEnv("UV_THREADPOOL_SIZE");
     string uvThreadVal = std::to_string(threadPoolCount);
 #ifdef _WIN32

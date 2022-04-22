@@ -19,7 +19,11 @@
 namespace Hdc {
 class HdcDaemon : public HdcSessionBase {
 public:
+#ifdef USE_CONFIG_UV_THREADS
+    HdcDaemon(bool serverOrDaemonIn, size_t uvThreadSize = SIZE_THREAD_POOL);
+#else
     HdcDaemon(bool serverOrDaemonIn);
+#endif
     virtual ~HdcDaemon();
 #ifdef HDC_SUPPORT_UART
     void InitMod(bool bEnableTCP, bool bEnableUSB, bool bEnableUART);

@@ -15,6 +15,12 @@ import("//build/ohos.gni")
 HDC_PATH = "//developtools/hdc_standard"
 import("//developtools/hdc_standard/hdc.gni")
 
+declare_args() {
+  # suggestion: uv threads number from 16 - 256
+  hdcd_uv_thread_size = 16
+  hdc_uv_thread_size = 128
+}
+
 hdc_common_sources = [
   "${HDC_PATH}/src/common/async_cmd.cpp",
   "${HDC_PATH}/src/common/auth.cpp",
@@ -58,7 +64,11 @@ ohos_executable("hdcd") {
   ]
   sources += hdc_common_sources
 
-  defines = [ "HARMONY_PROJECT" ]
+  defines = [
+    "HARMONY_PROJECT",
+    "USE_CONFIG_UV_THREADS",
+    "SIZE_THREAD_POOL=$hdcd_uv_thread_size",
+  ]
 
   if (hdc_debug) {
     defines += [ "HDC_DEBUG" ]
@@ -116,6 +126,8 @@ ohos_executable("hdc_std") {
   defines = [
     "HDC_HOST",
     "HARMONY_PROJECT",
+    "USE_CONFIG_UV_THREADS",
+    "SIZE_THREAD_POOL=$hdc_uv_thread_size",
   ]
   if (is_mac) {
     defines += [ "HOST_MAC" ]
