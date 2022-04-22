@@ -79,6 +79,20 @@ bool ForkChildCheck(int argc, const char *argv[])
     return true;
 }
 
+size_t CheckUvThreadConfig()
+{
+    string nThreadsString;
+    bool ret = SystemDepend::GetDevItem("persist.hdc.uv.threads", nThreadsString);
+    if (!ret) {
+        return SIZE_THREAD_POOL;
+    }
+    size_t nThreads = atoi(nThreadsString.c_str());
+    if (nThreads <= 0) {
+        nThreads = SIZE_THREAD_POOL;
+    }
+    return nThreads;
+}
+
 int BackgroundRun()
 {
     pid_t pc = fork();  // create process as daemon process
@@ -209,12 +223,14 @@ int main(int argc, const char *argv[])
         return BackgroundRun();
     }
     NeedDropPriv();
+
     umask(0);
     signal(SIGPIPE, SIG_IGN);
     signal(SIGCHLD, SIG_IGN);
     signal(SIGALRM, SIG_IGN);
     WRITE_LOG(LOG_DEBUG, "HdcDaemon main run");
-    HdcDaemon daemon(false);
+    HdcDaemon daemon(false, CheckUvThreadConfig());
+
 #ifdef HDC_SUPPORT_UART
     daemon.InitMod(g_enableTcp, g_enableUsb, g_enableUart);
 #else
