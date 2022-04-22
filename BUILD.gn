@@ -220,7 +220,5 @@ group("hdc_all") {
   testonly = true
   deps = [
     ":hdc_target_standard_all",
-    "test:HdcJdwpTest",
-    "test:hdc_unittest",
   ]
 }
