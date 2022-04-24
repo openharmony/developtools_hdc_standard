@@ -17,8 +17,13 @@
 #include <openssl/sha.h>
 
 namespace Hdc {
+#ifdef USE_CONFIG_UV_THREADS
+HdcDaemon::HdcDaemon(bool serverOrDaemonIn, size_t uvThreadSize)
+    : HdcSessionBase(serverOrDaemonIn, uvThreadSize)
+#else
 HdcDaemon::HdcDaemon(bool serverOrDaemonIn)
-    : HdcSessionBase(serverOrDaemonIn)
+    : HdcSessionBase(serverOrDaemonIn, -1)
+#endif
 {
     clsTCPServ = nullptr;
     clsUSBServ = nullptr;

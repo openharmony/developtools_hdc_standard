@@ -46,15 +46,14 @@ namespace SystemDepend {
         return ret;
     }
 
-    bool GetDevItem(const char *key, string &out, string preDefine)
+    bool GetDevItem(const char *key, string &out, const char *preDefine)
     {
         bool ret = true;
         char tmpStringBuf[BUF_SIZE_MEDIUM] = "";
 #ifdef HARMONY_PROJECT
-        const string strKey(key);
-        if (GetParameter(key, preDefine.c_str(), tmpStringBuf, BUF_SIZE_MEDIUM) < 0) {
-            ret = false;
-            Base::ZeroStruct(tmpStringBuf);
+        auto res = GetParameter(key, preDefine, tmpStringBuf, BUF_SIZE_MEDIUM);
+        if (res <= 0) {
+            return false;
         }
 #else
         string sFailString = Base::StringFormat("Get parameter \"%s\" fail", key);
