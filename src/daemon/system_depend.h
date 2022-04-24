@@ -29,7 +29,7 @@ namespace SystemDepend {
         return false;
     };
 #else
-    bool GetDevItem(const char *key, string &out, string preDefine = "");
+    bool GetDevItem(const char *key, string &out, const char *preDefine = nullptr);
     bool SetDevItem(const char *key, const char *value);
 #endif
     bool RebootDevice(const string &cmd);

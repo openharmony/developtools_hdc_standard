@@ -55,7 +55,7 @@ public:
         uint8_t vCode;
     };
 
-    HdcSessionBase(bool serverOrDaemonIn);
+    HdcSessionBase(bool serverOrDaemonIn, size_t uvThreadSize = SIZE_THREAD_POOL);
     virtual ~HdcSessionBase();
     virtual void AttachChannel(HSession hSession, const uint32_t channelId)
     {
