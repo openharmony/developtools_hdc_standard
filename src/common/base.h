@@ -64,6 +64,7 @@ namespace Base {
     uint64_t HostToNet(uint64_t val);
     uint64_t NetToHost(uint64_t val);
     string GetFullFilePath(const string &s);
+    string GetPathWithoutFilename(const string &s);
     int CreateSocketPair(int *fds);
     void CloseSocketPair(const int *fds);
     int StringEndsWith(string s, string sub);
