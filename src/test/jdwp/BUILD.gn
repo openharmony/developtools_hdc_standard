@@ -31,9 +31,5 @@ ohos_executable("jdwp_test") {
   ]
   install_enable = true
   subsystem_name = "developtools"
-  part_name = "hdc_standard"
-}
-
-group("hdc_target_standard_test") {
-  deps = [ ":jdwp_test" ]
+  part_name = "hdc"
 }

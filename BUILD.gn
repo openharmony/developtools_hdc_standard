@@ -12,8 +12,8 @@
 # limitations under the License.
 
 import("//build/ohos.gni")
-HDC_PATH = "//developtools/hdc_standard"
-import("//developtools/hdc_standard/hdc.gni")
+HDC_PATH = "//developtools/hdc"
+import("//developtools/hdc/hdc.gni")
 
 declare_args() {
   # suggestion: uv threads number from 16 - 256
@@ -115,7 +115,7 @@ ohos_executable("hdcd") {
 
   install_enable = true
   subsystem_name = "developtools"
-  part_name = "hdc_standard"
+  part_name = "hdc"
 }
 
 ohos_executable("hdc_std") {
@@ -197,40 +197,21 @@ ohos_executable("hdc_std") {
   }
 
   subsystem_name = "developtools"
-  part_name = "hdc_standard"
+  part_name = "hdc"
 }
 
-group("hdc_target_standard") {
+group("hdc_target") {
   deps = [
     ":hdc_std",
     ":hdcd",
   ]
 }
 
-group("hdc_target_standard_linux") {
-  deps = [ ":hdc_std(//build/toolchain/linux:clang_x64)" ]
-}
-
-group("hdc_target_standard_mingw") {
-  deps = [ ":hdc_std(//build/toolchain/mingw:mingw_x86_64)" ]
-}
-
-group("hdc_target_standard_all") {
-  deps = [
-    ":hdc_target_standard",
-    ":hdc_target_standard_linux",
-    ":hdc_target_standard_mingw",
-  ]
-}
-
-group("hdc_target_standard_windows") {
-  deps = [
-    ":hdc_target_standard",
-    ":hdc_target_standard_mingw",
-  ]
+group("hdc_target_all") {
+  deps = [ ":hdc_target" ]
 }
 
 group("hdc_all") {
   testonly = true
-  deps = [ ":hdc_target_standard_all" ]
+  deps = [ ":hdc_target_all" ]
 }
