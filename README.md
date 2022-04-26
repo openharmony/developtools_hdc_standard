@@ -26,7 +26,7 @@ HDC mainly consists of three parts:
 
 ```
 /developtools
-├── hdc_standard # hdc code directory
+├── hdc # hdc code directory
 │ └── src
 │ ├── common # Code directory shared by the device side and the host side
 │ ├── daemon # Code directory on the device side

@@ -17,7 +17,7 @@ DIR=$(dirname $(realpath ${BASH_SOURCE[0]}))
 TOP=$(realpath $DIR/../../../../../..)
 
 HOST_OUT=$TOP/out/ohos-arm-release/
-TEST_OUT=$HOST_OUT/tests/unittest/developtools/hdc_standard/coverage
+TEST_OUT=$HOST_OUT/tests/unittest/developtools/hdc/coverage
 mkdir -p $TEST_OUT
 
 # collect and convert all gcno and gcda to test.info
