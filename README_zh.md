@@ -29,7 +29,7 @@ hdc主要有三部分组成：
 
 ```
 /developtools
-├── hdc_standard      # hdc代码目录
+├── hdc               # hdc代码目录
 │   └── src
 │       ├── common    # 设备端和host端公用的代码目录
 │       ├── daemon    # 设备端的代码目录 

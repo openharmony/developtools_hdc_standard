@@ -77,7 +77,7 @@ function build_lz4 ()
 
 function build_hdc ()
 {
-	pushd developtools_hdc_standard
+	pushd developtools_hdc
 	echo $STATICLIB
 	echo $INCLUDES
 
@@ -99,7 +99,7 @@ function build_hdc ()
 pushd $ohos_hdc_build
 
 if [ "X$KEEP" == "X" ]; then
-	for name in "developtools/hdc_standard" "third_party/libuv" "third_party/openssl" "third_party/bounds_checking_function" "third_party/lz4"; do
+	for name in "developtools/hdc" "third_party/libuv" "third_party/openssl" "third_party/bounds_checking_function" "third_party/lz4"; do
 		reponame=$(echo $name | sed "s/\//_/g")
 		if [ "$build_in_source" == "true" ] ; then
 			cp -ra ${ohos_root_real}/${name} ${reponame} || exit 1
