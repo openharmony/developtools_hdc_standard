@@ -55,10 +55,13 @@ protected:
     struct CtxFile {  // The structure cannot be initialized by MEMSET, will rename to CtxTransfer
         uint64_t fileSize;
         uint64_t indexIO;  // Id or written IO bytes
+        uint32_t fileCnt; // add for directory mode
+        bool isDir;       // add for directory mode
         uint64_t transferBegin;
         string localName;
         string localPath;
         string remotePath;
+        string localDirName;
         bool master;  // Document transmission initiative
         bool closeNotify;
         bool ioFinish;
@@ -69,7 +72,7 @@ protected:
         uv_fs_t fsOpenReq;
         uv_fs_t fsCloseReq;
         uv_fs_cb cb;
-        vector<string> taskQueue;
+        vector<string> taskQueue;  // save file list if directory send mode
         TransferConfig transferConfig;  // Used for network IO configuration initialization
     };
     // Just app-mode use
@@ -83,6 +86,7 @@ protected:
     static void OnFileOpen(uv_fs_t *req);
     static void OnFileClose(uv_fs_t *req);
     int GetSubFiles(const char *path, string filter, vector<string> *out);
+    int GetSubFilesRecursively(string path, string currentDirname, vector<string> *out);
     virtual void CheckMaster(CtxFile *context)
     {
     }

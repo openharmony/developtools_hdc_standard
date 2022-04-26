@@ -336,6 +336,42 @@ int HdcTransferBase::GetSubFiles(const char *path, string filter, vector<string>
     return retNum;
 }
 
+
+int HdcTransferBase::GetSubFilesRecursively(string path, string currentDirname, vector<string> *out)
+{
+    int retNum = 0;
+    uv_fs_t req = {};
+    uv_dirent_t dent;
+
+    WRITE_LOG(LOG_WARN, "GetSubFiles111 path = %s currentDirname = %s", path.c_str(), currentDirname.c_str());
+
+    if (!path.size()) {
+        return retNum;
+    }
+
+    if (uv_fs_scandir(nullptr, &req, path.c_str(), 0, nullptr) < 0) {
+        uv_fs_req_cleanup(&req);
+        return retNum;
+    }
+    while (uv_fs_scandir_next(&req, &dent) != UV_EOF) {
+        // Skip. File
+        if (strcmp(dent.name, ".") == 0 || strcmp(dent.name, "..") == 0)
+            continue;
+        if (!(static_cast<uint32_t>(dent.type) & UV_DIRENT_FILE)) {
+            WRITE_LOG(LOG_WARN, "subdir dent.name fileName = %s", dent.name);
+            GetSubFilesRecursively(path + Base::GetPathSep() + dent.name,
+                currentDirname + Base::GetPathSep() + dent.name, out);
+            continue;
+        }
+        string fileName = dent.name;
+        WRITE_LOG(LOG_WARN, "GetSubFile1111s fileName = %s", fileName.c_str());
+
+        out->push_back(currentDirname + Base::GetPathSep() + fileName);
+    }
+    uv_fs_req_cleanup(&req);
+    return retNum;
+}
+
 // https://en.cppreference.com/w/cpp/filesystem/is_directory
 // return true if file exist， false if file not exist
 bool HdcTransferBase::SmartSlavePath(string &cwd, string &localPath, const char *optName)
@@ -349,11 +385,48 @@ bool HdcTransferBase::SmartSlavePath(string &cwd, string &localPath, const char 
         WRITE_LOG(LOG_INFO, "%s", errStr.c_str());
         return true;
     }
+
+    string filename = optName;
+    bool isDir = false;
+    vector<string> dirs;
+    if (string::npos != filename.find('/')) {
+        WRITE_LOG(LOG_WARN, "dir mode create parent dir from linux system");
+        isDir = true;
+        Base::SplitString(filename, "/", dirs);
+    } else if (string::npos != filename.find('\\')) {
+        WRITE_LOG(LOG_WARN, "dir mode create parent dir from windows system");
+        Base::SplitString(filename, "\\", dirs);
+        isDir = true;
+    }
+
+    if (isDir) {
+        filename = dirs.back();
+        dirs.pop_back();
+        uv_fs_t req;
+
+        string mkdirPath = localPath.c_str();
+        string shortPath;
+        for (auto s : dirs) {
+            mkdirPath = mkdirPath + Base::GetPathSep() + s;
+            shortPath = shortPath + Base::GetPathSep() + s;
+            WRITE_LOG(LOG_INFO, "ready create dir = %s", mkdirPath.c_str());
+            int r = uv_fs_lstat(nullptr, &req, mkdirPath.c_str(), nullptr);
+            if (r < 0) {
+                WRITE_LOG(LOG_INFO, "path not exist create dir = %s", mkdirPath.c_str());
+                r = uv_fs_mkdir(nullptr, &req, mkdirPath.c_str(), 0750, nullptr);
+                if (r < 0) {
+                    WRITE_LOG(LOG_WARN, "create dir failed");
+                }
+            }
+        }
+        filename = shortPath + Base::GetPathSep() + filename;
+        WRITE_LOG(LOG_WARN, "filename = %s", filename.c_str());
+    }
     uv_fs_t req;
     int r = uv_fs_lstat(nullptr, &req, localPath.c_str(), nullptr);
     uv_fs_req_cleanup(&req);
     if (r == 0 && req.statbuf.st_mode & S_IFDIR) {  // is dir
-        localPath = Base::StringFormat("%s%c%s", localPath.c_str(), Base::GetPathSep(), optName);
+        localPath = Base::StringFormat("%s%c%s", localPath.c_str(), Base::GetPathSep(), filename.c_str());
     }
     return false;
 }

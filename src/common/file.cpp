@@ -100,11 +100,29 @@ bool HdcFile::SetMasterParameters(CtxFile *context, const char *command, int arg
         // master and server
         ExtractRelativePath(context->transferConfig.clientCwd, context->localPath);
     }
-    if (!Base::CheckDirectoryOrPath(context->localPath.c_str(), true, true, errStr)) {
-        LogMsg(MSG_FAIL, "%s", errStr.c_str());
-        return false;
-    }
+
     context->localName = Base::GetFullFilePath(context->localPath);
+
+    if (!Base::CheckDirectoryOrPath(context->localPath.c_str(), true, true, errStr)) {
+        context->isDir = true;
+
+        GetSubFilesRecursively(context->localPath, context->localName, &context->taskQueue);
+        if (context->taskQueue.size() == 0) {
+            LogMsg(MSG_OK, "Directory empty.");
+            return false;
+        }
+        context->fileCnt = 0;
+        context->localDirName = Base::GetPathWithoutFilename(context->localPath);
+
+        WRITE_LOG(LOG_WARN, "send directory file list %u %s", context->taskQueue.size(), context->taskQueue[0].c_str());
+        WRITE_LOG(LOG_WARN, "context->localDirName = %s", context->localDirName.c_str());
+
+        context->localName = context->taskQueue.back();
+        context->localPath = context->localDirName + context->localName;
+
+        WRITE_LOG(LOG_WARN, "localName = %s context->localPath = %s", context->localName.c_str(), context->localPath.c_str());
+        context->taskQueue.pop_back();
+    }
     return true;
 }
 
@@ -116,8 +134,9 @@ void HdcFile::CheckMaster(CtxFile *context)
 
 void HdcFile::WhenTransferFinish(CtxFile *context)
 {
-    WRITE_LOG(LOG_DEBUG, "HdcTransferBase OnFileClose");
+    WRITE_LOG(LOG_DEBUG, "HdcTransferBase WhenTransferFinish");
     uint8_t flag = 1;
+    context->fileCnt++;
     SendToAnother(CMD_FILE_FINISH, &flag, 1);
 }
 
@@ -126,7 +145,7 @@ void HdcFile::TransferSummary(CtxFile *context)
     uint64_t nMSec = Base::GetRuntimeMSec() - context->transferBegin;
     double fRate = static_cast<double>(context->indexIO) / nMSec;  // / /1000 * 1000 = 0
     if (context->indexIO >= context->fileSize) {
-        LogMsg(MSG_OK, "FileTransfer finish, Size:%lld time:%lldms rate:%.2lfkB/s", context->indexIO, nMSec, fRate);
+        LogMsg(MSG_OK, "FileTransfer finish, File count = %d, Size:%lld time:%lldms rate:%.2lfkB/s", context->fileCnt, context->indexIO, nMSec, fRate);
     } else {
         constexpr int bufSize = 1024;
         char buf[bufSize] = { 0 };
@@ -141,9 +160,9 @@ bool HdcFile::SlaveCheck(uint8_t *payload, const int payloadSize)
     bool ret = true;
     bool childRet = false;
     // parse option
-    string serialStrring((char *)payload, payloadSize);
+    string serialString((char *)payload, payloadSize);
     TransferConfig &stat = ctxNow.transferConfig;
-    SerialStruct::ParseFromString(stat, serialStrring);
+    SerialStruct::ParseFromString(stat, serialString);
     ctxNow.fileSize = stat.fileSize;
     ctxNow.localPath = stat.path;
     ctxNow.master = false;
@@ -171,6 +190,22 @@ bool HdcFile::SlaveCheck(uint8_t *payload, const int payloadSize)
     return ret;
 }
 
+void HdcFile::TransferNext(CtxFile *context)
+{
+    WRITE_LOG(LOG_WARN, "HdcFile::TransferNext");
+
+    context->localName = context->taskQueue.back();
+    context->localPath = context->localDirName + context->localName;
+    context->taskQueue.pop_back();
+    WRITE_LOG(LOG_WARN, "context->localName = %s context->localPath = %s queuesize:%d", context->localName.c_str(), context->localPath.c_str(), ctxNow.taskQueue.size());
+    do {
+        ++refCount;
+        uv_fs_open(loopTask, &context->fsOpenReq, context->localPath.c_str(), O_RDONLY, S_IWUSR | S_IRUSR, OnFileOpen);
+    } while (false);
+
+    return;
+}
+
 bool HdcFile::CommandDispatch(const uint16_t command, uint8_t *payload, const int payloadSize)
 {
     HdcTransferBase::CommandDispatch(command, payload, payloadSize);
@@ -186,11 +221,17 @@ bool HdcFile::CommandDispatch(const uint16_t command, uint8_t *payload, const in
             ret = SlaveCheck(payload, payloadSize);
             break;
         }
+
         case CMD_FILE_FINISH: {
             if (*payload) {  // close-step3
-                ctxNow.ioFinish = true;
-                --(*payload);
-                SendToAnother(CMD_FILE_FINISH, payload, 1);
+                WRITE_LOG(LOG_DEBUG, "Dir = %d taskQueue size = %d", ctxNow.isDir, ctxNow.taskQueue.size());
+                if (ctxNow.isDir && (ctxNow.taskQueue.size() > 0)) {
+                    TransferNext(&ctxNow);
+                } else {
+                    ctxNow.ioFinish = true;
+                    --(*payload);
+                    SendToAnother(CMD_FILE_FINISH, payload, 1);
+                }
             } else {  // close-step3
                 TransferSummary(&ctxNow);
                 TaskFinish();
