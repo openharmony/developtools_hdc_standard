@@ -11,9 +11,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import("//build/test.gni")
-import("//developtools/hdc_standard/hdc.gni")
-hdc_path = "//developtools/hdc_standard/"
-module_output_path = "developtools/hdc_standard/"
+import("//developtools/hdc/hdc.gni")
+hdc_path = "//developtools/hdc/"
+module_output_path = "developtools/hdc/"
 declare_args() {
   hdc_unit_test = true
 }
