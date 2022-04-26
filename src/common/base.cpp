@@ -894,6 +894,15 @@ namespace Base {
         return s;
     }
 
+    string GetPathWithoutFilename(const string &s)
+    {
+        size_t i = s.rfind(GetPathSep(), s.length());
+        if (i != string::npos) {
+            return (s.substr(0, i + 1));
+        }
+        return s;
+    }
+
     int CreateSocketPair(int *fds)
     {
 #ifndef _WIN32

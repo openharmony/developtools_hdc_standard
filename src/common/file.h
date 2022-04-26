@@ -27,6 +27,7 @@ public:
 
 protected:
 private:
+    void TransferNext(CtxFile *context);
     bool SlaveCheck(uint8_t *payload, const int payloadSize);
     void CheckMaster(CtxFile *context);
     void WhenTransferFinish(CtxFile *context);
