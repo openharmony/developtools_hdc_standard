@@ -21,6 +21,7 @@
 
 namespace Hdc {
 constexpr uint64_t HDC_TIME_CONVERT_BASE = 1000000000;
+constexpr int DEF_FILE_PERMISSION = 0750;
 
 HdcTransferBase::HdcTransferBase(HTaskInfo hTaskInfo)
     : HdcTaskBase(hTaskInfo)
@@ -381,7 +382,8 @@ bool HdcTransferBase::SmartSlavePath(string &cwd, string &localPath, const char 
         // slave and server
         ExtractRelativePath(cwd, localPath);
     }
-    if (Base::CheckDirectoryOrPath(localPath.c_str(), true, false, errStr)) {
+    mode_t mode = mode_t(~S_IFMT);
+    if (Base::CheckDirectoryOrPath(localPath.c_str(), true, false, errStr, mode)) {
         WRITE_LOG(LOG_INFO, "%s", errStr.c_str());
         return true;
     }
@@ -413,7 +415,7 @@ bool HdcTransferBase::SmartSlavePath(string &cwd, string &localPath, const char 
             int r = uv_fs_lstat(nullptr, &req, mkdirPath.c_str(), nullptr);
             if (r < 0) {
                 WRITE_LOG(LOG_INFO, "path not exist create dir = %s", mkdirPath.c_str());
-                r = uv_fs_mkdir(nullptr, &req, mkdirPath.c_str(), 0750, nullptr);
+                r = uv_fs_mkdir(nullptr, &req, mkdirPath.c_str(), DEF_FILE_PERMISSION, nullptr);
                 if (r < 0) {
                     WRITE_LOG(LOG_WARN, "create dir failed");
                 }
