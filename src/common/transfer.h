@@ -54,10 +54,12 @@ protected:
     // Static file context
     struct CtxFile {  // The structure cannot be initialized by MEMSET, will rename to CtxTransfer
         uint64_t fileSize;
-        uint64_t indexIO;  // Id or written IO bytes
+        uint64_t dirSize;
+        uint64_t indexIO; // Id or written IO bytes
         uint32_t fileCnt; // add for directory mode
         bool isDir;       // add for directory mode
         uint64_t transferBegin;
+        uint64_t transferDirBegin;
         string localName;
         string localPath;
         string remotePath;
