@@ -149,7 +149,7 @@ void HdcFile::TransferSummary(CtxFile *context)
                      (context->fileCnt > 1 ? context->transferDirBegin : context->transferBegin);
     uint64_t fSize = context->fileCnt > 1 ? context->dirSize : context->indexIO;
     double fRate = static_cast<double>(fSize) / nMSec; // / /1000 * 1000 = 0
-     if (context->indexIO >= context->fileSize) {
+    if (context->indexIO >= context->fileSize) {
         WRITE_LOG(LOG_INFO, "HdcFile::TransferSummary success");
         LogMsg(MSG_OK, "FileTransfer finish, File count = %d, Size:%lld time:%lldms rate:%.2lfkB/s",
                context->fileCnt, fSize, nMSec, fRate);
