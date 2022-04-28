@@ -1027,11 +1027,12 @@ namespace Base {
     }
 
     // Both absolute and relative paths support
-    bool CheckDirectoryOrPath(const char *localPath, bool pathOrDir, bool readWrite, string &errStr)
+    bool CheckDirectoryOrPath(const char *localPath, bool pathOrDir, bool readWrite, string &errStr, mode_t &fm)
     {
         if (pathOrDir) {  // filepath
             uv_fs_t req;
             mode_t mode;
+            fm = mode_t(~S_IFMT);
             int r = uv_fs_lstat(nullptr, &req, localPath, nullptr);
             if (r) {
                 constexpr int bufSize = 1024;
@@ -1043,7 +1044,9 @@ namespace Base {
             mode = req.statbuf.st_mode;
             uv_fs_req_cleanup(&req);
 
-            if ((r == 0) && (mode & S_IFREG)) {  // is file
+            if ((r == 0) && (mode & S_IFDIR)) {
+                fm = S_IFDIR;
+            } else if ((r == 0) && (mode & S_IFREG)) {  // is file
                 uv_fs_access(nullptr, &req, localPath, readWrite ? R_OK : W_OK, nullptr);
                 if (req.result) {
                     const char *op = readWrite ? "access R_OK" : "access W_OK";
@@ -1072,7 +1075,8 @@ namespace Base {
     bool CheckDirectoryOrPath(const char *localPath, bool pathOrDir, bool readWrite)
     {
         string strUnused;
-        return CheckDirectoryOrPath(localPath, pathOrDir, readWrite, strUnused);
+        mode_t mode = mode_t(~S_IFMT);
+        return CheckDirectoryOrPath(localPath, pathOrDir, readWrite, strUnused, mode);
     }
 
     // Using openssl encryption and decryption method, high efficiency; when encrypting more than 64 bytes,
