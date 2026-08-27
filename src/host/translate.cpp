@@ -13,6 +13,7 @@
  * limitations under the License.
  */
 #include "translate.h"
+#include "parse_port.h"
 
 namespace Hdc {
 namespace TranslateCommand {
@@ -123,9 +124,10 @@ namespace TranslateCommand {
                 outCmd->bJumpDo = true;
                 return stringError;
             }
-            int port = std::stoi(sport);
+            int port = 0;
             sockaddr_in addr;
-            if ((port <= 0 || port > MAX_IP_PORT) || uv_ip4_addr(ip.c_str(), port, &addr) < 0) {
+            if (!ParsePort(sport, port) || (port <= 0 || port > MAX_IP_PORT) ||
+                uv_ip4_addr(ip.c_str(), port, &addr) < 0) {
                 stringError = "IP:Port incorrect";
                 outCmd->bJumpDo = true;
             }
